@@ -1,0 +1,124 @@
+:root {
+  color: #3b2e20;
+  background: #f7efeb;
+  font-family:
+    Inter, ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 280px;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  overscroll-behavior: contain;
+}
+
+button,
+canvas {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 28rem;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 26%, rgba(255, 255, 255, 0.96), transparent 38%),
+    linear-gradient(180deg, #faf3f1 0%, #f4ebe7 58%, #e9ddd4 100%);
+  isolation: isolate;
+}
+
+.app-shell::after {
+  position: absolute;
+  right: 8%;
+  bottom: 7%;
+  left: 8%;
+  height: 18%;
+  border-radius: 50%;
+  background: rgba(178, 136, 95, 0.08);
+  filter: blur(34px);
+  content: "";
+  pointer-events: none;
+}
+
+.app-shell canvas {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  touch-action: pan-y;
+}
+
+.app-shell--fallback {
+  display: grid;
+  place-items: center;
+}
+
+.status-card {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  max-width: min(24rem, calc(100% - 2rem));
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(83, 59, 35, 0.1);
+  border-radius: 999px;
+  color: rgba(59, 46, 32, 0.72);
+  background: rgba(255, 252, 244, 0.76);
+  box-shadow: 0 12px 40px rgba(84, 57, 34, 0.08);
+  font-size: 0.875rem;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(16px);
+}
+
+.fallback-butter {
+  width: min(76vw, 34rem);
+  aspect-ratio: 3.55;
+  border-radius: 1.4rem;
+  background: linear-gradient(145deg, #fff09a, #efbd42);
+  box-shadow:
+    inset 0 2px 7px rgba(255, 255, 255, 0.66),
+    0 26px 40px rgba(97, 62, 24, 0.16);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-height: 520px) {
+  .app-shell {
+    min-height: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}
