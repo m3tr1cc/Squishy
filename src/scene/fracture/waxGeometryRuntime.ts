@@ -12,6 +12,8 @@ export type WaxFragmentPoses = {
   readonly quaternions: Float32Array
 }
 
+type BondIndexArray = Uint16Array | Uint32Array
+
 export type WaxGeometryRuntime = {
   readonly geometry: THREE.BufferGeometry
   readonly restPositions: Float32Array
@@ -22,8 +24,20 @@ export type WaxGeometryRuntime = {
   readonly surfaceKinds: Uint8Array
   readonly pivots: Float32Array
   readonly peelAxes: Float32Array
+  readonly seamInfluenceStarts: Uint32Array
+  readonly seamInfluenceBondIds: BondIndexArray
+  readonly seamInfluenceSigns: Int8Array
+  readonly seamInfluenceWeights: Uint8Array
+  readonly seamBondDirections: Float32Array
+  readonly seamBondOpenings: Float32Array
   readonly poseScratch: WaxFragmentPoses
 }
+
+const MIN_SEAM_OPENING = 0.012
+const MAX_SEAM_OPENING = 0.028
+const MAX_SEAM_HALF_DISPLACEMENT = MAX_SEAM_OPENING * 0.5
+const FULL_SEAM_WEIGHT = 255
+const SMOOTHED_SEAM_WEIGHT = Math.round(FULL_SEAM_WEIGHT * 0.35)
 
 const positionScratch = new THREE.Vector3()
 const pivotScratch = new THREE.Vector3()
@@ -57,6 +71,256 @@ function choosePeelAxis(
   return [axisX / length, axisY / length, axisZ / length] as const
 }
 
+function createBondIndexArray(length: number, bondCount: number) {
+  return bondCount <= 0xffff
+    ? new Uint16Array(length)
+    : new Uint32Array(length)
+}
+
+function buildSourceNeighbors(topology: WaxTopology) {
+  const neighbors = Array.from(
+    { length: topology.source.vertexCount },
+    () => new Set<number>(),
+  )
+  const indices = topology.source.indices
+
+  for (let offset = 0; offset < indices.length; offset += 3) {
+    const a = indices[offset]
+    const b = indices[offset + 1]
+    const c = indices[offset + 2]
+    neighbors[a].add(b)
+    neighbors[a].add(c)
+    neighbors[b].add(a)
+    neighbors[b].add(c)
+    neighbors[c].add(a)
+    neighbors[c].add(b)
+  }
+
+  return neighbors
+}
+
+function createSeamInfluences(
+  topology: WaxTopology,
+  fragmentIds: Uint16Array,
+  sourceVertexIds: Uint32Array,
+) {
+  const outputVerticesByFragment = Array.from(
+    { length: topology.plateCount },
+    () => new Map<number, number[]>(),
+  )
+  for (let vertex = 0; vertex < fragmentIds.length; vertex += 1) {
+    const fragmentMap = outputVerticesByFragment[fragmentIds[vertex]]
+    const sourceVertex = sourceVertexIds[vertex]
+    const outputVertices = fragmentMap.get(sourceVertex)
+    if (outputVertices) {
+      outputVertices.push(vertex)
+    } else {
+      fragmentMap.set(sourceVertex, [vertex])
+    }
+  }
+
+  const boundaryVerticesByFragment = Array.from(
+    { length: topology.plateCount },
+    () => new Set<number>(),
+  )
+  for (const bond of topology.bonds) {
+    const boundaryA = boundaryVerticesByFragment[bond.fragmentA]
+    const boundaryB = boundaryVerticesByFragment[bond.fragmentB]
+    for (
+      let cursor = 0;
+      cursor < bond.boundaryVertexIndices.length;
+      cursor += 1
+    ) {
+      const sourceVertex = bond.boundaryVertexIndices[cursor]
+      boundaryA.add(sourceVertex)
+      boundaryB.add(sourceVertex)
+    }
+  }
+
+  const sourceNeighbors = buildSourceNeighbors(topology)
+  const recordsByVertex = new Map<
+    number,
+    Map<number, { sign: -1 | 1; weight: number }>
+  >()
+  const seamBondDirections = new Float32Array(topology.bonds.length * 3)
+  const seamBondOpenings = new Float32Array(topology.bonds.length)
+  const meanBondLength =
+    topology.bonds.length > 0
+      ? topology.bonds.reduce((sum, bond) => sum + bond.length, 0) /
+        topology.bonds.length
+      : 1
+
+  function addInfluence(
+    outputVertex: number,
+    bondIndex: number,
+    sign: -1 | 1,
+    weight: number,
+  ) {
+    let records = recordsByVertex.get(outputVertex)
+    if (!records) {
+      records = new Map()
+      recordsByVertex.set(outputVertex, records)
+    }
+    const existing = records.get(bondIndex)
+    if (!existing || weight > existing.weight) {
+      records.set(bondIndex, { sign, weight })
+    }
+  }
+
+  function addFragmentInfluence(
+    fragmentId: number,
+    sourceVertex: number,
+    bondIndex: number,
+    sign: -1 | 1,
+    weight: number,
+  ) {
+    const outputVertices =
+      outputVerticesByFragment[fragmentId].get(sourceVertex)
+    if (!outputVertices) {
+      return
+    }
+    for (const outputVertex of outputVertices) {
+      addInfluence(outputVertex, bondIndex, sign, weight)
+    }
+  }
+
+  for (let bondIndex = 0; bondIndex < topology.bonds.length; bondIndex += 1) {
+    const bond = topology.bonds[bondIndex]
+    const fragmentA = topology.fragments[bond.fragmentA]
+    const fragmentB = topology.fragments[bond.fragmentB]
+    let directionX = fragmentB.centroid[0] - fragmentA.centroid[0]
+    let directionY = fragmentB.centroid[1] - fragmentA.centroid[1]
+    let directionZ = fragmentB.centroid[2] - fragmentA.centroid[2]
+    let normalX = 0
+    let normalY = 0
+    let normalZ = 0
+
+    for (
+      let cursor = 0;
+      cursor < bond.boundaryVertexIndices.length;
+      cursor += 1
+    ) {
+      const sourceOffset = bond.boundaryVertexIndices[cursor] * 3
+      normalX += topology.source.normals[sourceOffset]
+      normalY += topology.source.normals[sourceOffset + 1]
+      normalZ += topology.source.normals[sourceOffset + 2]
+    }
+    const normalLength = Math.hypot(normalX, normalY, normalZ)
+    if (normalLength > 1e-6) {
+      normalX /= normalLength
+      normalY /= normalLength
+      normalZ /= normalLength
+      const normalDot =
+        directionX * normalX + directionY * normalY + directionZ * normalZ
+      directionX -= normalX * normalDot
+      directionY -= normalY * normalDot
+      directionZ -= normalZ * normalDot
+    }
+    let directionLength = Math.hypot(directionX, directionY, directionZ)
+    if (directionLength < 1e-6) {
+      directionX = bond.midpoint[0] - fragmentA.centroid[0]
+      directionY = bond.midpoint[1] - fragmentA.centroid[1]
+      directionZ = bond.midpoint[2] - fragmentA.centroid[2]
+      directionLength = Math.max(
+        1e-6,
+        Math.hypot(directionX, directionY, directionZ),
+      )
+    }
+    const directionOffset = bondIndex * 3
+    seamBondDirections[directionOffset] = directionX / directionLength
+    seamBondDirections[directionOffset + 1] = directionY / directionLength
+    seamBondDirections[directionOffset + 2] = directionZ / directionLength
+    const relativeLength = Math.min(
+      1,
+      bond.length / Math.max(meanBondLength * 1.75, 1e-6),
+    )
+    seamBondOpenings[bondIndex] =
+      MIN_SEAM_OPENING +
+      (MAX_SEAM_OPENING - MIN_SEAM_OPENING) * relativeLength
+
+    const fragmentSides = [
+      [bond.fragmentA, -1],
+      [bond.fragmentB, 1],
+    ] as const
+    for (const [fragmentId, sign] of fragmentSides) {
+      const fragmentMap = outputVerticesByFragment[fragmentId]
+      const fragmentBoundary = boundaryVerticesByFragment[fragmentId]
+
+      for (
+        let cursor = 0;
+        cursor < bond.boundaryVertexIndices.length;
+        cursor += 1
+      ) {
+        const sourceVertex = bond.boundaryVertexIndices[cursor]
+        addFragmentInfluence(
+          fragmentId,
+          sourceVertex,
+          bondIndex,
+          sign,
+          FULL_SEAM_WEIGHT,
+        )
+
+        // Taper the displacement over one source-mesh ring. Other boundary
+        // vertices are excluded so an unrelated intact seam is not opened.
+        for (const neighbor of sourceNeighbors[sourceVertex]) {
+          if (
+            fragmentMap.has(neighbor) &&
+            !fragmentBoundary.has(neighbor)
+          ) {
+            addFragmentInfluence(
+              fragmentId,
+              neighbor,
+              bondIndex,
+              sign,
+              SMOOTHED_SEAM_WEIGHT,
+            )
+          }
+        }
+      }
+    }
+  }
+
+  const seamInfluenceStarts = new Uint32Array(fragmentIds.length + 1)
+  let influenceCount = 0
+  for (let vertex = 0; vertex < fragmentIds.length; vertex += 1) {
+    seamInfluenceStarts[vertex] = influenceCount
+    influenceCount += recordsByVertex.get(vertex)?.size ?? 0
+  }
+  seamInfluenceStarts[fragmentIds.length] = influenceCount
+
+  const seamInfluenceBondIds = createBondIndexArray(
+    influenceCount,
+    topology.bonds.length,
+  )
+  const seamInfluenceSigns = new Int8Array(influenceCount)
+  const seamInfluenceWeights = new Uint8Array(influenceCount)
+  let cursor = 0
+  for (let vertex = 0; vertex < fragmentIds.length; vertex += 1) {
+    const records = recordsByVertex.get(vertex)
+    if (!records) {
+      continue
+    }
+    const orderedRecords = [...records.entries()].sort(
+      (left, right) => left[0] - right[0],
+    )
+    for (const [bondIndex, record] of orderedRecords) {
+      seamInfluenceBondIds[cursor] = bondIndex
+      seamInfluenceSigns[cursor] = record.sign
+      seamInfluenceWeights[cursor] = record.weight
+      cursor += 1
+    }
+  }
+
+  return {
+    seamInfluenceStarts,
+    seamInfluenceBondIds,
+    seamInfluenceSigns,
+    seamInfluenceWeights,
+    seamBondDirections,
+    seamBondOpenings,
+  }
+}
+
 export function createWaxGeometryRuntime(
   topology: WaxTopology,
 ): WaxGeometryRuntime {
@@ -73,8 +337,15 @@ export function createWaxGeometryRuntime(
   const shellOffsets = geometry.getAttribute('shellOffset')
   const fragmentIds = geometry.getAttribute('fragmentId')
   const surfaceKinds = geometry.getAttribute('surfaceKind')
+  const fragmentIdValues = new Uint16Array(fragmentIds.array)
+  const sourceVertexIdValues = new Uint32Array(sourceVertexIds.array)
   const pivots = new Float32Array(topology.plateCount * 3)
   const peelAxes = new Float32Array(topology.plateCount * 3)
+  const seamInfluences = createSeamInfluences(
+    topology,
+    fragmentIdValues,
+    sourceVertexIdValues,
+  )
 
   for (const fragment of topology.fragments) {
     const offset = fragment.id * 3
@@ -101,12 +372,13 @@ export function createWaxGeometryRuntime(
     geometry,
     restPositions: new Float32Array(positions.array),
     restNormals: new Float32Array(normals.array),
-    sourceVertexIds: new Uint32Array(sourceVertexIds.array),
+    sourceVertexIds: sourceVertexIdValues,
     shellOffsets: new Float32Array(shellOffsets.array),
-    fragmentIds: new Uint16Array(fragmentIds.array),
+    fragmentIds: fragmentIdValues,
     surfaceKinds: new Uint8Array(surfaceKinds.array),
     pivots,
     peelAxes,
+    ...seamInfluences,
     poseScratch: {
       valid: new Uint8Array(topology.plateCount),
       positions: new Float32Array(topology.plateCount * 3),
@@ -118,7 +390,6 @@ export function createWaxGeometryRuntime(
 export function writeWaxGeometry({
   runtime,
   topology,
-  fractureModel,
   fractureState,
   impacts,
   peelAmounts,
@@ -212,30 +483,63 @@ export function writeWaxGeometry({
       const pivotX = runtime.pivots[fragmentOffset]
       const pivotY = runtime.pivots[fragmentOffset + 1]
       const pivotZ = runtime.pivots[fragmentOffset + 2]
-      const degree =
-        fractureModel.incidentStarts[fragmentId + 1] -
-        fractureModel.incidentStarts[fragmentId]
-      const brokenRatio =
-        degree > 0
-          ? fractureState.fragmentBrokenBonds[fragmentId] / degree
-          : 0
-      const crackRetraction = Math.min(0.04, brokenRatio * 0.05)
-      const tangentialScale = 1 - crackRetraction
+      let seamX = 0
+      let seamY = 0
+      let seamZ = 0
+      const influenceStart = runtime.seamInfluenceStarts[vertex]
+      const influenceEnd = runtime.seamInfluenceStarts[vertex + 1]
+      for (
+        let influence = influenceStart;
+        influence < influenceEnd;
+        influence += 1
+      ) {
+        const bondIndex = runtime.seamInfluenceBondIds[influence]
+        if (fractureState.bondBroken[bondIndex] === 0) {
+          continue
+        }
+        const seamProgress = Math.min(
+          1,
+          Math.max(0, fractureState.bondSeamOpen[bondIndex]),
+        )
+        if (seamProgress <= 1e-5) {
+          continue
+        }
+        const directionOffset = bondIndex * 3
+        const signedHalfOpening =
+          runtime.seamInfluenceSigns[influence] *
+          runtime.seamBondOpenings[bondIndex] *
+          0.5 *
+          seamProgress *
+          (runtime.seamInfluenceWeights[influence] / FULL_SEAM_WEIGHT)
+        seamX +=
+          runtime.seamBondDirections[directionOffset] * signedHalfOpening
+        seamY +=
+          runtime.seamBondDirections[directionOffset + 1] * signedHalfOpening
+        seamZ +=
+          runtime.seamBondDirections[directionOffset + 2] * signedHalfOpening
+      }
+      const seamLength = Math.hypot(seamX, seamY, seamZ)
+      if (seamLength > MAX_SEAM_HALF_DISPLACEMENT) {
+        const scale = MAX_SEAM_HALF_DISPLACEMENT / seamLength
+        seamX *= scale
+        seamY *= scale
+        seamZ *= scale
+      }
 
       x =
-        pivotX +
-        (sourceX + surfaceNormalX * shellOffset - pivotX) *
-          tangentialScale -
+        sourceX +
+        surfaceNormalX * shellOffset +
+        seamX -
         surfaceNormalX * dent
       y =
-        pivotY +
-        (sourceY + surfaceNormalY * shellOffset - pivotY) *
-          tangentialScale -
+        sourceY +
+        surfaceNormalY * shellOffset +
+        seamY -
         surfaceNormalY * dent
       z =
-        pivotZ +
-        (sourceZ + surfaceNormalZ * shellOffset - pivotZ) *
-          tangentialScale -
+        sourceZ +
+        surfaceNormalZ * shellOffset +
+        seamZ -
         surfaceNormalZ * dent
 
       const peel = peelAmounts[fragmentId]

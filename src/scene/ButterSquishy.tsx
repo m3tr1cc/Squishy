@@ -60,6 +60,7 @@ import type {
 const LazyRapierDebris = lazy(() => import('./fracture/RapierDebris'))
 
 type ButterSquishyProps = {
+  coatingSeed: number
   reducedMotion: boolean
   onComplete: () => void
   onImpact?: (impact: SquishyImpact) => void
@@ -100,10 +101,26 @@ type DebrisClusterBinding = Readonly<{
 }>
 
 const DEFAULT_NORMAL = [0, 0, 1] as const
-const PRESENTATION_ROTATION = [-0.055, -0.11, 0] as const
+export const PRESENTATION_ROTATION = [0, 0, 0] as const
+export const WAX_OUTER_MATERIAL = {
+  attenuationColor: '#ddd8cf',
+  attenuationDistance: 0.35,
+  color: '#e8e4dc',
+  clearcoat: 0,
+  ior: 1.44,
+  metalness: 0,
+  opacity: 1,
+  roughness: 0.74,
+  sheen: 0.03,
+  specularIntensity: 0.25,
+  thickness: 0.049,
+  transmission: 0.1,
+  transparent: false,
+} as const
 const MINIMUM_TAP_PULSE_SECONDS = 0.16
 const TOUCH_DAMAGE_DELAY_SECONDS = 0.08
-const MAX_DEBRIS_CLUSTER_SIZE = 6
+const MAX_DEBRIS_CLUSTER_SIZE = 4
+const MAX_COLLIDER_SUPPORT_POINTS = 48
 const NO_RAYCAST = () => null
 const REDUCED_PRESS_SPRING = {
   ...PRESS_SPRING,
@@ -111,6 +128,110 @@ const REDUCED_PRESS_SPRING = {
 } as const
 
 let impactSequence = 0
+
+function hashUint32(value: number) {
+  let hash = value >>> 0
+  hash ^= hash >>> 16
+  hash = Math.imul(hash, 0x7feb352d)
+  hash ^= hash >>> 15
+  hash = Math.imul(hash, 0x846ca68b)
+  hash ^= hash >>> 16
+  return hash >>> 0
+}
+
+function chooseDebrisClusterSize(seed: number, maximum: number) {
+  const roll = hashUint32(seed) / 0x100000000
+  const target = roll < 0.35 ? 1 : roll < 0.7 ? 2 : roll < 0.9 ? 3 : 4
+  return Math.min(maximum, target)
+}
+
+export function selectColliderSupportPoints(
+  vertices: ArrayLike<number>,
+  maximumPointCount = MAX_COLLIDER_SUPPORT_POINTS,
+) {
+  if (
+    !Number.isInteger(maximumPointCount) ||
+    maximumPointCount < 4
+  ) {
+    throw new Error('maximumPointCount must be an integer of at least four')
+  }
+
+  const pointCount = Math.floor(vertices.length / 3)
+  if (pointCount <= maximumPointCount) {
+    return Float32Array.from(vertices)
+  }
+
+  const selected = new Uint8Array(pointCount)
+  const indices: number[] = []
+  const addIndex = (index: number) => {
+    if (selected[index] === 0) {
+      selected[index] = 1
+      indices.push(index)
+    }
+  }
+
+  for (let axis = 0; axis < 3; axis += 1) {
+    let minimumIndex = 0
+    let maximumIndex = 0
+    let minimum = Number.POSITIVE_INFINITY
+    let maximum = Number.NEGATIVE_INFINITY
+    for (let point = 0; point < pointCount; point += 1) {
+      const value = vertices[point * 3 + axis]
+      if (value < minimum) {
+        minimum = value
+        minimumIndex = point
+      }
+      if (value > maximum) {
+        maximum = value
+        maximumIndex = point
+      }
+    }
+    addIndex(minimumIndex)
+    addIndex(maximumIndex)
+  }
+
+  while (indices.length < maximumPointCount) {
+    let candidateIndex = -1
+    let candidateDistance = -1
+    for (let point = 0; point < pointCount; point += 1) {
+      if (selected[point] !== 0) {
+        continue
+      }
+      const pointOffset = point * 3
+      let nearestDistance = Number.POSITIVE_INFINITY
+      for (const chosen of indices) {
+        const chosenOffset = chosen * 3
+        const deltaX =
+          vertices[pointOffset] - vertices[chosenOffset]
+        const deltaY =
+          vertices[pointOffset + 1] - vertices[chosenOffset + 1]
+        const deltaZ =
+          vertices[pointOffset + 2] - vertices[chosenOffset + 2]
+        const distance =
+          deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ
+        nearestDistance = Math.min(nearestDistance, distance)
+      }
+      if (nearestDistance > candidateDistance) {
+        candidateDistance = nearestDistance
+        candidateIndex = point
+      }
+    }
+    if (candidateIndex < 0 || candidateDistance <= 1e-10) {
+      break
+    }
+    addIndex(candidateIndex)
+  }
+
+  const supportPoints = new Float32Array(indices.length * 3)
+  for (let index = 0; index < indices.length; index += 1) {
+    const sourceOffset = indices[index] * 3
+    const outputOffset = index * 3
+    supportPoints[outputOffset] = vertices[sourceOffset]
+    supportPoints[outputOffset + 1] = vertices[sourceOffset + 1]
+    supportPoints[outputOffset + 2] = vertices[sourceOffset + 2]
+  }
+  return supportPoints
+}
 
 function normalizePointerType(value: string): SurfaceHit['pointerType'] {
   if (value === 'touch' || value === 'pen') {
@@ -149,6 +270,7 @@ export function groupConnectedFragments(
   fragmentIndices: readonly number[],
   fragments: readonly FragmentAdjacency[],
   maximumClusterSize = MAX_DEBRIS_CLUSTER_SIZE,
+  coatingSeed = 0,
 ) {
   if (
     !Number.isInteger(maximumClusterSize) ||
@@ -169,10 +291,14 @@ export function groupConnectedFragments(
     }
 
     const cluster = [seed]
+    const targetClusterSize = chooseDebrisClusterSize(
+      coatingSeed ^ Math.imul(seed + 1, 0x9e3779b1),
+      maximumClusterSize,
+    )
     for (
       let cursor = 0;
       cursor < cluster.length &&
-      cluster.length < maximumClusterSize;
+      cluster.length < targetClusterSize;
       cursor += 1
     ) {
       const neighbors = fragments[cluster[cursor]]?.neighborFragmentIds
@@ -182,7 +308,7 @@ export function groupConnectedFragments(
       for (
         let neighborCursor = 0;
         neighborCursor < neighbors.length &&
-        cluster.length < maximumClusterSize;
+        cluster.length < targetClusterSize;
         neighborCursor += 1
       ) {
         const neighbor = neighbors[neighborCursor]
@@ -198,13 +324,13 @@ export function groupConnectedFragments(
 }
 
 export function ButterSquishy({
+  coatingSeed,
   reducedMotion,
   onComplete,
   onImpact,
 }: ButterSquishyProps) {
   const presentationRef = useRef<THREE.Group>(null)
   const compressionRef = useRef<THREE.Group>(null)
-  const hoverLightRef = useRef<THREE.PointLight>(null)
   const innerGeometry = useMemo(() => createRoundedCuboidGeometry(), [])
   const labelGeometry = useMemo(() => createButterLabelGeometry(), [])
   const labelTexture = useMemo(createButterLabelTexture, [])
@@ -217,8 +343,12 @@ export function ButterSquishy({
     [labelGeometry],
   )
   const waxTopology = useMemo(
-    () => createWaxTopology({ sourceGeometry: innerGeometry }),
-    [innerGeometry],
+    () =>
+      createWaxTopology({
+        sourceGeometry: innerGeometry,
+        seed: coatingSeed,
+      }),
+    [coatingSeed, innerGeometry],
   )
   const waxRuntime = useMemo(
     () => createWaxGeometryRuntime(waxTopology),
@@ -239,15 +369,19 @@ export function ButterSquishy({
             fragmentB: bond.fragmentB,
             length: bond.length,
             toughness: bond.toughness,
+            role: bond.fractureRole,
           })),
         },
         {
-          propagationRadius: 0.52,
-          damagePerSecond: 5.2,
-          holdRampSeconds: 0.22,
-          holdStrength: 0.9,
-          crackContinuation: 0.3,
-          globalCompressionFatigue: 0.035,
+          propagationRadius: 0.78,
+          damagePerSecond: 4.2,
+          holdRampSeconds: 0.25,
+          holdStrength: 0.8,
+          crackContinuation: 0.32,
+          globalCompressionFatigue: 0.01,
+          tipStressTransfer: 0.55,
+          tipStressDecay: 0.82,
+          maxTipBranches: 2,
           peelBrokenRatio: 0.78,
           detachBrokenRatio: 0.99,
           minimumPeelSeconds: 0.22,
@@ -267,9 +401,6 @@ export function ButterSquishy({
   const geometryDirtyRef = useRef(true)
   const bodyNeedsRestoreRef = useRef(true)
   const historyRef = useRef<SquishyImpact[]>([])
-  const hoverTargetRef = useRef(new THREE.Vector3(0, 0, 2))
-  const hoverStrengthRef = useRef(0)
-  const hoverGoalRef = useRef(0)
   const introRef = useRef({
     value: reducedMotion ? 1 : 0.72,
     velocity: 0,
@@ -315,7 +446,7 @@ export function ButterSquishy({
         id: 'tabletop',
         kind: 'cuboid',
         halfExtents: [20, 0.05, 20],
-        position: [0, GROUND_Y - 0.085, 0],
+        position: [0, GROUND_Y - 0.05, 0],
         friction: 0.94,
         restitution: 0.01,
       },
@@ -392,15 +523,6 @@ export function ButterSquishy({
     bodyNeedsRestoreRef.current = true
     geometryDirtyRef.current = true
     return dent
-  }, [])
-
-  const setHoverTarget = useCallback((hit: SurfaceHit) => {
-    hoverTargetRef.current.set(
-      hit.worldPoint[0] + hit.worldNormal[0] * 0.16,
-      hit.worldPoint[1] + hit.worldNormal[1] * 0.16,
-      hit.worldPoint[2] + hit.worldNormal[2] * 0.16,
-    )
-    hoverGoalRef.current = hit.layer === 'wax' ? 1 : 0.35
   }, [])
 
   const hitFromEvent = useCallback(
@@ -562,19 +684,14 @@ export function ButterSquishy({
 
       if (hit.pointerType !== 'touch') {
         rememberImpact(hit)
-        setHoverTarget(hit)
-      } else {
-        // Touch has no persistent hover state. Keeping the pointer-following
-        // light active after a tap can wash out the fine crack edges.
-        hoverGoalRef.current = 0
       }
       lastInteractionRef.current = performance.now()
     },
-    [addDent, hitFromEvent, rememberImpact, setHoverTarget],
+    [addDent, hitFromEvent, rememberImpact],
   )
 
   const handlePointerMove = useCallback(
-    (event: ThreeEvent<PointerEvent>, layer: SurfaceLayer) => {
+    (event: ThreeEvent<PointerEvent>) => {
       const active = activePressesRef.current.get(
         event.nativeEvent.pointerId,
       )
@@ -591,20 +708,9 @@ export function ButterSquishy({
             false,
           )
         }
-        return
-      }
-
-      if (event.nativeEvent.pointerType === 'touch') {
-        return
-      }
-
-      const hit = hitFromEvent(event, layer)
-      if (hit) {
-        setHoverTarget(hit)
-        lastInteractionRef.current = performance.now()
       }
     },
-    [hitFromEvent, releaseActivePress, setHoverTarget],
+    [releaseActivePress],
   )
 
   const handlePointerUp = useCallback(
@@ -640,7 +746,6 @@ export function ButterSquishy({
         event.nativeEvent.clientY,
         false,
       )
-      hoverGoalRef.current = 0
     },
     [releaseActivePress],
   )
@@ -783,7 +888,7 @@ export function ButterSquishy({
         localOffsets[bindingOffset + 2] = localPivot.z
 
         const vertexRange = fragment.vertexRange
-        const colliderVertices = new Float32Array(
+        const fullColliderVertices = new Float32Array(
           vertexRange.count * 3,
         )
         for (let cursor = 0; cursor < vertexRange.count; cursor += 1) {
@@ -794,12 +899,12 @@ export function ButterSquishy({
             .applyMatrix4(parent.matrixWorld)
             .sub(worldPivot)
             .applyQuaternion(inverseParentQuaternion)
-          colliderVertices[outputOffset] = worldVertex.x
-          colliderVertices[outputOffset + 1] = worldVertex.y
-          colliderVertices[outputOffset + 2] = worldVertex.z
+          fullColliderVertices[outputOffset] = worldVertex.x
+          fullColliderVertices[outputOffset + 1] = worldVertex.y
+          fullColliderVertices[outputOffset + 2] = worldVertex.z
         }
         colliders.push({
-          vertices: colliderVertices,
+          vertices: selectColliderSupportPoints(fullColliderVertices),
           position: [
             localOffsets[bindingOffset],
             localOffsets[bindingOffset + 1],
@@ -931,7 +1036,7 @@ export function ButterSquishy({
     [fractureModel, handleDebrisTransform],
   )
 
-  useFrame((state, delta) => {
+  useFrame((_, delta) => {
     const now = performance.now()
     const impacts = impactsRef.current
     const activeDents = activeDentsRef.current
@@ -1040,6 +1145,8 @@ export function ButterSquishy({
       const connectedGroups = groupConnectedFragments(
         detachedFragments,
         waxTopology.fragments,
+        MAX_DEBRIS_CLUSTER_SIZE,
+        coatingSeed,
       )
       for (const group of connectedGroups) {
         const cluster = createDebrisCluster(group)
@@ -1153,28 +1260,6 @@ export function ButterSquishy({
       presentationRef.current.scale.setScalar(scale)
     }
 
-    const hoverEase = 1 - Math.exp(-delta * 14)
-    hoverStrengthRef.current = THREE.MathUtils.lerp(
-      hoverStrengthRef.current,
-      hoverGoalRef.current,
-      hoverEase,
-    )
-    if (hoverLightRef.current) {
-      hoverLightRef.current.position.lerp(
-        hoverTargetRef.current,
-        hoverEase,
-      )
-      hoverLightRef.current.intensity =
-        1.7 * hoverStrengthRef.current
-    }
-
-    if (
-      state.pointer.x === 0 &&
-      state.pointer.y === 0 &&
-      hoverGoalRef.current === 0
-    ) {
-      hoverStrengthRef.current = 0
-    }
   })
 
   const handleWaxPointerDown = useCallback(
@@ -1188,13 +1273,11 @@ export function ButterSquishy({
     [handlePointerDown],
   )
   const handleWaxPointerMove = useCallback(
-    (event: ThreeEvent<PointerEvent>) =>
-      handlePointerMove(event, 'wax'),
+    (event: ThreeEvent<PointerEvent>) => handlePointerMove(event),
     [handlePointerMove],
   )
   const handleButterPointerMove = useCallback(
-    (event: ThreeEvent<PointerEvent>) =>
-      handlePointerMove(event, 'butter'),
+    (event: ThreeEvent<PointerEvent>) => handlePointerMove(event),
     [handlePointerMove],
   )
 
@@ -1223,15 +1306,15 @@ export function ButterSquishy({
           <mesh
             geometry={labelGeometry}
             raycast={NO_RAYCAST}
-            renderOrder={0}
+            renderOrder={1}
           >
             <meshBasicMaterial
               map={labelTexture}
-              transparent
-              depthTest={false}
-              depthWrite={false}
+              transparent={false}
+              depthTest
+              depthWrite
               alphaTest={0.015}
-              opacity={0.94}
+              opacity={1}
               polygonOffset
               polygonOffsetFactor={-7}
               toneMapped={false}
@@ -1242,49 +1325,55 @@ export function ButterSquishy({
             castShadow
             receiveShadow
             frustumCulled={false}
-            renderOrder={1}
             onPointerMove={handleWaxPointerMove}
             onPointerDown={handleWaxPointerDown}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerCancel}
             onPointerOver={() => {
-              hoverGoalRef.current = 1
               document.body.style.cursor = 'pointer'
             }}
             onPointerOut={() => {
-              if (activePressesRef.current.size === 0) {
-                hoverGoalRef.current = 0
-              }
               document.body.style.cursor = ''
             }}
           >
             <meshPhysicalMaterial
               attach="material-0"
-              color="#ffe17b"
-              clearcoat={0.42}
-              clearcoatRoughness={0.31}
-              ior={1.42}
-              metalness={0}
-              roughness={0.44}
-              sheen={0.16}
-              sheenColor="#fff3bd"
+              {...WAX_OUTER_MATERIAL}
             />
             <meshStandardMaterial
               attach="material-1"
-              color="#bd811d"
+              color="#d2ccc2"
               metalness={0}
-              roughness={0.62}
-              side={THREE.DoubleSide}
+              roughness={0.82}
+              side={THREE.FrontSide}
             />
             <meshStandardMaterial
               attach="material-2"
-              color="#8f5512"
+              color="#b8b0a4"
               metalness={0}
               polygonOffset
               polygonOffsetFactor={4}
               polygonOffsetUnits={4}
-              roughness={0.72}
-              side={THREE.DoubleSide}
+              roughness={0.88}
+              side={THREE.FrontSide}
+            />
+          </mesh>
+          <mesh
+            geometry={labelGeometry}
+            position={[0, 0, 0.058]}
+            raycast={NO_RAYCAST}
+            renderOrder={3}
+          >
+            <meshBasicMaterial
+              map={labelTexture}
+              transparent
+              depthTest
+              depthWrite={false}
+              alphaTest={0.015}
+              opacity={0.3}
+              polygonOffset
+              polygonOffsetFactor={-5}
+              toneMapped={false}
             />
           </mesh>
         </group>
@@ -1292,7 +1381,7 @@ export function ButterSquishy({
       {debrisClusters.length > 0 ? (
         <Suspense fallback={null}>
           <LazyRapierDebris
-            generation="butter-shell"
+            generation={coatingSeed}
             clusters={debrisClusters}
             staticColliders={staticColliders}
             onTransform={handleDebrisTransform}
@@ -1300,13 +1389,6 @@ export function ButterSquishy({
           />
         </Suspense>
       ) : null}
-      <pointLight
-        ref={hoverLightRef}
-        color="#fff8dc"
-        decay={2}
-        distance={1.5}
-        intensity={0}
-      />
     </>
   )
 }

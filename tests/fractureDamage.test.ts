@@ -34,6 +34,77 @@ function createRingGraph(fragmentCount = 8): FractureGraph {
   }
 }
 
+function createTipGraph(reverseBonds = false): FractureGraph {
+  const bonds = [
+    {
+      id: 'source',
+      fragmentA: 'fragment-0',
+      fragmentB: 'fragment-1',
+      length: 1,
+      toughness: 0.05,
+      role: 0,
+    },
+    {
+      id: 'trunk',
+      fragmentA: 'fragment-1',
+      fragmentB: 'fragment-2',
+      length: 1,
+      toughness: 10,
+      role: 0,
+    },
+    {
+      id: 'branch',
+      fragmentA: 'fragment-1',
+      fragmentB: 'fragment-3',
+      length: 1,
+      toughness: 10,
+      role: 1,
+    },
+    {
+      id: 'extra',
+      fragmentA: 'fragment-1',
+      fragmentB: 'fragment-4',
+      length: 1,
+      toughness: 10,
+      role: 1,
+    },
+    {
+      id: 'ordinary-turn',
+      fragmentA: 'fragment-1',
+      fragmentB: 'fragment-5',
+      length: 1,
+      toughness: 10,
+      role: 2,
+    },
+    {
+      id: 'remote',
+      fragmentA: 'fragment-6',
+      fragmentB: 'fragment-7',
+      length: 1,
+      toughness: 10,
+      role: 0,
+    },
+  ]
+
+  return {
+    fragments: [
+      [-1, 0, 0],
+      [0, 0, 0],
+      [1, 0, 0],
+      [0.9, 0.35, 0],
+      [0.9, -0.35, 0],
+      [0, 1, 0],
+      [4, 0, 0],
+      [5, 0, 0],
+    ].map((centroid, index) => ({
+      id: `fragment-${index}`,
+      centroid: centroid as [number, number, number],
+      normal: [0, 0, 1] as const,
+    })),
+    bonds: reverseBonds ? [...bonds].reverse() : bonds,
+  }
+}
+
 function createModel(overrides = {}): FractureModel {
   return createFractureModel(createRingGraph(), {
     fixedDeltaSeconds: 1 / 60,
@@ -80,6 +151,8 @@ function snapshot(state: FractureState) {
   return {
     damage: Array.from(state.bondDamage),
     broken: Array.from(state.bondBroken),
+    tipStress: Array.from(state.bondTipStress),
+    seamOpen: Array.from(state.bondSeamOpen),
     fragments: Array.from(state.fragmentState),
     peelAges: Array.from(state.fragmentPeelAge),
     brokenBondCount: state.brokenBondCount,
@@ -87,6 +160,20 @@ function snapshot(state: FractureState) {
     completed: state.completed,
     elapsedSeconds: state.elapsedSeconds,
   }
+}
+
+function bondSnapshot(model: FractureModel, state: FractureState) {
+  return Object.fromEntries(
+    model.bondIds.map((id, index) => [
+      String(id),
+      {
+        damage: state.bondDamage[index],
+        broken: state.bondBroken[index],
+        tipStress: state.bondTipStress[index],
+        seamOpen: state.bondSeamOpen[index],
+      },
+    ]),
+  )
 }
 
 describe('deterministic wax fracture damage', () => {
@@ -136,6 +223,146 @@ describe('deterministic wax fracture damage', () => {
     expect(() =>
       createModel({ globalCompressionFatigue: Number.NaN }),
     ).toThrow(/globalCompressionFatigue/)
+  })
+
+  it('commits breaks before transferring stress to a later step', () => {
+    const graph = createTipGraph()
+    const chainGraph: FractureGraph = {
+      fragments: graph.fragments.slice(0, 3),
+      bonds: graph.bonds.slice(0, 2).map((bond, index) => ({
+        ...bond,
+        toughness: index === 0 ? 0.05 : 0.01,
+      })),
+    }
+    const model = createFractureModel(chainGraph, {
+      fixedDeltaSeconds: 1 / 60,
+      propagationRadius: 0.2,
+      damagePerSecond: 100,
+      tipStressTransfer: 0.55,
+      tipStressDecay: 0.82,
+      maxTipBranches: 2,
+    })
+    const state = createFractureState(model)
+    const localPress: FracturePress = {
+      fragmentIndex: 0,
+      localPoint: [-1, 0, 0],
+      localNormal: [0, 0, 1],
+      pressure: 1,
+      durationSeconds: 0.16,
+    }
+
+    stepFracture(model, state, [localPress], 1 / 60)
+
+    expect(Array.from(state.bondBroken)).toEqual([1, 0])
+    expect(state.bondSeamOpen[0]).toBeGreaterThan(0)
+    expect(state.bondSeamOpen[0]).toBeLessThan(1)
+    expect(state.bondSeamOpen[1]).toBe(0)
+    expect(state.bondTipStress[1]).toBeGreaterThan(0)
+
+    stepFracture(model, state, [], 1 / 60)
+    expect(Array.from(state.bondBroken)).toEqual([1, 1])
+    expect(state.bondSeamOpen[0]).toBeGreaterThan(
+      state.bondSeamOpen[1],
+    )
+    expect(state.bondSeamOpen[1]).toBeGreaterThan(0)
+    expect(state.bondSeamOpen[1]).toBeLessThan(1)
+
+    runFrames(model, state, [], 10)
+    expect(Array.from(state.bondSeamOpen)).toEqual([1, 1])
+  })
+
+  it('routes decaying tip stress only to adjacent weak or aligned bonds', () => {
+    const model = createFractureModel(createTipGraph(), {
+      fixedDeltaSeconds: 1 / 60,
+      propagationRadius: 0.2,
+      damagePerSecond: 100,
+      tipStressTransfer: 0.55,
+      tipStressDecay: 0.82,
+      maxTipBranches: 2,
+    })
+    const state = createFractureState(model)
+    const localPress: FracturePress = {
+      fragmentIndex: 0,
+      localPoint: [-1, 0, 0],
+      localNormal: [0, 0, 1],
+      pressure: 1,
+      durationSeconds: 0.16,
+    }
+
+    stepFracture(model, state, [localPress], 1 / 60)
+    const firstTipStress = bondSnapshot(model, state)
+
+    expect(firstTipStress.trunk.tipStress).toBeGreaterThan(0)
+    expect(firstTipStress.branch.tipStress).toBeGreaterThan(0)
+    expect(firstTipStress.extra.tipStress).toBe(0)
+    expect(firstTipStress['ordinary-turn'].tipStress).toBe(0)
+    expect(firstTipStress.remote.tipStress).toBe(0)
+
+    stepFracture(model, state, [], 1 / 60)
+    const decayedTipStress = bondSnapshot(model, state)
+    expect(decayedTipStress.trunk.tipStress).toBeCloseTo(
+      firstTipStress.trunk.tipStress * 0.82,
+      6,
+    )
+    expect(decayedTipStress.branch.tipStress).toBeCloseTo(
+      firstTipStress.branch.tipStress * 0.82,
+      6,
+    )
+  })
+
+  it('is invariant to bond input order', () => {
+    const options = {
+      fixedDeltaSeconds: 1 / 60,
+      propagationRadius: 0.2,
+      damagePerSecond: 100,
+      tipStressTransfer: 0.55,
+      tipStressDecay: 0.82,
+      maxTipBranches: 2,
+    }
+    const orderedModel = createFractureModel(createTipGraph(), options)
+    const reversedModel = createFractureModel(
+      createTipGraph(true),
+      options,
+    )
+    const orderedState = createFractureState(orderedModel)
+    const reversedState = createFractureState(reversedModel)
+    const localPress: FracturePress = {
+      fragmentId: 'fragment-0',
+      localPoint: [-1, 0, 0],
+      localNormal: [0, 0, 1],
+      pressure: 1,
+      durationSeconds: 0.16,
+    }
+
+    stepFracture(orderedModel, orderedState, [localPress], 1 / 60)
+    stepFracture(reversedModel, reversedState, [localPress], 1 / 60)
+    stepFracture(orderedModel, orderedState, [], 1 / 60)
+    stepFracture(reversedModel, reversedState, [], 1 / 60)
+
+    expect(bondSnapshot(orderedModel, orderedState)).toEqual(
+      bondSnapshot(reversedModel, reversedState),
+    )
+    expect(orderedState.events.map((event) => event.type)).toEqual(
+      reversedState.events.map((event) => event.type),
+    )
+  })
+
+  it('validates crack-tip routing options and bond roles', () => {
+    expect(() => createModel({ tipStressTransfer: 1.1 })).toThrow(
+      /tipStressTransfer/,
+    )
+    expect(() => createModel({ tipStressDecay: -0.1 })).toThrow(
+      /tipStressDecay/,
+    )
+    expect(() => createModel({ maxTipBranches: 3 })).toThrow(
+      /maxTipBranches/,
+    )
+    const graph = createRingGraph()
+    const invalidGraph: FractureGraph = {
+      ...graph,
+      bonds: [{ ...graph.bonds[0], role: 4 }, ...graph.bonds.slice(1)],
+    }
+    expect(() => createFractureModel(invalidGraph)).toThrow(/role/)
   })
 
   it('never heals damage or returns fragments to an earlier state', () => {
@@ -223,9 +450,15 @@ describe('deterministic wax fracture damage', () => {
   })
 
   it('amplifies a continuing crack along an already broken boundary', () => {
-    const continuingModel = createModel({ crackContinuation: 1.2 })
+    const continuingModel = createModel({
+      crackContinuation: 1.2,
+      tipStressTransfer: 0,
+    })
     const continuing = createFractureState(continuingModel)
-    const baselineModel = createModel({ crackContinuation: 0 })
+    const baselineModel = createModel({
+      crackContinuation: 0,
+      tipStressTransfer: 0,
+    })
     const baseline = createFractureState(baselineModel)
 
     runFrames(continuingModel, continuing, [press(0)], 18)
@@ -275,6 +508,18 @@ describe('deterministic wax fracture damage', () => {
       snapshot(createFractureState(model)),
     )
     expect(state.events).toEqual([])
+    expect(Array.from(state.bondTipStress)).toEqual(
+      Array(model.bondCount).fill(0),
+    )
+    expect(Array.from(state.bondSeamOpen)).toEqual(
+      Array(model.bondCount).fill(0),
+    )
+    expect(Array.from(state.bondPendingBreak)).toEqual(
+      Array(model.bondCount).fill(0),
+    )
+    expect(Array.from(state.bondNextTipStress)).toEqual(
+      Array(model.bondCount).fill(0),
+    )
     expect(Array.from(state.fragmentSettleCandidate)).toEqual(
       Array(8).fill(0),
     )

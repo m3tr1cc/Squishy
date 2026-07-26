@@ -2,6 +2,24 @@ import { Canvas } from '@react-three/fiber'
 import { Suspense, useCallback, useMemo, useState } from 'react'
 import { SquishyScene } from './scene/SquishyScene'
 
+function createCoatingSeed() {
+  const seed = new Uint32Array(1)
+  crypto.getRandomValues(seed)
+  return seed[0]
+}
+
+function resolveCanvasDpr(maximumDpr: number) {
+  if (import.meta.env.DEV) {
+    const requestedDpr = Number(
+      new URLSearchParams(window.location.search).get('qaDpr'),
+    )
+    if (Number.isFinite(requestedDpr) && requestedDpr > 0) {
+      return Math.min(maximumDpr, Math.max(1, requestedDpr))
+    }
+  }
+  return [1, maximumDpr] as [number, number]
+}
+
 function hasWebGl2Support() {
   try {
     const canvas = document.createElement('canvas')
@@ -22,16 +40,19 @@ function LoadingState() {
 export function App() {
   const webGlSupported = useMemo(hasWebGl2Support, [])
   const [resetKey, setResetKey] = useState(0)
+  const [coatingSeed, setCoatingSeed] = useState(createCoatingSeed)
   const [isComplete, setIsComplete] = useState(false)
   const maximumDpr =
     typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
       ? 1.5
       : 1.75
+  const canvasDpr = resolveCanvasDpr(maximumDpr)
   const handleComplete = useCallback(() => {
     setIsComplete(true)
   }, [])
   const handleReset = useCallback(() => {
     setIsComplete(false)
+    setCoatingSeed(createCoatingSeed())
     setResetKey((current) => current + 1)
   }, [])
 
@@ -56,15 +77,16 @@ export function App() {
         <Canvas
           aria-label="Interactive wax-covered butter squishy"
           camera={{ fov: 32, near: 0.1, far: 80 }}
-          dpr={[1, maximumDpr]}
+          dpr={canvasDpr}
           gl={{
-            alpha: true,
+            alpha: false,
             antialias: true,
             powerPreference: 'high-performance',
           }}
           shadows="percentage"
         >
           <SquishyScene
+            coatingSeed={coatingSeed}
             onComplete={handleComplete}
             resetKey={resetKey}
           />

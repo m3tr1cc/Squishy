@@ -1,9 +1,11 @@
 import * as THREE from 'three'
 import { createRoundedCuboidGeometry } from '../createRoundedCuboidGeometry'
 import {
+  WAX_FRACTURE_ROLE,
   WAX_SURFACE_KIND,
   type CreateWaxTopologyOptions,
   type WaxBond,
+  type WaxFractureRole,
   type WaxFragmentMetadata,
   type WaxSourceSurface,
   type WaxSurfaceKind,
@@ -11,12 +13,15 @@ import {
   type WaxTriangleMetadata,
 } from './types'
 
-export const DEFAULT_WAX_PLATE_COUNT = 128
+export const DEFAULT_WAX_PLATE_COUNT = 48
 export const DEFAULT_WAX_TOPOLOGY_SEED = 0x57a45eed
 export const DEFAULT_WAX_INNER_CLEARANCE = 0.006
 export const DEFAULT_WAX_OUTER_OFFSET = 0.055
+export const SEED_CANDIDATE_MINIMUM_DISTANCE_RATIO = 0.78
+export const WAX_GROWTH_SPEED_MODES = [0.78, 1, 1.28] as const
 
 const DISTANCE_EPSILON = 1e-10
+const MINIMUM_SLIVER_TRIANGLE_COUNT = 12
 
 type EdgeRecord = {
   a: number
@@ -393,6 +398,7 @@ function chooseSeeds(
   seed: number,
 ) {
   const seeds: number[] = []
+  const selectionDistanceRatios: number[] = [1]
   const selected = new Uint8Array(graph.length)
   const nearestDistances = new Float64Array(graph.length)
   nearestDistances.fill(Number.POSITIVE_INFINITY)
@@ -407,33 +413,82 @@ function chooseSeeds(
       break
     }
 
-    let farthestTriangle = -1
     let farthestDistance = -1
     for (let triangle = 0; triangle < graph.length; triangle += 1) {
       if (selected[triangle]) {
         continue
       }
       const distance = nearestDistances[triangle]
-      if (
-        distance > farthestDistance + DISTANCE_EPSILON ||
-        (Math.abs(distance - farthestDistance) <= DISTANCE_EPSILON &&
-          triangle < farthestTriangle)
-      ) {
-        farthestTriangle = triangle
+      if (distance > farthestDistance) {
         farthestDistance = distance
       }
     }
 
-    if (farthestTriangle < 0 || !Number.isFinite(farthestDistance)) {
+    if (!Number.isFinite(farthestDistance)) {
       throw new Error('Unable to choose the requested number of wax plates.')
     }
-    nextSeed = farthestTriangle
+
+    const minimumCandidateDistance =
+      farthestDistance * SEED_CANDIDATE_MINIMUM_DISTANCE_RATIO
+    const candidates: number[] = []
+    for (let triangle = 0; triangle < graph.length; triangle += 1) {
+      if (
+        !selected[triangle] &&
+        nearestDistances[triangle] + DISTANCE_EPSILON >=
+          minimumCandidateDistance
+      ) {
+        candidates.push(triangle)
+      }
+    }
+    if (candidates.length === 0) {
+      throw new Error('Unable to find a separated wax plate seed.')
+    }
+
+    const candidateHash = hashUint32(
+      normalizedSeedSalt(seed, fragment, nextSeed),
+    )
+    nextSeed = candidates[candidateHash % candidates.length]
+    selectionDistanceRatios.push(
+      nearestDistances[nextSeed] / farthestDistance,
+    )
   }
 
-  return seeds
+  return { seeds, selectionDistanceRatios }
 }
 
-function partitionTriangles(graph: GraphNeighbor[][], seeds: number[]) {
+function normalizedSeedSalt(seed: number, index: number, value: number) {
+  return (
+    seed ^
+    Math.imul(index + 1, 0x9e3779b1) ^
+    Math.imul(value + 1, 0x85ebca6b)
+  ) >>> 0
+}
+
+function createGrowthSpeeds(plateCount: number, seed: number) {
+  const modeIndices = Array.from(
+    { length: plateCount },
+    (_, index) => index % WAX_GROWTH_SPEED_MODES.length,
+  )
+  for (let index = modeIndices.length - 1; index > 0; index -= 1) {
+    const swapIndex =
+      hashUint32(normalizedSeedSalt(seed, index, modeIndices[index])) %
+      (index + 1)
+    const temporary = modeIndices[index]
+    modeIndices[index] = modeIndices[swapIndex]
+    modeIndices[swapIndex] = temporary
+  }
+
+  return Float32Array.from(
+    modeIndices,
+    (modeIndex) => WAX_GROWTH_SPEED_MODES[modeIndex],
+  )
+}
+
+function partitionTriangles(
+  graph: GraphNeighbor[][],
+  seeds: number[],
+  growthSpeeds: Float32Array,
+) {
   const distances = new Float64Array(graph.length)
   distances.fill(Number.POSITIVE_INFINITY)
   const owners = new Uint16Array(graph.length)
@@ -458,7 +513,9 @@ function partitionTriangles(graph: GraphNeighbor[][], seeds: number[]) {
     }
 
     for (const neighbor of graph[current.triangle]) {
-      const distance = current.distance + neighbor.distance
+      const distance =
+        current.distance +
+        neighbor.distance / growthSpeeds[current.owner]
       const existingDistance = distances[neighbor.triangle]
       const existingOwner = owners[neighbor.triangle]
       if (
@@ -475,6 +532,42 @@ function partitionTriangles(graph: GraphNeighbor[][], seeds: number[]) {
         })
       }
     }
+  }
+
+  return owners
+}
+
+function partitionTrianglesWithSliverGuard(
+  graph: GraphNeighbor[][],
+  seeds: number[],
+  growthSpeeds: Float32Array,
+) {
+  const minimumTriangleCount = Math.min(
+    MINIMUM_SLIVER_TRIANGLE_COUNT,
+    Math.max(1, Math.floor(graph.length / seeds.length / 8)),
+  )
+  let owners = partitionTriangles(graph, seeds, growthSpeeds)
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const triangleCounts = new Uint32Array(seeds.length)
+    for (const owner of owners) {
+      triangleCounts[owner] += 1
+    }
+    const slivers: number[] = []
+    for (let owner = 0; owner < triangleCounts.length; owner += 1) {
+      if (triangleCounts[owner] < minimumTriangleCount) {
+        slivers.push(owner)
+      }
+    }
+    if (slivers.length === 0) {
+      return owners
+    }
+
+    for (const owner of slivers) {
+      growthSpeeds[owner] =
+        WAX_GROWTH_SPEED_MODES[WAX_GROWTH_SPEED_MODES.length - 1]
+    }
+    owners = partitionTriangles(graph, seeds, growthSpeeds)
   }
 
   return owners
@@ -516,6 +609,363 @@ function appendVertex(
   outputSourceVertexIds.push(sourceVertexId)
   outputShellOffsets.push(shellOffset)
   return vertex
+}
+
+function fragmentDistance(
+  fragmentA: WaxFragmentMetadata,
+  fragmentB: WaxFragmentMetadata,
+) {
+  return Math.hypot(
+    fragmentB.centroid[0] - fragmentA.centroid[0],
+    fragmentB.centroid[1] - fragmentA.centroid[1],
+    fragmentB.centroid[2] - fragmentA.centroid[2],
+  )
+}
+
+function createFragmentBondAdjacency(
+  bonds: WaxBond[],
+  fragmentCount: number,
+) {
+  const adjacency: number[][] = Array.from(
+    { length: fragmentCount },
+    () => [],
+  )
+  for (const bond of bonds) {
+    adjacency[bond.fragmentA].push(bond.id)
+    adjacency[bond.fragmentB].push(bond.id)
+  }
+  for (const bondIds of adjacency) {
+    bondIds.sort((left, right) => left - right)
+  }
+  return adjacency
+}
+
+function otherBondFragment(bond: WaxBond, fragment: number) {
+  return bond.fragmentA === fragment ? bond.fragmentB : bond.fragmentA
+}
+
+function correlatedFractureField(
+  point: readonly [number, number, number],
+  seed: number,
+) {
+  const phaseX = seededUnitFloat(seed, 0x101) * Math.PI * 2
+  const phaseY = seededUnitFloat(seed, 0x202) * Math.PI * 2
+  const phaseZ = seededUnitFloat(seed, 0x303) * Math.PI * 2
+  return clamp(
+    0.5 +
+      Math.sin(point[0] * 1.37 + phaseX) * 0.24 +
+      Math.sin(point[1] * 2.41 + phaseY) * 0.16 +
+      Math.sin((point[0] + point[2]) * 0.93 + phaseZ) * 0.1,
+    0,
+    1,
+  )
+}
+
+function findVisibleCorridor(
+  bonds: WaxBond[],
+  fragments: MutableFragmentMetadata[],
+  adjacency: number[][],
+  visibility: Float32Array,
+  start: number,
+  end: number,
+  targetY: number,
+  seed: number,
+  salt: number,
+  excludedFragments: ReadonlySet<number> = new Set(),
+) {
+  const distances = new Float64Array(fragments.length)
+  distances.fill(Number.POSITIVE_INFINITY)
+  const previousBond = new Int32Array(fragments.length)
+  previousBond.fill(-1)
+  const heap = new MinHeap()
+  distances[start] = 0
+  heap.push({ distance: 0, triangle: start, owner: 0 })
+
+  let minimumY = Number.POSITIVE_INFINITY
+  let maximumY = Number.NEGATIVE_INFINITY
+  for (const fragment of fragments) {
+    minimumY = Math.min(minimumY, fragment.centroid[1])
+    maximumY = Math.max(maximumY, fragment.centroid[1])
+  }
+  const yRange = Math.max(maximumY - minimumY, 0.1)
+
+  while (heap.size > 0) {
+    const current = heap.pop()
+    if (
+      !current ||
+      current.distance !== distances[current.triangle]
+    ) {
+      continue
+    }
+    if (current.triangle === end) {
+      break
+    }
+
+    for (const bondId of adjacency[current.triangle]) {
+      const bond = bonds[bondId]
+      const next = otherBondFragment(bond, current.triangle)
+      if (
+        next !== end &&
+        next !== start &&
+        excludedFragments.has(next)
+      ) {
+        continue
+      }
+
+      const stepDistance = fragmentDistance(
+        fragments[current.triangle],
+        fragments[next],
+      )
+      const sharedVisibility = Math.min(
+        visibility[current.triangle],
+        visibility[next],
+      )
+      const verticalTravel = Math.abs(
+        fragments[next].centroid[1] -
+          fragments[current.triangle].centroid[1],
+      )
+      const horizontalTravel = Math.abs(
+        fragments[next].centroid[0] -
+          fragments[current.triangle].centroid[0],
+      )
+      const midpointY =
+        (fragments[next].centroid[1] +
+          fragments[current.triangle].centroid[1]) /
+        2
+      const seededVariation =
+        0.82 +
+        seededUnitFloat(seed, bond.id + salt) * 0.36
+      const stepCost =
+        stepDistance *
+        (1 + (1 - sharedVisibility) * 5.5) *
+        (1 + (verticalTravel / (horizontalTravel + 0.12)) * 0.12) *
+        (1 + (Math.abs(midpointY - targetY) / yRange) * 1.35) *
+        seededVariation
+      const nextDistance = current.distance + stepCost
+      if (
+        nextDistance < distances[next] - DISTANCE_EPSILON ||
+        (Math.abs(nextDistance - distances[next]) <=
+          DISTANCE_EPSILON &&
+          bond.id < previousBond[next])
+      ) {
+        distances[next] = nextDistance
+        previousBond[next] = bond.id
+        heap.push({ distance: nextDistance, triangle: next, owner: 0 })
+      }
+    }
+  }
+
+  const corridorBonds = new Set<number>()
+  const corridorFragments = new Set<number>([start])
+  let cursor = end
+  while (cursor !== start && previousBond[cursor] >= 0) {
+    const bondId = previousBond[cursor]
+    corridorBonds.add(bondId)
+    corridorFragments.add(cursor)
+    cursor = otherBondFragment(bonds[bondId], cursor)
+  }
+  if (cursor !== start) {
+    return {
+      bonds: new Set<number>(),
+      fragments: new Set<number>(),
+    }
+  }
+  corridorFragments.add(start)
+  return { bonds: corridorBonds, fragments: corridorFragments }
+}
+
+function assignFractureRoles(
+  bonds: WaxBond[],
+  fragments: MutableFragmentMetadata[],
+  seed: number,
+) {
+  if (bonds.length === 0 || fragments.length < 2) {
+    return
+  }
+
+  const adjacency = createFragmentBondAdjacency(bonds, fragments.length)
+  let minimumZ = Number.POSITIVE_INFINITY
+  let maximumZ = Number.NEGATIVE_INFINITY
+  for (const fragment of fragments) {
+    minimumZ = Math.min(minimumZ, fragment.centroid[2])
+    maximumZ = Math.max(maximumZ, fragment.centroid[2])
+  }
+  const zRange = Math.max(maximumZ - minimumZ, DISTANCE_EPSILON)
+  const visibility = Float32Array.from(fragments, (fragment) => {
+    const normalVisibility = clamp(
+      (fragment.averageNormal[2] - 0.15) / 0.85,
+      0,
+      1,
+    )
+    const positionVisibility = clamp(
+      (fragment.centroid[2] - minimumZ) / zRange,
+      0,
+      1,
+    )
+    return normalVisibility * 0.72 + positionVisibility * 0.28
+  })
+
+  let visibleFragments = fragments
+    .filter((fragment) => visibility[fragment.id] >= 0.58)
+    .map((fragment) => fragment.id)
+  if (visibleFragments.length < 2) {
+    visibleFragments = fragments
+      .map((fragment) => fragment.id)
+      .sort(
+        (left, right) =>
+          visibility[right] - visibility[left] || left - right,
+      )
+      .slice(0, Math.max(2, Math.ceil(fragments.length / 4)))
+  }
+  let minimumX = Number.POSITIVE_INFINITY
+  let maximumX = Number.NEGATIVE_INFINITY
+  for (const fragmentId of visibleFragments) {
+    minimumX = Math.min(minimumX, fragments[fragmentId].centroid[0])
+    maximumX = Math.max(maximumX, fragments[fragmentId].centroid[0])
+  }
+  const xRange = Math.max(maximumX - minimumX, DISTANCE_EPSILON)
+  const leftCandidates = visibleFragments.filter(
+    (fragment) =>
+      fragments[fragment].centroid[0] <= minimumX + xRange * 0.175,
+  )
+  const rightCandidates = visibleFragments.filter(
+    (fragment) =>
+      fragments[fragment].centroid[0] >= maximumX - xRange * 0.175,
+  )
+  const byUpperBand = (left: number, right: number) =>
+    fragments[right].centroid[1] - fragments[left].centroid[1] ||
+    left - right
+  const byLowerBand = (left: number, right: number) =>
+    fragments[left].centroid[1] - fragments[right].centroid[1] ||
+    left - right
+  leftCandidates.sort(byUpperBand)
+  rightCandidates.sort(byUpperBand)
+  const upperStart = leftCandidates[0] ?? visibleFragments[0]
+  const upperEnd =
+    rightCandidates[0] ?? visibleFragments[visibleFragments.length - 1]
+  leftCandidates.sort(byLowerBand)
+  rightCandidates.sort(byLowerBand)
+  const lowerStart = leftCandidates[0] ?? visibleFragments[0]
+  const lowerEnd =
+    rightCandidates[0] ?? visibleFragments[visibleFragments.length - 1]
+
+  const upperCorridor = findVisibleCorridor(
+    bonds,
+    fragments,
+    adjacency,
+    visibility,
+    upperStart,
+    upperEnd,
+    (fragments[upperStart].centroid[1] +
+      fragments[upperEnd].centroid[1]) /
+      2,
+    seed,
+    0x401,
+  )
+  const lowerCorridor = findVisibleCorridor(
+    bonds,
+    fragments,
+    adjacency,
+    visibility,
+    lowerStart,
+    lowerEnd,
+    (fragments[lowerStart].centroid[1] +
+      fragments[lowerEnd].centroid[1]) /
+      2,
+    seed,
+    0x701,
+    upperCorridor.fragments,
+  )
+  const trunkBondIds = new Set<number>([
+    ...upperCorridor.bonds,
+    ...lowerCorridor.bonds,
+  ])
+
+  const parents = Int32Array.from(
+    { length: fragments.length },
+    (_, index) => index,
+  )
+  const ranks = new Uint8Array(fragments.length)
+  const findRoot = (fragment: number) => {
+    let root = fragment
+    while (parents[root] !== root) {
+      root = parents[root]
+    }
+    let cursor = fragment
+    while (parents[cursor] !== cursor) {
+      const parent = parents[cursor]
+      parents[cursor] = root
+      cursor = parent
+    }
+    return root
+  }
+  const connect = (fragmentA: number, fragmentB: number) => {
+    const rootA = findRoot(fragmentA)
+    const rootB = findRoot(fragmentB)
+    if (rootA === rootB) {
+      return false
+    }
+    if (ranks[rootA] < ranks[rootB]) {
+      parents[rootA] = rootB
+    } else {
+      parents[rootB] = rootA
+      if (ranks[rootA] === ranks[rootB]) {
+        ranks[rootA] += 1
+      }
+    }
+    return true
+  }
+  for (const bondId of trunkBondIds) {
+    const bond = bonds[bondId]
+    connect(bond.fragmentA, bond.fragmentB)
+  }
+
+  const branchBondIds = new Set<number>()
+  const branchCandidates = bonds
+    .filter((bond) => !trunkBondIds.has(bond.id))
+    .map((bond) => ({
+      bond,
+      cost:
+        fragmentDistance(
+          fragments[bond.fragmentA],
+          fragments[bond.fragmentB],
+        ) *
+        (0.82 + correlatedFractureField(bond.midpoint, seed) * 0.36),
+    }))
+    .sort(
+      (left, right) =>
+        left.cost - right.cost || left.bond.id - right.bond.id,
+    )
+  for (const candidate of branchCandidates) {
+    const { bond } = candidate
+    if (connect(bond.fragmentA, bond.fragmentB)) {
+      branchBondIds.add(bond.id)
+    }
+  }
+  const networkRoot = findRoot(0)
+  for (let fragment = 1; fragment < fragments.length; fragment += 1) {
+    if (findRoot(fragment) !== networkRoot) {
+      throw new Error('Unable to construct a connected wax weakness network.')
+    }
+  }
+
+  for (const bond of bonds) {
+    const field = correlatedFractureField(bond.midpoint, seed)
+    let fractureRole: WaxFractureRole
+    let toughness: number
+    if (trunkBondIds.has(bond.id)) {
+      fractureRole = WAX_FRACTURE_ROLE.trunk
+      toughness = 0.5 + field * 0.18
+    } else if (branchBondIds.has(bond.id)) {
+      fractureRole = WAX_FRACTURE_ROLE.branch
+      toughness = 0.7 + field * 0.16
+    } else {
+      fractureRole = WAX_FRACTURE_ROLE.ordinary
+      toughness = 1 + field * 0.24
+    }
+    bond.fractureRole = fractureRole
+    bond.toughness = toughness
+  }
 }
 
 function createBondMetadata(
@@ -605,7 +1055,8 @@ function createBondMetadata(
         weightedMidpointZ / length,
       ],
       restAngle: Math.acos(normalDot),
-      toughness: 0.88 + seededUnitFloat(seed, id) * 0.24,
+      fractureRole: WAX_FRACTURE_ROLE.ordinary,
+      toughness: 1,
     }
   })
 
@@ -618,6 +1069,7 @@ function createBondMetadata(
     )
   }
 
+  assignFractureRoles(bonds, fragments, seed)
   return bonds
 }
 
@@ -627,6 +1079,8 @@ function assembleGeometry(
   edgeRecords: EdgeRecord[],
   edgeRecordMap: ReadonlyMap<string, EdgeRecord>,
   sourceTriangleFragmentIds: Uint16Array,
+  seedTriangleIds: Uint32Array,
+  growthSpeeds: Float32Array,
   plateCount: number,
   innerClearance: number,
   outerOffset: number,
@@ -957,6 +1411,8 @@ function assembleGeometry(
     )
     fragments.push({
       id: fragment,
+      seedTriangleId: seedTriangleIds[fragment],
+      growthSpeed: growthSpeeds[fragment],
       sourceTriangleIndices: Uint32Array.from(sourceTriangleIds),
       sourceVertexIndices: Uint32Array.from(sourceVertexIds),
       neighborFragmentIds: new Uint16Array(),
@@ -1129,14 +1585,24 @@ export function createWaxTopology({
     const edgeRecordMap = new Map(
       graphData.edgeRecords.map((edge) => [edgeKey(edge.a, edge.b), edge]),
     )
-    const seeds = chooseSeeds(
+    const seedSelection = chooseSeeds(
       graphData.graph,
       roundedPlateCount,
       normalizedSeed,
     )
-    const sourceTriangleFragmentIds = partitionTriangles(
+    const { seeds } = seedSelection
+    const seedTriangleIds = Uint32Array.from(seeds)
+    const seedSelectionDistanceRatios = Float32Array.from(
+      seedSelection.selectionDistanceRatios,
+    )
+    const growthSpeeds = createGrowthSpeeds(
+      roundedPlateCount,
+      normalizedSeed,
+    )
+    const sourceTriangleFragmentIds = partitionTrianglesWithSliverGuard(
       graphData.graph,
       seeds,
+      growthSpeeds,
     )
     const source: WaxSourceSurface = {
       vertexCount: sourceData.vertexCount,
@@ -1155,6 +1621,8 @@ export function createWaxTopology({
       graphData.edgeRecords,
       edgeRecordMap,
       sourceTriangleFragmentIds,
+      seedTriangleIds,
+      growthSpeeds,
       roundedPlateCount,
       innerClearance,
       outerOffset,
@@ -1169,6 +1637,9 @@ export function createWaxTopology({
       outerOffset,
       thickness: outerOffset - innerClearance,
       source,
+      seedTriangleIds,
+      seedSelectionDistanceRatios,
+      growthSpeeds,
       sourceTriangleFragmentIds,
     }
   } finally {

@@ -3,10 +3,13 @@ import {
   DEFAULT_WAX_INNER_CLEARANCE,
   DEFAULT_WAX_OUTER_OFFSET,
   DEFAULT_WAX_PLATE_COUNT,
+  SEED_CANDIDATE_MINIMUM_DISTANCE_RATIO,
+  WAX_GROWTH_SPEED_MODES,
   createWaxTopology,
   getWaxTriangleMetadata,
 } from '../src/scene/fracture/topology'
 import {
+  WAX_FRACTURE_ROLE,
   WAX_SURFACE_KIND,
   type WaxTopology,
 } from '../src/scene/fracture/types'
@@ -34,6 +37,12 @@ describe('wax shell topology', () => {
     expect([...duplicate.sourceTriangleFragmentIds]).toEqual([
       ...topology.sourceTriangleFragmentIds,
     ])
+    expect([...duplicate.seedTriangleIds]).toEqual([
+      ...topology.seedTriangleIds,
+    ])
+    expect([...duplicate.growthSpeeds]).toEqual([
+      ...topology.growthSpeeds,
+    ])
     expect([...duplicate.geometry.getAttribute('position').array]).toEqual([
       ...topology.geometry.getAttribute('position').array,
     ])
@@ -42,6 +51,7 @@ describe('wax shell topology', () => {
         bond.fragmentA,
         bond.fragmentB,
         [...bond.boundaryEdges],
+        bond.fractureRole,
         bond.toughness,
       ]),
     ).toEqual(
@@ -49,6 +59,7 @@ describe('wax shell topology', () => {
         bond.fragmentA,
         bond.fragmentB,
         [...bond.boundaryEdges],
+        bond.fractureRole,
         bond.toughness,
       ]),
     )
@@ -56,7 +67,7 @@ describe('wax shell topology', () => {
     duplicate.geometry.dispose()
   }, 30_000)
 
-  it('partitions every source triangle into exactly 128 connected plates', () => {
+  it('partitions every source triangle into exactly 48 connected irregular plates', () => {
     expect(topology.plateCount).toBe(DEFAULT_WAX_PLATE_COUNT)
     expect(topology.fragments).toHaveLength(DEFAULT_WAX_PLATE_COUNT)
     expect(topology.sourceTriangleFragmentIds).toHaveLength(
@@ -64,8 +75,25 @@ describe('wax shell topology', () => {
     )
 
     const coverage = new Uint8Array(topology.source.triangleCount)
+    let minimumTriangleCount = Number.POSITIVE_INFINITY
+    let maximumTriangleCount = 0
     for (const fragment of topology.fragments) {
       expect(fragment.sourceTriangleIndices.length).toBeGreaterThan(0)
+      expect(fragment.sourceTriangleIndices).toContain(
+        fragment.seedTriangleId,
+      )
+      expect(topology.sourceTriangleFragmentIds[fragment.seedTriangleId]).toBe(
+        fragment.id,
+      )
+      expect(fragment.growthSpeed).toBe(topology.growthSpeeds[fragment.id])
+      minimumTriangleCount = Math.min(
+        minimumTriangleCount,
+        fragment.sourceTriangleIndices.length,
+      )
+      maximumTriangleCount = Math.max(
+        maximumTriangleCount,
+        fragment.sourceTriangleIndices.length,
+      )
       const allowed = new Set(fragment.sourceTriangleIndices)
       const visited = new Set<number>()
       const queue = [fragment.sourceTriangleIndices[0]]
@@ -91,6 +119,40 @@ describe('wax shell topology', () => {
     }
 
     expect([...coverage].every((count) => count === 1)).toBe(true)
+    expect(minimumTriangleCount).toBeGreaterThanOrEqual(12)
+    expect(maximumTriangleCount / minimumTriangleCount).toBeGreaterThan(1.5)
+  })
+
+  it('selects separated irregular seeds and uses all three growth modes', () => {
+    expect(new Set(topology.seedTriangleIds).size).toBe(
+      DEFAULT_WAX_PLATE_COUNT,
+    )
+    expect(topology.seedSelectionDistanceRatios).toHaveLength(
+      DEFAULT_WAX_PLATE_COUNT,
+    )
+    expect(topology.seedSelectionDistanceRatios[0]).toBe(1)
+    for (
+      let selection = 1;
+      selection < topology.seedSelectionDistanceRatios.length;
+      selection += 1
+    ) {
+      expect(
+        topology.seedSelectionDistanceRatios[selection],
+      ).toBeGreaterThanOrEqual(
+        SEED_CANDIDATE_MINIMUM_DISTANCE_RATIO - 1e-6,
+      )
+    }
+
+    const modeCounts = new Map<number, number>()
+    for (const growthSpeed of topology.growthSpeeds) {
+      const mode = WAX_GROWTH_SPEED_MODES.find((candidate) =>
+        Math.abs(candidate - growthSpeed) < 1e-6
+      )
+      expect(mode).toBeDefined()
+      modeCounts.set(mode!, (modeCounts.get(mode!) ?? 0) + 1)
+    }
+    expect(modeCounts.size).toBe(3)
+    expect([...modeCounts.values()].every((count) => count >= 8)).toBe(true)
   })
 
   it('extrudes finite closed plates at the specified wax thickness', () => {
@@ -218,7 +280,7 @@ describe('wax shell topology', () => {
     }
   })
 
-  it('builds a connected bond graph with complete raycast lookup data', () => {
+  it('builds a connected role-weighted bond graph with complete raycast lookup data', () => {
     const visited = new Set<number>()
     const queue = [0]
     while (queue.length > 0) {
@@ -238,9 +300,23 @@ describe('wax shell topology', () => {
         (bond) =>
           bond.length > 0 &&
           bond.boundaryEdges.length >= 2 &&
-          bond.toughness >= 0.88 &&
-          bond.toughness <= 1.12,
+          Number.isInteger(bond.fractureRole) &&
+          bond.fractureRole >= WAX_FRACTURE_ROLE.trunk &&
+          bond.fractureRole <= WAX_FRACTURE_ROLE.ordinary &&
+          bond.toughness >= 0.5 &&
+          bond.toughness <= 1.24,
       ),
+    ).toBe(true)
+    expect(
+      topology.bonds.every((bond) => {
+        if (bond.fractureRole === WAX_FRACTURE_ROLE.trunk) {
+          return bond.toughness >= 0.5 && bond.toughness <= 0.68
+        }
+        if (bond.fractureRole === WAX_FRACTURE_ROLE.branch) {
+          return bond.toughness >= 0.7 && bond.toughness <= 0.86
+        }
+        return bond.toughness >= 1 && bond.toughness <= 1.24
+      }),
     ).toBe(true)
 
     expect(topology.triangleFragmentIds).toHaveLength(
@@ -255,6 +331,108 @@ describe('wax shell topology', () => {
       surfaceKind: WAX_SURFACE_KIND.outer,
       sourceTriangleId: topology.triangleSourceTriangleIds[0],
     })
+  })
+
+  it('creates two long visible trunks inside a connected weak network', () => {
+    const weakBonds = topology.bonds.filter(
+      (bond) => bond.fractureRole !== WAX_FRACTURE_ROLE.ordinary,
+    )
+    const trunkBonds = topology.bonds.filter(
+      (bond) => bond.fractureRole === WAX_FRACTURE_ROLE.trunk,
+    )
+    const branchBonds = topology.bonds.filter(
+      (bond) => bond.fractureRole === WAX_FRACTURE_ROLE.branch,
+    )
+    const ordinaryBonds = topology.bonds.filter(
+      (bond) => bond.fractureRole === WAX_FRACTURE_ROLE.ordinary,
+    )
+
+    expect(trunkBonds.length).toBeGreaterThan(3)
+    expect(branchBonds.length).toBeGreaterThan(0)
+    expect(ordinaryBonds.length).toBeGreaterThan(0)
+
+    const trunkAdjacency = new Map<number, Set<number>>()
+    for (const bond of trunkBonds) {
+      const neighborsA = trunkAdjacency.get(bond.fragmentA) ?? new Set()
+      const neighborsB = trunkAdjacency.get(bond.fragmentB) ?? new Set()
+      neighborsA.add(bond.fragmentB)
+      neighborsB.add(bond.fragmentA)
+      trunkAdjacency.set(bond.fragmentA, neighborsA)
+      trunkAdjacency.set(bond.fragmentB, neighborsB)
+    }
+    const trunkComponents: number[][] = []
+    const unvisitedTrunkFragments = new Set(trunkAdjacency.keys())
+    while (unvisitedTrunkFragments.size > 0) {
+      const seed = unvisitedTrunkFragments.values().next().value!
+      const component: number[] = []
+      const queue = [seed]
+      while (queue.length > 0) {
+        const fragment = queue.pop()!
+        if (!unvisitedTrunkFragments.delete(fragment)) {
+          continue
+        }
+        component.push(fragment)
+        queue.push(...(trunkAdjacency.get(fragment) ?? []))
+      }
+      trunkComponents.push(component)
+    }
+    expect(trunkComponents).toHaveLength(2)
+
+    const allFragmentX = topology.fragments.map(
+      (fragment) => fragment.centroid[0],
+    )
+    const requiredCorridorSpan =
+      (Math.max(...allFragmentX) - Math.min(...allFragmentX)) * 0.65
+    for (const component of trunkComponents) {
+      const componentX = component.map(
+        (fragment) => topology.fragments[fragment].centroid[0],
+      )
+      expect(Math.max(...componentX) - Math.min(...componentX)).toBeGreaterThanOrEqual(
+        requiredCorridorSpan,
+      )
+      const componentSet = new Set(component)
+      const componentBonds = trunkBonds.filter(
+        (bond) =>
+          componentSet.has(bond.fragmentA) &&
+          componentSet.has(bond.fragmentB),
+      )
+      const averageTrunkZ =
+        componentBonds.reduce(
+          (total, bond) => total + bond.midpoint[2],
+          0,
+        ) / componentBonds.length
+      expect(averageTrunkZ).toBeGreaterThan(0.3)
+    }
+
+    const weakAdjacency = Array.from(
+      { length: topology.plateCount },
+      () => [] as number[],
+    )
+    for (const bond of weakBonds) {
+      weakAdjacency[bond.fragmentA].push(bond.fragmentB)
+      weakAdjacency[bond.fragmentB].push(bond.fragmentA)
+    }
+    const weakVisited = new Set<number>()
+    const weakQueue = [0]
+    while (weakQueue.length > 0) {
+      const fragment = weakQueue.pop()!
+      if (weakVisited.has(fragment)) {
+        continue
+      }
+      weakVisited.add(fragment)
+      weakQueue.push(...weakAdjacency[fragment])
+    }
+    expect(weakVisited.size).toBe(topology.plateCount)
+
+    const averageToughness = (bonds: typeof topology.bonds) =>
+      bonds.reduce((total, bond) => total + bond.toughness, 0) /
+      bonds.length
+    expect(averageToughness(trunkBonds)).toBeLessThan(
+      averageToughness(branchBonds),
+    )
+    expect(averageToughness(branchBonds)).toBeLessThan(
+      averageToughness(ordinaryBonds),
+    )
   })
 
   it('stays inside the shell triangle and draw-call budgets', () => {

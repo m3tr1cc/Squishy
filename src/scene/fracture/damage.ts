@@ -13,6 +13,8 @@ export type FractureBond = Readonly<{
   fragmentB: FractureId
   length: number
   toughness: number
+  /** 0 = trunk/guide, 1 = branch, 2 or omitted = ordinary structure. */
+  role?: number
 }>
 
 export type FractureGraph = Readonly<{
@@ -84,6 +86,12 @@ export type FractureOptions = Readonly<{
    */
   globalCompressionFatigue?: number
   crackContinuation?: number
+  /** Fraction of a newly broken bond's stress transferred to crack tips. */
+  tipStressTransfer?: number
+  /** Per-fixed-step retention applied to stress waiting at a crack tip. */
+  tipStressDecay?: number
+  /** Maximum adjacent bonds that one newly broken tip may activate. */
+  maxTipBranches?: number
   normalCutoff?: number
   peelBrokenRatio?: number
   detachBrokenRatio?: number
@@ -101,6 +109,9 @@ type ResolvedFractureOptions = Readonly<{
   holdStrength: number
   globalCompressionFatigue: number
   crackContinuation: number
+  tipStressTransfer: number
+  tipStressDecay: number
+  maxTipBranches: number
   normalCutoff: number
   peelBrokenRatio: number
   detachBrokenRatio: number
@@ -119,8 +130,13 @@ export type FractureModel = Readonly<{
   bondFragmentB: Uint16Array | Uint32Array
   bondLength: Float32Array
   bondToughness: Float32Array
+  bondRole: Uint8Array
   incidentStarts: Uint32Array
   incidentBonds: Uint16Array | Uint32Array
+  bondNeighborStarts: Uint32Array
+  bondNeighbors: Uint16Array | Uint32Array
+  bondNeighborAlignment: Float32Array
+  bondStableOrder: Uint16Array | Uint32Array
   geodesicDistances: Float32Array
   meanBondLength: number
   options: ResolvedFractureOptions
@@ -131,6 +147,10 @@ export type FractureState = {
   /** Accumulated, irreversible damage in the same units as bond toughness. */
   readonly bondDamage: Float32Array
   readonly bondBroken: Uint8Array
+  /** Decaying load waiting to continue through an existing crack tip. */
+  readonly bondTipStress: Float32Array
+  /** Persistent 0..1 seam state consumed by shell geometry. */
+  readonly bondSeamOpen: Float32Array
   readonly fragmentState: Uint8Array
   readonly fragmentLoad: Float32Array
   readonly fragmentBrokenBonds: Uint16Array | Uint32Array
@@ -138,6 +158,11 @@ export type FractureState = {
   readonly fragmentPeelAge: Float32Array
   readonly fragmentDetachAge: Float32Array
   readonly fragmentSettleCandidate: Uint8Array
+  /** Fixed-size scratch buffers reused by the two-phase bond update. */
+  readonly bondStepLoad: Float32Array
+  readonly bondStepDamage: Float32Array
+  readonly bondPendingBreak: Uint8Array
+  readonly bondNextTipStress: Float32Array
   /** Reused on every step. Copy events if they must survive the next call. */
   readonly events: FractureEvent[]
   elapsedSeconds: number
@@ -150,6 +175,7 @@ export type FractureState = {
 }
 
 const DEFAULT_FIXED_DELTA_SECONDS = 1 / 60
+const SEAM_OPEN_SECONDS = 0.12
 const EPSILON = 1e-8
 
 function assertFinitePositive(value: number, label: string) {
@@ -178,6 +204,78 @@ function chooseIndexArray(length: number, maximumValue: number) {
     : new Uint32Array(length)
 }
 
+function compareIds(left: FractureId, right: FractureId) {
+  if (typeof left === 'number' && typeof right === 'number') {
+    return left - right
+  }
+  const leftKey = `${typeof left}:${String(left)}`
+  const rightKey = `${typeof right}:${String(right)}`
+  return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0
+}
+
+function bondContinuationAlignment(
+  sourceA: number,
+  sourceB: number,
+  candidateA: number,
+  candidateB: number,
+  centroids: Float32Array,
+) {
+  let bestAlignment = 0
+  const sharedA =
+    sourceA === candidateA || sourceA === candidateB ? sourceA : -1
+  const sharedB =
+    sourceB === candidateA || sourceB === candidateB ? sourceB : -1
+
+  for (let pass = 0; pass < 2; pass += 1) {
+    const shared = pass === 0 ? sharedA : sharedB
+    if (shared < 0 || (pass === 1 && shared === sharedA)) continue
+
+    const sourceOther = shared === sourceA ? sourceB : sourceA
+    const candidateOther =
+      shared === candidateA ? candidateB : candidateA
+    const sharedOffset = shared * 3
+    const sourceOffset = sourceOther * 3
+    const candidateOffset = candidateOther * 3
+    const sourceX =
+      centroids[sourceOffset] - centroids[sharedOffset]
+    const sourceY =
+      centroids[sourceOffset + 1] - centroids[sharedOffset + 1]
+    const sourceZ =
+      centroids[sourceOffset + 2] - centroids[sharedOffset + 2]
+    const candidateX =
+      centroids[candidateOffset] - centroids[sharedOffset]
+    const candidateY =
+      centroids[candidateOffset + 1] - centroids[sharedOffset + 1]
+    const candidateZ =
+      centroids[candidateOffset + 2] - centroids[sharedOffset + 2]
+    const sourceLength = vectorLength(sourceX, sourceY, sourceZ)
+    const candidateLength = vectorLength(
+      candidateX,
+      candidateY,
+      candidateZ,
+    )
+    if (
+      sourceLength <= EPSILON ||
+      candidateLength <= EPSILON
+    ) {
+      continue
+    }
+    const alignment = clamp(
+      -(
+        sourceX * candidateX +
+        sourceY * candidateY +
+        sourceZ * candidateZ
+      ) /
+        (sourceLength * candidateLength),
+      0,
+      1,
+    )
+    bestAlignment = Math.max(bestAlignment, alignment)
+  }
+
+  return bestAlignment
+}
+
 function resolveOptions(
   options: FractureOptions,
   defaultPropagationRadius: number,
@@ -193,6 +291,9 @@ function resolveOptions(
     holdStrength: options.holdStrength ?? 0.65,
     globalCompressionFatigue: options.globalCompressionFatigue ?? 0,
     crackContinuation: options.crackContinuation ?? 0.45,
+    tipStressTransfer: options.tipStressTransfer ?? 0.55,
+    tipStressDecay: options.tipStressDecay ?? 0.82,
+    maxTipBranches: options.maxTipBranches ?? 2,
     normalCutoff: options.normalCutoff ?? -0.2,
     peelBrokenRatio: options.peelBrokenRatio ?? 0.4,
     detachBrokenRatio: options.detachBrokenRatio ?? 0.8,
@@ -230,6 +331,15 @@ function resolveOptions(
     resolved.crackContinuation < 0
   ) {
     throw new Error('crackContinuation must be a finite non-negative number')
+  }
+  assertRatio(resolved.tipStressTransfer, 'tipStressTransfer')
+  assertRatio(resolved.tipStressDecay, 'tipStressDecay')
+  if (
+    !Number.isInteger(resolved.maxTipBranches) ||
+    resolved.maxTipBranches < 0 ||
+    resolved.maxTipBranches > 2
+  ) {
+    throw new Error('maxTipBranches must be an integer between zero and two')
   }
   if (
     !Number.isFinite(resolved.normalCutoff) ||
@@ -321,6 +431,8 @@ export function createFractureModel(
   const bondFragmentB = chooseIndexArray(bondCount, fragmentCount - 1)
   const bondLength = new Float32Array(bondCount)
   const bondToughness = new Float32Array(bondCount)
+  const bondRole = new Uint8Array(bondCount)
+  bondRole.fill(2)
   const incidentCounts = new Uint32Array(fragmentCount)
   let totalBondLength = 0
 
@@ -342,11 +454,20 @@ export function createFractureModel(
     }
     assertFinitePositive(bond.length, `Bond ${String(bond.id)} length`)
     assertFinitePositive(bond.toughness, `Bond ${String(bond.id)} toughness`)
+    if (
+      bond.role !== undefined &&
+      (!Number.isInteger(bond.role) || bond.role < 0 || bond.role > 2)
+    ) {
+      throw new Error(
+        `Bond ${String(bond.id)} role must be an integer from zero to two`,
+      )
+    }
 
     bondFragmentA[index] = fragmentA
     bondFragmentB[index] = fragmentB
     bondLength[index] = bond.length
     bondToughness[index] = bond.toughness
+    bondRole[index] = bond.role ?? 2
     incidentCounts[fragmentA] += 1
     incidentCounts[fragmentB] += 1
     totalBondLength += bond.length
@@ -377,6 +498,69 @@ export function createFractureModel(
     incidentBonds[incidentCursors[fragmentB]] = bondIndex
     incidentCursors[fragmentB] += 1
   }
+
+  const neighborLists = Array.from(
+    { length: bondCount },
+    () => new Map<number, number>(),
+  )
+  for (let bondIndex = 0; bondIndex < bondCount; bondIndex += 1) {
+    const fragmentA = bondFragmentA[bondIndex]
+    const fragmentB = bondFragmentB[bondIndex]
+    for (let endpoint = 0; endpoint < 2; endpoint += 1) {
+      const fragment = endpoint === 0 ? fragmentA : fragmentB
+      const start = incidentStarts[fragment]
+      const end = incidentStarts[fragment + 1]
+      for (let cursor = start; cursor < end; cursor += 1) {
+        const neighbor = incidentBonds[cursor]
+        if (neighbor === bondIndex) continue
+        const alignment = bondContinuationAlignment(
+          fragmentA,
+          fragmentB,
+          bondFragmentA[neighbor],
+          bondFragmentB[neighbor],
+          centroids,
+        )
+        const existing = neighborLists[bondIndex].get(neighbor)
+        if (existing === undefined || alignment > existing) {
+          neighborLists[bondIndex].set(neighbor, alignment)
+        }
+      }
+    }
+  }
+
+  const bondNeighborStarts = new Uint32Array(bondCount + 1)
+  const sortedNeighborLists = neighborLists.map((neighbors) =>
+    [...neighbors.entries()].sort((left, right) =>
+      compareIds(bondIds[left[0]], bondIds[right[0]]),
+    ),
+  )
+  for (let bondIndex = 0; bondIndex < bondCount; bondIndex += 1) {
+    bondNeighborStarts[bondIndex + 1] =
+      bondNeighborStarts[bondIndex] +
+      sortedNeighborLists[bondIndex].length
+  }
+  const bondNeighbors = chooseIndexArray(
+    bondNeighborStarts[bondCount],
+    bondCount - 1,
+  )
+  const bondNeighborAlignment = new Float32Array(
+    bondNeighborStarts[bondCount],
+  )
+  for (let bondIndex = 0; bondIndex < bondCount; bondIndex += 1) {
+    const outputStart = bondNeighborStarts[bondIndex]
+    const neighbors = sortedNeighborLists[bondIndex]
+    for (let cursor = 0; cursor < neighbors.length; cursor += 1) {
+      bondNeighbors[outputStart + cursor] = neighbors[cursor][0]
+      bondNeighborAlignment[outputStart + cursor] =
+        neighbors[cursor][1]
+    }
+  }
+  const stableOrder = Array.from(
+    { length: bondCount },
+    (_, index) => index,
+  ).sort((left, right) => compareIds(bondIds[left], bondIds[right]))
+  const bondStableOrder = chooseIndexArray(bondCount, bondCount - 1)
+  bondStableOrder.set(stableOrder)
 
   const geodesicDistances = new Float32Array(fragmentCount * fragmentCount)
   geodesicDistances.fill(Number.POSITIVE_INFINITY)
@@ -449,8 +633,13 @@ export function createFractureModel(
     bondFragmentB,
     bondLength,
     bondToughness,
+    bondRole,
     incidentStarts,
     incidentBonds,
+    bondNeighborStarts,
+    bondNeighbors,
+    bondNeighborAlignment,
+    bondStableOrder,
     geodesicDistances,
     meanBondLength,
     options: resolvedOptions,
@@ -462,6 +651,8 @@ export function createFractureState(model: FractureModel): FractureState {
   return {
     bondDamage: new Float32Array(model.bondCount),
     bondBroken: new Uint8Array(model.bondCount),
+    bondTipStress: new Float32Array(model.bondCount),
+    bondSeamOpen: new Float32Array(model.bondCount),
     fragmentState: new Uint8Array(model.fragmentCount),
     fragmentLoad: new Float32Array(model.fragmentCount),
     fragmentBrokenBonds: chooseIndexArray(
@@ -471,6 +662,10 @@ export function createFractureState(model: FractureModel): FractureState {
     fragmentPeelAge: new Float32Array(model.fragmentCount),
     fragmentDetachAge: new Float32Array(model.fragmentCount),
     fragmentSettleCandidate: new Uint8Array(model.fragmentCount),
+    bondStepLoad: new Float32Array(model.bondCount),
+    bondStepDamage: new Float32Array(model.bondCount),
+    bondPendingBreak: new Uint8Array(model.bondCount),
+    bondNextTipStress: new Float32Array(model.bondCount),
     events: [],
     elapsedSeconds: 0,
     accumulatorSeconds: 0,
@@ -485,12 +680,18 @@ export function createFractureState(model: FractureModel): FractureState {
 export function resetFractureState(state: FractureState) {
   state.bondDamage.fill(0)
   state.bondBroken.fill(0)
+  state.bondTipStress.fill(0)
+  state.bondSeamOpen.fill(0)
   state.fragmentState.fill(FRAGMENT_STATE.ATTACHED)
   state.fragmentLoad.fill(0)
   state.fragmentBrokenBonds.fill(0)
   state.fragmentPeelAge.fill(0)
   state.fragmentDetachAge.fill(0)
   state.fragmentSettleCandidate.fill(0)
+  state.bondStepLoad.fill(0)
+  state.bondStepDamage.fill(0)
+  state.bondPendingBreak.fill(0)
+  state.bondNextTipStress.fill(0)
   state.events.length = 0
   state.elapsedSeconds = 0
   state.accumulatorSeconds = 0
@@ -716,6 +917,73 @@ function updateFragmentStates(
   }
 }
 
+function transferTipStress(
+  model: FractureModel,
+  state: FractureState,
+  sourceBond: number,
+  sourceStress: number,
+) {
+  if (
+    model.options.maxTipBranches === 0 ||
+    sourceStress <= EPSILON
+  ) {
+    return
+  }
+
+  let firstBond = -1
+  let firstScore = 0
+  let secondBond = -1
+  let secondScore = 0
+  const start = model.bondNeighborStarts[sourceBond]
+  const end = model.bondNeighborStarts[sourceBond + 1]
+
+  for (let cursor = start; cursor < end; cursor += 1) {
+    const candidate = model.bondNeighbors[cursor]
+    if (
+      state.bondBroken[candidate] !== 0 ||
+      state.bondPendingBreak[candidate] !== 0
+    ) {
+      continue
+    }
+
+    const role = model.bondRole[candidate]
+    const alignment = model.bondNeighborAlignment[cursor]
+    const isWeakPath = role <= 1
+    if (!isWeakPath && alignment < 0.55) {
+      continue
+    }
+
+    const roleWeight = role === 0 ? 1 : role === 1 ? 0.78 : 0.48
+    const score =
+      ((0.2 + alignment * 0.8) * roleWeight) /
+      Math.sqrt(model.bondToughness[candidate])
+
+    if (score > firstScore + EPSILON) {
+      secondBond = firstBond
+      secondScore = firstScore
+      firstBond = candidate
+      firstScore = score
+    } else if (score > secondScore + EPSILON) {
+      secondBond = candidate
+      secondScore = score
+    }
+  }
+
+  if (firstBond < 0) {
+    return
+  }
+  if (model.options.maxTipBranches === 1 || secondBond < 0) {
+    state.bondNextTipStress[firstBond] += sourceStress
+    return
+  }
+
+  const totalScore = firstScore + secondScore
+  state.bondNextTipStress[firstBond] +=
+    sourceStress * (firstScore / totalScore)
+  state.bondNextTipStress[secondBond] +=
+    sourceStress * (secondScore / totalScore)
+}
+
 function runFixedStep(
   model: FractureModel,
   state: FractureState,
@@ -726,6 +994,19 @@ function runFixedStep(
   const globalCompressionLoad =
     combinedPressStrength * model.options.globalCompressionFatigue
 
+  state.bondStepLoad.fill(0)
+  state.bondStepDamage.fill(0)
+  state.bondPendingBreak.fill(0)
+  for (let bondIndex = 0; bondIndex < model.bondCount; bondIndex += 1) {
+    state.bondNextTipStress[bondIndex] =
+      state.bondBroken[bondIndex] === 0
+        ? state.bondTipStress[bondIndex] *
+          model.options.tipStressDecay
+        : 0
+  }
+
+  // Phase one only evaluates the start-of-step state. No bond can observe a
+  // break selected by another bond during this pass.
   for (let bondIndex = 0; bondIndex < model.bondCount; bondIndex += 1) {
     if (state.bondBroken[bondIndex] !== 0) continue
 
@@ -735,7 +1016,9 @@ function runFixedStep(
       Math.max(
         state.fragmentLoad[fragmentA],
         state.fragmentLoad[fragmentB],
-      ) + globalCompressionLoad
+      ) +
+      globalCompressionLoad +
+      state.bondTipStress[bondIndex]
     if (load <= EPSILON) continue
 
     const brokenNeighbors =
@@ -756,28 +1039,82 @@ function runFixedStep(
       fixedDeltaSeconds *
       continuationMultiplier *
       lengthMultiplier
+    state.bondStepLoad[bondIndex] = load
+    state.bondStepDamage[bondIndex] = damageIncrement
+  }
+
+  // Phase two applies monotonic damage and marks candidates in stable ID
+  // order, but deliberately leaves the broken mask untouched.
+  for (
+    let orderIndex = 0;
+    orderIndex < model.bondCount;
+    orderIndex += 1
+  ) {
+    const bondIndex = model.bondStableOrder[orderIndex]
+    if (state.bondBroken[bondIndex] !== 0) continue
+    const damageIncrement = state.bondStepDamage[bondIndex]
+    if (damageIncrement <= EPSILON) continue
+
     const nextDamage =
       state.bondDamage[bondIndex] + damageIncrement
     state.bondDamage[bondIndex] = nextDamage
-
     if (nextDamage >= model.bondToughness[bondIndex]) {
-      state.bondBroken[bondIndex] = 1
-      state.brokenBondCount += 1
-      state.fragmentBrokenBonds[fragmentA] += 1
-      state.fragmentBrokenBonds[fragmentB] += 1
-      state.events.push({
-        type: 'bond-break',
-        bondIndex,
-        bondId: model.bondIds[bondIndex],
-        fragmentA,
-        fragmentB,
-        energy:
-          damageIncrement +
-          Math.max(
-            0,
-            nextDamage - model.bondToughness[bondIndex],
-          ),
-      })
+      state.bondPendingBreak[bondIndex] = 1
+    }
+  }
+
+  // Phase three commits every selected break. Transferred tip stress is
+  // written only to the next-step buffer, preventing same-step avalanches.
+  for (
+    let orderIndex = 0;
+    orderIndex < model.bondCount;
+    orderIndex += 1
+  ) {
+    const bondIndex = model.bondStableOrder[orderIndex]
+    if (state.bondPendingBreak[bondIndex] === 0) continue
+
+    const fragmentA = model.bondFragmentA[bondIndex]
+    const fragmentB = model.bondFragmentB[bondIndex]
+    const damageIncrement = state.bondStepDamage[bondIndex]
+    const overload = Math.max(
+      0,
+      state.bondDamage[bondIndex] -
+        model.bondToughness[bondIndex],
+    )
+    state.bondBroken[bondIndex] = 1
+    state.bondSeamOpen[bondIndex] = 0
+    state.bondNextTipStress[bondIndex] = 0
+    state.brokenBondCount += 1
+    state.fragmentBrokenBonds[fragmentA] += 1
+    state.fragmentBrokenBonds[fragmentB] += 1
+    state.events.push({
+      type: 'bond-break',
+      bondIndex,
+      bondId: model.bondIds[bondIndex],
+      fragmentA,
+      fragmentB,
+      energy: damageIncrement + overload,
+    })
+
+    transferTipStress(
+      model,
+      state,
+      bondIndex,
+      (damageIncrement + overload) *
+        model.options.tipStressTransfer,
+    )
+  }
+
+  for (let bondIndex = 0; bondIndex < model.bondCount; bondIndex += 1) {
+    state.bondTipStress[bondIndex] =
+      state.bondNextTipStress[bondIndex]
+    if (state.bondBroken[bondIndex] !== 0) {
+      state.bondTipStress[bondIndex] = 0
+      state.bondSeamOpen[bondIndex] = Math.min(
+        1,
+        state.bondSeamOpen[bondIndex] +
+          fixedDeltaSeconds / SEAM_OPEN_SECONDS,
+      )
     }
   }
 
