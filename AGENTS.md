@@ -19,6 +19,7 @@ Use this stack unless a task explicitly changes it:
 - React Three Fiber
 - Three.js
 - Drei
+- React Three Rapier, only for detached wax-fragment rigid bodies
 - Plain CSS
 - Vitest
 - Oxlint
@@ -26,8 +27,10 @@ Use this stack unless a task explicitly changes it:
 - Vercel static deployment with native Git integration
 
 Do not migrate to Next.js, introduce a backend, add a state-management library,
-add a physics or animation library, add post-processing, or add heavy UI
-frameworks unless the task explicitly requires it.
+add another physics or animation library, add post-processing, or add heavy UI
+frameworks unless the task explicitly requires it. Keep fracture topology and
+damage deterministic in application code; Rapier does not decide where wax
+breaks.
 
 ## Product and implementation rules
 

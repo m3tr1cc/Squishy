@@ -50,7 +50,15 @@ function ResponsiveCamera() {
   return null
 }
 
-export function SquishyScene() {
+type SquishySceneProps = {
+  onComplete: () => void
+  resetKey: number
+}
+
+export function SquishyScene({
+  onComplete,
+  resetKey,
+}: SquishySceneProps) {
   const reducedMotion = useReducedMotion()
 
   return (
@@ -75,7 +83,11 @@ export function SquishyScene() {
         intensity={0.75}
         position={[4, 2, -3]}
       />
-      <ButterSquishy reducedMotion={reducedMotion} />
+      <ButterSquishy
+        key={resetKey}
+        onComplete={onComplete}
+        reducedMotion={reducedMotion}
+      />
       <mesh
         position={[0, GROUND_Y - 0.035, 0]}
         rotation={[-Math.PI / 2, 0, 0]}

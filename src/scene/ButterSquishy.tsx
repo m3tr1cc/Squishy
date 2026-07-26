@@ -1,73 +1,272 @@
 import type { ThreeEvent } from '@react-three/fiber'
 import { useFrame } from '@react-three/fiber'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import * as THREE from 'three'
 import {
+  BUTTER_SIZE,
+  CORNER_RADIUS,
+  GROUND_Y,
   MAX_ACTIVE_IMPACTS,
-  SHELL_OFFSET,
 } from './constants'
-import { createRoundedCuboidGeometry } from './createRoundedCuboidGeometry'
+import { createButterLabelGeometry } from './createButterLabelGeometry'
 import { createButterLabelTexture } from './createButterLabelTexture'
+import { createRoundedCuboidGeometry } from './createRoundedCuboidGeometry'
 import {
   captureDeformationSource,
   writeDeformedPositions,
 } from './deformation'
-import { createSquishyImpact, isQualifiedTap } from './interaction'
+import {
+  createFractureModel,
+  createFractureState,
+  FRAGMENT_STATE,
+  markFragmentsSettled,
+  stepFracture,
+  type FracturePress,
+} from './fracture/damage'
+import type {
+  DebrisCluster,
+  DebrisStaticCollider,
+  DebrisTransform,
+} from './fracture/RapierDebris'
+import {
+  createWaxGeometryRuntime,
+  writeWaxGeometry,
+} from './fracture/waxGeometryRuntime'
+import {
+  createWaxTopology,
+  getWaxTriangleMetadata,
+} from './fracture/topology'
+import { createSurfaceHit, isQualifiedTap } from './interaction'
 import {
   INTRO_SPRING,
   PRESS_SPRING,
   stepSpring,
 } from './spring'
-import type { DentImpact, SquishyImpact } from './types'
-import { WaxBreak, type WaxBreakRecord } from './WaxBreak'
-import { createCrackTexture } from './createWaxBreakAssets'
+import type {
+  DentImpact,
+  SquishyImpact,
+  SurfaceHit,
+  SurfaceLayer,
+} from './types'
+
+const LazyRapierDebris = lazy(() => import('./fracture/RapierDebris'))
 
 type ButterSquishyProps = {
   reducedMotion: boolean
+  onComplete: () => void
   onImpact?: (impact: SquishyImpact) => void
 }
 
-type PendingTouch = {
-  clientX: number
-  clientY: number
-  startedAt: number
-  impact: SquishyImpact
+type MutableFracturePress = {
+  fragmentIndex?: number
+  localPoint: SurfaceHit['localPoint']
+  localNormal: SurfaceHit['localNormal']
+  pressure: number
+  durationSeconds: number
 }
 
-let impactSequence = 0
+type ActivePress = {
+  pointerId: number
+  pointerType: SurfaceHit['pointerType']
+  startX: number
+  startY: number
+  startedAt: number
+  hit: SurfaceHit
+  dent: DentImpact
+  damageInput: MutableFracturePress
+}
+
+type TapPulse = {
+  input: MutableFracturePress
+  remainingSeconds: number
+}
+
+type FragmentAdjacency = Readonly<{
+  neighborFragmentIds: ArrayLike<number>
+}>
+
+type DebrisClusterBinding = Readonly<{
+  fragmentIndices: readonly number[]
+  /** Fragment-pivot offsets in the rigid body's local coordinate system. */
+  localOffsets: Float32Array
+}>
+
 const DEFAULT_NORMAL = [0, 0, 1] as const
+const PRESENTATION_ROTATION = [-0.055, -0.11, 0] as const
+const MINIMUM_TAP_PULSE_SECONDS = 0.16
+const TOUCH_DAMAGE_DELAY_SECONDS = 0.08
+const MAX_DEBRIS_CLUSTER_SIZE = 6
 const NO_RAYCAST = () => null
 const REDUCED_PRESS_SPRING = {
   ...PRESS_SPRING,
   damping: 31,
 } as const
 
-function normalizePointerType(value: string): SquishyImpact['pointerType'] {
+let impactSequence = 0
+
+function normalizePointerType(value: string): SurfaceHit['pointerType'] {
   if (value === 'touch' || value === 'pen') {
     return value
   }
   return 'mouse'
 }
 
+function findWeakestInactiveImpact(
+  impacts: DentImpact[],
+  activeDents: ReadonlySet<DentImpact>,
+) {
+  let selectedIndex = -1
+  let selectedAmount = Number.POSITIVE_INFINITY
+
+  for (let index = 0; index < impacts.length; index += 1) {
+    const impact = impacts[index]
+    if (
+      !activeDents.has(impact) &&
+      Math.abs(impact.amount) < selectedAmount
+    ) {
+      selectedIndex = index
+      selectedAmount = Math.abs(impact.amount)
+    }
+  }
+
+  return selectedIndex
+}
+
+/**
+ * Partitions one frame's detachments into stable, connected groups. Starting
+ * with the lowest remaining fragment ID makes the result independent of event
+ * order, while breadth-first growth prevents a group from spanning a gap.
+ */
+export function groupConnectedFragments(
+  fragmentIndices: readonly number[],
+  fragments: readonly FragmentAdjacency[],
+  maximumClusterSize = MAX_DEBRIS_CLUSTER_SIZE,
+) {
+  if (
+    !Number.isInteger(maximumClusterSize) ||
+    maximumClusterSize < 1
+  ) {
+    throw new Error('maximumClusterSize must be a positive integer')
+  }
+
+  const ordered = [...new Set(fragmentIndices)].sort(
+    (left, right) => left - right,
+  )
+  const remaining = new Set(ordered)
+  const clusters: number[][] = []
+
+  for (const seed of ordered) {
+    if (!remaining.delete(seed)) {
+      continue
+    }
+
+    const cluster = [seed]
+    for (
+      let cursor = 0;
+      cursor < cluster.length &&
+      cluster.length < maximumClusterSize;
+      cursor += 1
+    ) {
+      const neighbors = fragments[cluster[cursor]]?.neighborFragmentIds
+      if (!neighbors) {
+        continue
+      }
+      for (
+        let neighborCursor = 0;
+        neighborCursor < neighbors.length &&
+        cluster.length < maximumClusterSize;
+        neighborCursor += 1
+      ) {
+        const neighbor = neighbors[neighborCursor]
+        if (remaining.delete(neighbor)) {
+          cluster.push(neighbor)
+        }
+      }
+    }
+    clusters.push(cluster)
+  }
+
+  return clusters
+}
+
 export function ButterSquishy({
   reducedMotion,
+  onComplete,
   onImpact,
 }: ButterSquishyProps) {
   const presentationRef = useRef<THREE.Group>(null)
   const compressionRef = useRef<THREE.Group>(null)
   const hoverLightRef = useRef<THREE.PointLight>(null)
   const innerGeometry = useMemo(() => createRoundedCuboidGeometry(), [])
-  const shellGeometry = useMemo(() => innerGeometry.clone(), [innerGeometry])
+  const labelGeometry = useMemo(() => createButterLabelGeometry(), [])
   const labelTexture = useMemo(createButterLabelTexture, [])
-  const crackTexture = useMemo(createCrackTexture, [])
-  const source = useMemo(
+  const innerSource = useMemo(
     () => captureDeformationSource(innerGeometry),
     [innerGeometry],
   )
+  const labelSource = useMemo(
+    () => captureDeformationSource(labelGeometry),
+    [labelGeometry],
+  )
+  const waxTopology = useMemo(
+    () => createWaxTopology({ sourceGeometry: innerGeometry }),
+    [innerGeometry],
+  )
+  const waxRuntime = useMemo(
+    () => createWaxGeometryRuntime(waxTopology),
+    [waxTopology],
+  )
+  const fractureModel = useMemo(
+    () =>
+      createFractureModel(
+        {
+          fragments: waxTopology.fragments.map((fragment) => ({
+            id: fragment.id,
+            centroid: fragment.centroid,
+            normal: fragment.averageNormal,
+          })),
+          bonds: waxTopology.bonds.map((bond) => ({
+            id: bond.id,
+            fragmentA: bond.fragmentA,
+            fragmentB: bond.fragmentB,
+            length: bond.length,
+            toughness: bond.toughness,
+          })),
+        },
+        {
+          propagationRadius: 0.52,
+          damagePerSecond: 5.2,
+          holdRampSeconds: 0.22,
+          holdStrength: 0.9,
+          crackContinuation: 0.3,
+          globalCompressionFatigue: 0.035,
+          peelBrokenRatio: 0.78,
+          detachBrokenRatio: 0.99,
+          minimumPeelSeconds: 0.22,
+          settleCandidateSeconds: 0.2,
+        },
+      ),
+    [waxTopology],
+  )
+  const fractureStateRef = useRef(createFractureState(fractureModel))
   const impactsRef = useRef<DentImpact[]>([])
-  const [waxBreaks, setWaxBreaks] = useState<WaxBreakRecord[]>([])
+  const activeDentsRef = useRef(new Set<DentImpact>())
+  const activePressesRef = useRef(new Map<number, ActivePress>())
+  const tapPulsesRef = useRef<TapPulse[]>([])
+  const pressInputsRef = useRef<FracturePress[]>([])
+  const peelAmountsRef = useRef(new Float32Array(waxTopology.plateCount))
+  const fragmentPosesRef = useRef(waxRuntime.poseScratch)
+  const geometryDirtyRef = useRef(true)
+  const bodyNeedsRestoreRef = useRef(true)
   const historyRef = useRef<SquishyImpact[]>([])
-  const pendingTouchesRef = useRef(new Map<number, PendingTouch>())
   const hoverTargetRef = useRef(new THREE.Vector3(0, 0, 2))
   const hoverStrengthRef = useRef(0)
   const hoverGoalRef = useRef(0)
@@ -77,198 +276,670 @@ export function ButterSquishy({
   })
   const springScratchRef = useRef({ value: 0, velocity: 0 })
   const lastInteractionRef = useRef(performance.now())
-  const needsBaselineRestoreRef = useRef(true)
+  const completionSentRef = useRef(false)
+  const clusterBindingsRef = useRef(
+    new Map<string, DebrisClusterBinding>(),
+  )
+  const inverseWorldMatrixRef = useRef(new THREE.Matrix4())
+  const parentWorldQuaternionRef = useRef(new THREE.Quaternion())
+  const worldQuaternionRef = useRef(new THREE.Quaternion())
+  const localQuaternionRef = useRef(new THREE.Quaternion())
+  const worldPositionRef = useRef(new THREE.Vector3())
+  const localPositionRef = useRef(new THREE.Vector3())
+  const [debrisClusters, setDebrisClusters] = useState<DebrisCluster[]>([])
+
+  const staticColliders = useMemo<readonly DebrisStaticCollider[]>(() => {
+    const quaternion = new THREE.Quaternion().setFromEuler(
+      new THREE.Euler(...PRESENTATION_ROTATION),
+    )
+    return [
+      {
+        id: 'butter-body',
+        kind: 'round-cuboid',
+        halfExtents: [
+          BUTTER_SIZE.width / 2 - CORNER_RADIUS - 0.06,
+          BUTTER_SIZE.height / 2 - CORNER_RADIUS - 0.06,
+          BUTTER_SIZE.depth / 2 - CORNER_RADIUS - 0.06,
+        ],
+        borderRadius: CORNER_RADIUS - 0.06,
+        quaternion: [
+          quaternion.x,
+          quaternion.y,
+          quaternion.z,
+          quaternion.w,
+        ],
+        friction: 0.88,
+        restitution: 0.015,
+      },
+      {
+        id: 'tabletop',
+        kind: 'cuboid',
+        halfExtents: [20, 0.05, 20],
+        position: [0, GROUND_Y - 0.085, 0],
+        friction: 0.94,
+        restitution: 0.01,
+      },
+    ]
+  }, [])
 
   useEffect(() => {
-    writeDeformedPositions(innerGeometry, source, [], 0)
-    writeDeformedPositions(shellGeometry, source, [], SHELL_OFFSET)
+    writeDeformedPositions(innerGeometry, innerSource, [], 0)
+    writeDeformedPositions(labelGeometry, labelSource, [], 0)
+    writeWaxGeometry({
+      runtime: waxRuntime,
+      topology: waxTopology,
+      fractureModel,
+      fractureState: fractureStateRef.current,
+      impacts: [],
+      peelAmounts: peelAmountsRef.current,
+    })
+    waxRuntime.geometry.boundingSphere = new THREE.Sphere(
+      new THREE.Vector3(),
+      12,
+    )
 
     return () => {
       innerGeometry.dispose()
-      shellGeometry.dispose()
+      labelGeometry.dispose()
+      waxRuntime.geometry.dispose()
       labelTexture.dispose()
-      crackTexture.dispose()
       document.body.style.cursor = ''
     }
   }, [
-    crackTexture,
+    fractureModel,
     innerGeometry,
+    innerSource,
+    labelGeometry,
+    labelSource,
     labelTexture,
-    shellGeometry,
-    source,
+    waxRuntime,
+    waxTopology,
   ])
 
-  const commitImpact = useCallback(
+  const rememberImpact = useCallback(
     (impact: SquishyImpact) => {
-      const impacts = impactsRef.current
-      const nextImpact: DentImpact = {
-        id: impact.id,
-        localPoint: impact.localPoint,
-        localNormal: impact.localNormal,
-        amount: 1,
-        velocity: 0,
-      }
-
-      if (impacts.length >= MAX_ACTIVE_IMPACTS) {
-        impacts.sort((left, right) => Math.abs(left.amount) - Math.abs(right.amount))
-        impacts.shift()
-      }
-      impacts.push(nextImpact)
-
       const history = historyRef.current
       history.push(impact)
       if (history.length > 16) {
         history.shift()
       }
-
-      lastInteractionRef.current = performance.now()
-      needsBaselineRestoreRef.current = true
-      setWaxBreaks((current) => [
-        ...current.slice(-7),
-        {
-          impact,
-          seed: impactSequence * 7919,
-        },
-      ])
       onImpact?.(impact)
     },
     [onImpact],
   )
 
-  const impactFromEvent = useCallback(
-    (event: ThreeEvent<PointerEvent>) => {
-      if (!event.face || !(event.object instanceof THREE.Mesh)) {
+  const addDent = useCallback((hit: SurfaceHit) => {
+    const impacts = impactsRef.current
+    if (impacts.length >= MAX_ACTIVE_IMPACTS) {
+      const weakest = findWeakestInactiveImpact(
+        impacts,
+        activeDentsRef.current,
+      )
+      if (weakest >= 0) {
+        impacts.splice(weakest, 1)
+      }
+    }
+
+    const dent: DentImpact = {
+      id: hit.id,
+      localPoint: hit.localPoint,
+      localNormal: hit.localNormal,
+      amount: 0,
+      velocity: 0,
+    }
+    impacts.push(dent)
+    activeDentsRef.current.add(dent)
+    bodyNeedsRestoreRef.current = true
+    geometryDirtyRef.current = true
+    return dent
+  }, [])
+
+  const setHoverTarget = useCallback((hit: SurfaceHit) => {
+    hoverTargetRef.current.set(
+      hit.worldPoint[0] + hit.worldNormal[0] * 0.16,
+      hit.worldPoint[1] + hit.worldNormal[1] * 0.16,
+      hit.worldPoint[2] + hit.worldNormal[2] * 0.16,
+    )
+    hoverGoalRef.current = hit.layer === 'wax' ? 1 : 0.35
+  }, [])
+
+  const hitFromEvent = useCallback(
+    (
+      event: ThreeEvent<PointerEvent>,
+      layer: SurfaceLayer,
+    ): SurfaceHit | null => {
+      if (
+        !event.face ||
+        event.faceIndex == null ||
+        !(event.object instanceof THREE.Mesh)
+      ) {
         return null
       }
 
+      let fragmentId: number | null = null
+      if (layer === 'wax') {
+        const metadata = getWaxTriangleMetadata(
+          waxTopology,
+          event.faceIndex,
+        )
+        if (!metadata) {
+          return null
+        }
+        fragmentId = metadata.fragmentId
+      }
+
       impactSequence += 1
-      return createSquishyImpact({
-        id: `impact-${Math.round(performance.now())}-${impactSequence}`,
+      return createSurfaceHit({
+        id: `press-${Math.round(performance.now())}-${impactSequence}`,
         timestampMs: performance.now(),
-        pointerType: normalizePointerType(event.nativeEvent.pointerType),
+        pointerType: normalizePointerType(
+          event.nativeEvent.pointerType,
+        ),
+        pointerId: event.nativeEvent.pointerId,
+        pressure: event.nativeEvent.pressure,
+        layer,
+        fragmentId,
+        faceIndex: event.faceIndex,
         object: event.object,
         worldPoint: event.point,
         face: event.face,
       })
     },
-    [],
+    [waxTopology],
   )
 
-  const setHoverTarget = useCallback((impact: SquishyImpact) => {
-    hoverTargetRef.current.set(
-      impact.worldPoint[0] + impact.worldNormal[0] * 0.16,
-      impact.worldPoint[1] + impact.worldNormal[1] * 0.16,
-      impact.worldPoint[2] + impact.worldNormal[2] * 0.16,
-    )
-    hoverGoalRef.current = 1
-  }, [])
-
-  const handlePointerMove = useCallback(
-    (event: ThreeEvent<PointerEvent>) => {
-      if (event.nativeEvent.pointerType === 'touch') {
-        const pending = pendingTouchesRef.current.get(event.nativeEvent.pointerId)
-        if (pending) {
-          const movement = Math.hypot(
-            event.nativeEvent.clientX - pending.clientX,
-            event.nativeEvent.clientY - pending.clientY,
-          )
-          if (movement > 10) {
-            pendingTouchesRef.current.delete(event.nativeEvent.pointerId)
-          }
-        }
+  const releaseActivePress = useCallback(
+    (
+      pointerId: number,
+      endX: number,
+      endY: number,
+      allowTapPulse: boolean,
+    ) => {
+      const active = activePressesRef.current.get(pointerId)
+      if (!active) {
         return
       }
 
-      const impact = impactFromEvent(event)
-      if (impact) {
-        setHoverTarget(impact)
-        lastInteractionRef.current = performance.now()
+      activePressesRef.current.delete(pointerId)
+      activeDentsRef.current.delete(active.dent)
+      const durationSeconds =
+        (performance.now() - active.startedAt) / 1000
+      const qualified =
+        active.pointerType !== 'touch' ||
+        (allowTapPulse &&
+          isQualifiedTap({
+            startX: active.startX,
+            startY: active.startY,
+            endX,
+            endY,
+            durationMs: durationSeconds * 1000,
+          }))
+
+      if (qualified) {
+        const appliedDamageSeconds =
+          active.pointerType === 'touch'
+            ? Math.max(
+                0,
+                durationSeconds - TOUCH_DAMAGE_DELAY_SECONDS,
+              )
+            : durationSeconds
+        const remaining = Math.max(
+          0,
+          MINIMUM_TAP_PULSE_SECONDS - appliedDamageSeconds,
+        )
+        if (remaining > 0) {
+          active.damageInput.pressure = 1
+          active.damageInput.durationSeconds = durationSeconds
+          tapPulsesRef.current.push({
+            input: active.damageInput,
+            remainingSeconds: remaining,
+          })
+        }
+        if (active.pointerType === 'touch') {
+          rememberImpact(active.hit)
+        }
       }
+
+      geometryDirtyRef.current = true
+      bodyNeedsRestoreRef.current = true
     },
-    [impactFromEvent, setHoverTarget],
+    [rememberImpact],
   )
 
   const handlePointerDown = useCallback(
-    (event: ThreeEvent<PointerEvent>) => {
+    (event: ThreeEvent<PointerEvent>, layer: SurfaceLayer) => {
+      const hit = hitFromEvent(event, layer)
+      if (!hit) {
+        return
+      }
+
+      const fractureState = fractureStateRef.current
+      if (
+        hit.fragmentId !== null &&
+        fractureState.fragmentState[hit.fragmentId] >=
+          FRAGMENT_STATE.DETACHED
+      ) {
+        return
+      }
+
+      if (
+        hit.pointerType === 'touch' &&
+        activePressesRef.current.size >= 2
+      ) {
+        return
+      }
+
       event.stopPropagation()
-      const impact = impactFromEvent(event)
-      if (!impact) {
-        return
+      const captureTarget = event.target as EventTarget & {
+        setPointerCapture?: (pointerId: number) => void
+      }
+      try {
+        captureTarget.setPointerCapture?.(event.nativeEvent.pointerId)
+      } catch {
+        // Pointer capture may be unavailable for synthetic browser events.
       }
 
-      setHoverTarget(impact)
-
-      if (impact.pointerType === 'touch') {
-        const captureTarget = event.target as EventTarget & {
-          setPointerCapture?: (pointerId: number) => void
-        }
-        try {
-          captureTarget.setPointerCapture?.(event.nativeEvent.pointerId)
-        } catch {
-          // Pointer capture is an enhancement; the stored tap still works
-          // when a browser declines capture for a synthetic or canceled event.
-        }
-        pendingTouchesRef.current.set(event.nativeEvent.pointerId, {
-          clientX: event.nativeEvent.clientX,
-          clientY: event.nativeEvent.clientY,
-          startedAt: performance.now(),
-          impact,
-        })
-        return
+      const dent = addDent(hit)
+      const damageInput: MutableFracturePress = {
+        localPoint: hit.localPoint,
+        localNormal: hit.localNormal,
+        pressure: 0,
+        durationSeconds: 0,
       }
+      if (hit.fragmentId !== null) {
+        damageInput.fragmentIndex = hit.fragmentId
+      }
+      activePressesRef.current.set(event.nativeEvent.pointerId, {
+        pointerId: event.nativeEvent.pointerId,
+        pointerType: hit.pointerType,
+        startX: event.nativeEvent.clientX,
+        startY: event.nativeEvent.clientY,
+        startedAt: performance.now(),
+        hit,
+        dent,
+        damageInput,
+      })
 
-      commitImpact(impact)
+      if (hit.pointerType !== 'touch') {
+        rememberImpact(hit)
+        setHoverTarget(hit)
+      } else {
+        // Touch has no persistent hover state. Keeping the pointer-following
+        // light active after a tap can wash out the fine crack edges.
+        hoverGoalRef.current = 0
+      }
+      lastInteractionRef.current = performance.now()
     },
-    [commitImpact, impactFromEvent, setHoverTarget],
+    [addDent, hitFromEvent, rememberImpact, setHoverTarget],
+  )
+
+  const handlePointerMove = useCallback(
+    (event: ThreeEvent<PointerEvent>, layer: SurfaceLayer) => {
+      const active = activePressesRef.current.get(
+        event.nativeEvent.pointerId,
+      )
+      if (active && active.pointerType === 'touch') {
+        const movement = Math.hypot(
+          event.nativeEvent.clientX - active.startX,
+          event.nativeEvent.clientY - active.startY,
+        )
+        if (movement > 10) {
+          releaseActivePress(
+            event.nativeEvent.pointerId,
+            event.nativeEvent.clientX,
+            event.nativeEvent.clientY,
+            false,
+          )
+        }
+        return
+      }
+
+      if (event.nativeEvent.pointerType === 'touch') {
+        return
+      }
+
+      const hit = hitFromEvent(event, layer)
+      if (hit) {
+        setHoverTarget(hit)
+        lastInteractionRef.current = performance.now()
+      }
+    },
+    [hitFromEvent, releaseActivePress, setHoverTarget],
   )
 
   const handlePointerUp = useCallback(
     (event: ThreeEvent<PointerEvent>) => {
-      const pending = pendingTouchesRef.current.get(event.nativeEvent.pointerId)
       const captureTarget = event.target as EventTarget & {
         hasPointerCapture?: (pointerId: number) => boolean
         releasePointerCapture?: (pointerId: number) => void
       }
-
       if (captureTarget.hasPointerCapture?.(event.nativeEvent.pointerId)) {
         try {
-          captureTarget.releasePointerCapture?.(event.nativeEvent.pointerId)
+          captureTarget.releasePointerCapture?.(
+            event.nativeEvent.pointerId,
+          )
         } catch {
-          // The browser may already have released a canceled touch pointer.
+          // The browser may already have released a canceled pointer.
         }
       }
+      releaseActivePress(
+        event.nativeEvent.pointerId,
+        event.nativeEvent.clientX,
+        event.nativeEvent.clientY,
+        true,
+      )
+    },
+    [releaseActivePress],
+  )
 
-      if (!pending) {
+  const handlePointerCancel = useCallback(
+    (event: ThreeEvent<PointerEvent>) => {
+      releaseActivePress(
+        event.nativeEvent.pointerId,
+        event.nativeEvent.clientX,
+        event.nativeEvent.clientY,
+        false,
+      )
+      hoverGoalRef.current = 0
+    },
+    [releaseActivePress],
+  )
+
+  const createDebrisCluster = useCallback(
+    (fragmentIndices: readonly number[]): DebrisCluster | null => {
+      const parent = compressionRef.current
+      if (!parent || fragmentIndices.length === 0) {
+        return null
+      }
+
+      // Bake the last rendered dent/peel pose into the fragment's rigid rest
+      // shape before Rapier mounts. This makes the first physics transform
+      // continuous instead of snapping a freshly detached plate back to the
+      // pristine shell.
+      const currentPositions = waxRuntime.geometry.getAttribute(
+        'position',
+      ).array as Float32Array
+      const currentNormals = waxRuntime.geometry.getAttribute(
+        'normal',
+      ).array as Float32Array
+      for (const fragmentIndex of fragmentIndices) {
+        const fragment = waxTopology.fragments[fragmentIndex]
+        const pivotOffset = fragmentIndex * 3
+        let pivotX = 0
+        let pivotY = 0
+        let pivotZ = 0
+        for (
+          let cursor = 0;
+          cursor < fragment.vertexRange.count;
+          cursor += 1
+        ) {
+          const vertex =
+            fragment.vertexRange.start + cursor
+          const offset = vertex * 3
+          const x = currentPositions[offset]
+          const y = currentPositions[offset + 1]
+          const z = currentPositions[offset + 2]
+          waxRuntime.restPositions[offset] = x
+          waxRuntime.restPositions[offset + 1] = y
+          waxRuntime.restPositions[offset + 2] = z
+          waxRuntime.restNormals[offset] = currentNormals[offset]
+          waxRuntime.restNormals[offset + 1] =
+            currentNormals[offset + 1]
+          waxRuntime.restNormals[offset + 2] =
+            currentNormals[offset + 2]
+          pivotX += x
+          pivotY += y
+          pivotZ += z
+        }
+        const inverseVertexCount = 1 / fragment.vertexRange.count
+        waxRuntime.pivots[pivotOffset] = pivotX * inverseVertexCount
+        waxRuntime.pivots[pivotOffset + 1] =
+          pivotY * inverseVertexCount
+        waxRuntime.pivots[pivotOffset + 2] =
+          pivotZ * inverseVertexCount
+      }
+
+      parent.updateWorldMatrix(true, false)
+      const orderedFragmentIndices = [...fragmentIndices].sort(
+        (left, right) => left - right,
+      )
+      let centroidX = 0
+      let centroidY = 0
+      let centroidZ = 0
+      let normalX = 0
+      let normalY = 0
+      let normalZ = 0
+      let totalArea = 0
+      let clusterSeed = 0
+
+      for (
+        let index = 0;
+        index < orderedFragmentIndices.length;
+        index += 1
+      ) {
+        const fragmentIndex = orderedFragmentIndices[index]
+        const fragment = waxTopology.fragments[fragmentIndex]
+        const pivotOffset = fragmentIndex * 3
+        const area = fragment.surfaceArea
+        centroidX += waxRuntime.pivots[pivotOffset] * area
+        centroidY += waxRuntime.pivots[pivotOffset + 1] * area
+        centroidZ += waxRuntime.pivots[pivotOffset + 2] * area
+        normalX += fragment.averageNormal[0] * area
+        normalY += fragment.averageNormal[1] * area
+        normalZ += fragment.averageNormal[2] * area
+        totalArea += area
+        clusterSeed =
+          (clusterSeed * 131 + fragmentIndex + index + 1) >>> 0
+      }
+      centroidX /= totalArea
+      centroidY /= totalArea
+      centroidZ /= totalArea
+
+      const parentQuaternion = parent.getWorldQuaternion(
+        parentWorldQuaternionRef.current,
+      )
+      const inverseParentQuaternion = parentQuaternion.clone().invert()
+      const euler = new THREE.Euler().setFromQuaternion(
+        parentQuaternion,
+      )
+      const worldCentroid = new THREE.Vector3(
+        centroidX,
+        centroidY,
+        centroidZ,
+      )
+        .applyMatrix4(parent.matrixWorld)
+      const normal = new THREE.Vector3(normalX, normalY, normalZ)
+        .normalize()
+        .applyQuaternion(parentQuaternion)
+        .normalize()
+      const localOffsets = new Float32Array(
+        orderedFragmentIndices.length * 3,
+      )
+      const colliders: Array<DebrisCluster['colliders'][number]> = []
+      const localPivot = new THREE.Vector3()
+      const worldPivot = new THREE.Vector3()
+      const worldVertex = new THREE.Vector3()
+
+      for (
+        let index = 0;
+        index < orderedFragmentIndices.length;
+        index += 1
+      ) {
+        const fragmentIndex = orderedFragmentIndices[index]
+        const fragment = waxTopology.fragments[fragmentIndex]
+        const pivotOffset = fragmentIndex * 3
+        localPivot.fromArray(waxRuntime.pivots, pivotOffset)
+        worldPivot
+          .copy(localPivot)
+          .applyMatrix4(parent.matrixWorld)
+
+        const bindingOffset = index * 3
+        localPivot
+          .copy(worldPivot)
+          .sub(worldCentroid)
+          .applyQuaternion(inverseParentQuaternion)
+        localOffsets[bindingOffset] = localPivot.x
+        localOffsets[bindingOffset + 1] = localPivot.y
+        localOffsets[bindingOffset + 2] = localPivot.z
+
+        const vertexRange = fragment.vertexRange
+        const colliderVertices = new Float32Array(
+          vertexRange.count * 3,
+        )
+        for (let cursor = 0; cursor < vertexRange.count; cursor += 1) {
+          const sourceOffset = (vertexRange.start + cursor) * 3
+          const outputOffset = cursor * 3
+          worldVertex
+            .fromArray(waxRuntime.restPositions, sourceOffset)
+            .applyMatrix4(parent.matrixWorld)
+            .sub(worldPivot)
+            .applyQuaternion(inverseParentQuaternion)
+          colliderVertices[outputOffset] = worldVertex.x
+          colliderVertices[outputOffset + 1] = worldVertex.y
+          colliderVertices[outputOffset + 2] = worldVertex.z
+        }
+        colliders.push({
+          vertices: colliderVertices,
+          position: [
+            localOffsets[bindingOffset],
+            localOffsets[bindingOffset + 1],
+            localOffsets[bindingOffset + 2],
+          ],
+          density: 0.42,
+        })
+      }
+
+      const clusterId = `wax-${orderedFragmentIndices.join('-')}`
+      clusterBindingsRef.current.set(clusterId, {
+        fragmentIndices: orderedFragmentIndices,
+        localOffsets,
+      })
+      for (const fragmentIndex of orderedFragmentIndices) {
+        const positionOffset = fragmentIndex * 3
+        const quaternionOffset = fragmentIndex * 4
+        fragmentPosesRef.current.valid[fragmentIndex] = 1
+        fragmentPosesRef.current.positions[positionOffset] =
+          waxRuntime.pivots[positionOffset]
+        fragmentPosesRef.current.positions[positionOffset + 1] =
+          waxRuntime.pivots[positionOffset + 1]
+        fragmentPosesRef.current.positions[positionOffset + 2] =
+          waxRuntime.pivots[positionOffset + 2]
+        fragmentPosesRef.current.quaternions[quaternionOffset] = 0
+        fragmentPosesRef.current.quaternions[quaternionOffset + 1] = 0
+        fragmentPosesRef.current.quaternions[quaternionOffset + 2] = 0
+        fragmentPosesRef.current.quaternions[quaternionOffset + 3] = 1
+      }
+      return {
+        id: clusterId,
+        colliders,
+        position: [
+          worldCentroid.x,
+          worldCentroid.y,
+          worldCentroid.z,
+        ],
+        rotation: [euler.x, euler.y, euler.z],
+        linearVelocity: [
+          normal.x * 0.14,
+          normal.y * 0.1 - 0.06,
+          normal.z * 0.14,
+        ],
+        angularVelocity: [
+          Math.sin(clusterSeed * 1.71) * 0.55,
+          Math.cos(clusterSeed * 2.13) * 0.48,
+          Math.sin(clusterSeed * 0.83) * 0.52,
+        ],
+        ccd: false,
+      }
+    },
+    [waxRuntime, waxTopology.fragments],
+  )
+
+  const handleDebrisTransform = useCallback(
+    (clusterId: string, transform: DebrisTransform) => {
+      const parent = compressionRef.current
+      const binding = clusterBindingsRef.current.get(clusterId)
+      if (!parent || !binding) {
         return
       }
 
-      pendingTouchesRef.current.delete(event.nativeEvent.pointerId)
-      const duration = performance.now() - pending.startedAt
+      parent.updateWorldMatrix(true, false)
+      inverseWorldMatrixRef.current.copy(parent.matrixWorld).invert()
+      parent.getWorldQuaternion(parentWorldQuaternionRef.current)
+      worldPositionRef.current.set(
+        transform.position[0],
+        transform.position[1],
+        transform.position[2],
+      )
+      worldQuaternionRef.current.set(
+        transform.quaternion[0],
+        transform.quaternion[1],
+        transform.quaternion[2],
+        transform.quaternion[3],
+      )
+      localQuaternionRef.current
+        .copy(parentWorldQuaternionRef.current)
+        .invert()
+        .multiply(worldQuaternionRef.current)
 
-      if (
-        isQualifiedTap({
-          startX: pending.clientX,
-          startY: pending.clientY,
-          endX: event.nativeEvent.clientX,
-          endY: event.nativeEvent.clientY,
-          durationMs: duration,
-        })
+      for (
+        let index = 0;
+        index < binding.fragmentIndices.length;
+        index += 1
       ) {
-        commitImpact(pending.impact)
-        hoverGoalRef.current = 1
+        const fragmentIndex = binding.fragmentIndices[index]
+        const bindingOffset = index * 3
+        const positionOffset = fragmentIndex * 3
+        const quaternionOffset = fragmentIndex * 4
+        localPositionRef.current
+          .fromArray(binding.localOffsets, bindingOffset)
+          .applyQuaternion(worldQuaternionRef.current)
+          .add(worldPositionRef.current)
+          .applyMatrix4(inverseWorldMatrixRef.current)
+        fragmentPosesRef.current.valid[fragmentIndex] = 1
+        fragmentPosesRef.current.positions[positionOffset] =
+          localPositionRef.current.x
+        fragmentPosesRef.current.positions[positionOffset + 1] =
+          localPositionRef.current.y
+        fragmentPosesRef.current.positions[positionOffset + 2] =
+          localPositionRef.current.z
+        fragmentPosesRef.current.quaternions[quaternionOffset] =
+          localQuaternionRef.current.x
+        fragmentPosesRef.current.quaternions[quaternionOffset + 1] =
+          localQuaternionRef.current.y
+        fragmentPosesRef.current.quaternions[quaternionOffset + 2] =
+          localQuaternionRef.current.z
+        fragmentPosesRef.current.quaternions[quaternionOffset + 3] =
+          localQuaternionRef.current.w
       }
+      geometryDirtyRef.current = true
     },
-    [commitImpact],
+    [],
   )
 
-  const handlePointerCancel = useCallback((event: ThreeEvent<PointerEvent>) => {
-    pendingTouchesRef.current.delete(event.nativeEvent.pointerId)
-    hoverGoalRef.current = 0
-  }, [])
+  const handleDebrisSettled = useCallback(
+    (clusterId: string, transform: DebrisTransform) => {
+      handleDebrisTransform(clusterId, transform)
+      const binding = clusterBindingsRef.current.get(clusterId)
+      if (binding) {
+        markFragmentsSettled(
+          fractureModel,
+          fractureStateRef.current,
+          binding.fragmentIndices,
+        )
+      }
+    },
+    [fractureModel, handleDebrisTransform],
+  )
 
   useFrame((state, delta) => {
     const now = performance.now()
     const impacts = impactsRef.current
+    const activeDents = activeDentsRef.current
+    const activePresses = activePressesRef.current
+    const pressInputs = pressInputsRef.current
+    const tapPulses = tapPulsesRef.current
+    const fractureState = fractureStateRef.current
+    pressInputs.length = 0
 
     if (reducedMotion) {
       introRef.current.value = 1
@@ -277,7 +948,50 @@ export function ButterSquishy({
       stepSpring(introRef.current, 1, delta, INTRO_SPRING)
     }
 
+    for (const active of activePresses.values()) {
+      const springScratch = springScratchRef.current
+      springScratch.value = active.dent.amount
+      springScratch.velocity = active.dent.velocity
+      stepSpring(
+        springScratch,
+        1,
+        delta,
+        reducedMotion ? REDUCED_PRESS_SPRING : PRESS_SPRING,
+      )
+      active.dent.amount = Math.min(1, springScratch.value)
+      active.dent.velocity = springScratch.velocity
+      const durationSeconds = (now - active.startedAt) / 1000
+      active.damageInput.durationSeconds = durationSeconds
+      active.damageInput.pressure =
+        Math.min(1, Math.max(0.3, active.dent.amount)) *
+        (active.hit.pressure > 0
+          ? THREE.MathUtils.clamp(active.hit.pressure * 1.45, 0.7, 1)
+          : 1)
+      if (
+        active.pointerType !== 'touch' ||
+        durationSeconds >= TOUCH_DAMAGE_DELAY_SECONDS
+      ) {
+        pressInputs.push(active.damageInput)
+      }
+      geometryDirtyRef.current = true
+      bodyNeedsRestoreRef.current = true
+    }
+
+    for (let index = tapPulses.length - 1; index >= 0; index -= 1) {
+      const pulse = tapPulses[index]
+      pulse.input.durationSeconds += delta
+      pulse.input.pressure = 1
+      pressInputs.push(pulse.input)
+      pulse.remainingSeconds -= delta
+      if (pulse.remainingSeconds <= 0) {
+        tapPulses.splice(index, 1)
+      }
+    }
+
     for (const impact of impacts) {
+      if (activeDents.has(impact)) {
+        continue
+      }
       const springScratch = springScratchRef.current
       springScratch.value = impact.amount
       springScratch.velocity = impact.velocity
@@ -293,40 +1007,144 @@ export function ButterSquishy({
 
     for (let index = impacts.length - 1; index >= 0; index -= 1) {
       const impact = impacts[index]
-      if (Math.abs(impact.amount) < 0.001 && Math.abs(impact.velocity) < 0.001) {
+      if (
+        !activeDents.has(impact) &&
+        Math.abs(impact.amount) < 0.001 &&
+        Math.abs(impact.velocity) < 0.001
+      ) {
         impacts.splice(index, 1)
       }
     }
 
+    stepFracture(
+      fractureModel,
+      fractureState,
+      pressInputs,
+      delta,
+    )
+    if (fractureState.events.length > 0) {
+      geometryDirtyRef.current = true
+      const newClusters: DebrisCluster[] = []
+      const detachedFragments: number[] = []
+      for (const event of fractureState.events) {
+        if (event.type === 'fragment-detach') {
+          detachedFragments.push(event.fragmentIndex)
+        } else if (
+          event.type === 'complete' &&
+          !completionSentRef.current
+        ) {
+          completionSentRef.current = true
+          onComplete()
+        }
+      }
+      const connectedGroups = groupConnectedFragments(
+        detachedFragments,
+        waxTopology.fragments,
+      )
+      for (const group of connectedGroups) {
+        const cluster = createDebrisCluster(group)
+        if (cluster) {
+          newClusters.push(cluster)
+        }
+      }
+      if (newClusters.length > 0) {
+        setDebrisClusters((current) => [...current, ...newClusters])
+      }
+    }
+
+    const peelAmounts = peelAmountsRef.current
+    const peelEase = 1 - Math.exp(-delta * (reducedMotion ? 18 : 8))
+    for (
+      let fragment = 0;
+      fragment < peelAmounts.length;
+      fragment += 1
+    ) {
+      const fragmentState = fractureState.fragmentState[fragment]
+      const degree =
+        fractureModel.incidentStarts[fragment + 1] -
+        fractureModel.incidentStarts[fragment]
+      const brokenRatio =
+        degree > 0
+          ? fractureState.fragmentBrokenBonds[fragment] / degree
+          : 0
+      const target =
+        fragmentState >= FRAGMENT_STATE.PEELING
+          ? 1
+          : fragmentState === FRAGMENT_STATE.CRACKED
+            ? brokenRatio * 0.24
+            : 0
+      const next = THREE.MathUtils.lerp(
+        peelAmounts[fragment],
+        target,
+        peelEase,
+      )
+      if (Math.abs(next - peelAmounts[fragment]) > 0.0001) {
+        peelAmounts[fragment] = next
+        geometryDirtyRef.current = true
+      }
+    }
+
     if (impacts.length > 0) {
-      writeDeformedPositions(innerGeometry, source, impacts, 0)
-      writeDeformedPositions(shellGeometry, source, impacts, SHELL_OFFSET)
-      needsBaselineRestoreRef.current = true
-    } else if (needsBaselineRestoreRef.current) {
-      writeDeformedPositions(innerGeometry, source, [], 0)
-      writeDeformedPositions(shellGeometry, source, [], SHELL_OFFSET)
-      needsBaselineRestoreRef.current = false
+      writeDeformedPositions(innerGeometry, innerSource, impacts, 0)
+      writeDeformedPositions(labelGeometry, labelSource, impacts, 0)
+      bodyNeedsRestoreRef.current = true
+    } else if (bodyNeedsRestoreRef.current) {
+      writeDeformedPositions(innerGeometry, innerSource, [], 0)
+      writeDeformedPositions(labelGeometry, labelSource, [], 0)
+      bodyNeedsRestoreRef.current = false
+      geometryDirtyRef.current = true
+    }
+
+    if (geometryDirtyRef.current) {
+      writeWaxGeometry({
+        runtime: waxRuntime,
+        topology: waxTopology,
+        fractureModel,
+        fractureState,
+        impacts,
+        peelAmounts,
+        fragmentPoses: fragmentPosesRef.current,
+      })
+      geometryDirtyRef.current = false
     }
 
     const newestImpact = impacts[impacts.length - 1]
-    const compression = newestImpact ? Math.max(0, newestImpact.amount) : 0
+    const compression = newestImpact
+      ? Math.max(0, newestImpact.amount)
+      : 0
     if (compressionRef.current) {
-      const normal = newestImpact?.localNormal ?? DEFAULT_NORMAL
-      compressionRef.current.scale.set(
-        1 - 0.025 * Math.abs(normal[0]) * compression +
-          0.006 * (1 - Math.abs(normal[0])) * compression,
-        1 - 0.025 * Math.abs(normal[1]) * compression +
-          0.006 * (1 - Math.abs(normal[1])) * compression,
-        1 - 0.025 * Math.abs(normal[2]) * compression +
-          0.006 * (1 - Math.abs(normal[2])) * compression,
-      )
+      if (debrisClusters.length > 0) {
+        // Detached geometry shares this render group with the butter. Keep
+        // its parent transform stable once rigid bodies exist so sleeping
+        // tabletop pieces cannot drift away from their fixed colliders.
+        compressionRef.current.scale.setScalar(1)
+      } else {
+        const normal = newestImpact?.localNormal ?? DEFAULT_NORMAL
+        compressionRef.current.scale.set(
+          1 -
+            0.025 * Math.abs(normal[0]) * compression +
+            0.006 * (1 - Math.abs(normal[0])) * compression,
+          1 -
+            0.025 * Math.abs(normal[1]) * compression +
+            0.006 * (1 - Math.abs(normal[1])) * compression,
+          1 -
+            0.025 * Math.abs(normal[2]) * compression +
+            0.006 * (1 - Math.abs(normal[2])) * compression,
+        )
+      }
     }
 
     let idlePulse = 0
-    if (!reducedMotion && now - lastInteractionRef.current > 6000) {
-      const pulseTime = ((now - lastInteractionRef.current - 6000) / 1000) % 5
+    if (
+      !reducedMotion &&
+      debrisClusters.length === 0 &&
+      now - lastInteractionRef.current > 6000
+    ) {
+      const pulseTime =
+        ((now - lastInteractionRef.current - 6000) / 1000) % 5
       if (pulseTime < 1.4) {
-        idlePulse = Math.sin((pulseTime / 1.4) * Math.PI) ** 2 * 0.025
+        idlePulse =
+          Math.sin((pulseTime / 1.4) * Math.PI) ** 2 * 0.025
       }
     }
 
@@ -342,20 +1160,60 @@ export function ButterSquishy({
       hoverEase,
     )
     if (hoverLightRef.current) {
-      hoverLightRef.current.position.lerp(hoverTargetRef.current, hoverEase)
-      hoverLightRef.current.intensity = 4.2 * hoverStrengthRef.current
+      hoverLightRef.current.position.lerp(
+        hoverTargetRef.current,
+        hoverEase,
+      )
+      hoverLightRef.current.intensity =
+        1.7 * hoverStrengthRef.current
     }
 
-    if (state.pointer.x === 0 && state.pointer.y === 0 && hoverGoalRef.current === 0) {
+    if (
+      state.pointer.x === 0 &&
+      state.pointer.y === 0 &&
+      hoverGoalRef.current === 0
+    ) {
       hoverStrengthRef.current = 0
     }
   })
 
+  const handleWaxPointerDown = useCallback(
+    (event: ThreeEvent<PointerEvent>) =>
+      handlePointerDown(event, 'wax'),
+    [handlePointerDown],
+  )
+  const handleButterPointerDown = useCallback(
+    (event: ThreeEvent<PointerEvent>) =>
+      handlePointerDown(event, 'butter'),
+    [handlePointerDown],
+  )
+  const handleWaxPointerMove = useCallback(
+    (event: ThreeEvent<PointerEvent>) =>
+      handlePointerMove(event, 'wax'),
+    [handlePointerMove],
+  )
+  const handleButterPointerMove = useCallback(
+    (event: ThreeEvent<PointerEvent>) =>
+      handlePointerMove(event, 'butter'),
+    [handlePointerMove],
+  )
+
   return (
     <>
-      <group ref={presentationRef} rotation={[-0.055, -0.11, 0]}>
+      <group
+        ref={presentationRef}
+        rotation={PRESENTATION_ROTATION}
+      >
         <group ref={compressionRef}>
-          <mesh geometry={innerGeometry} castShadow receiveShadow>
+          <mesh
+            geometry={innerGeometry}
+            castShadow
+            receiveShadow
+            onPointerDown={handleButterPointerDown}
+            onPointerMove={handleButterPointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+          >
             <meshStandardMaterial
               color="#f2c94c"
               metalness={0}
@@ -363,11 +1221,30 @@ export function ButterSquishy({
             />
           </mesh>
           <mesh
-            geometry={shellGeometry}
+            geometry={labelGeometry}
+            raycast={NO_RAYCAST}
+            renderOrder={0}
+          >
+            <meshBasicMaterial
+              map={labelTexture}
+              transparent
+              depthTest={false}
+              depthWrite={false}
+              alphaTest={0.015}
+              opacity={0.94}
+              polygonOffset
+              polygonOffsetFactor={-7}
+              toneMapped={false}
+            />
+          </mesh>
+          <mesh
+            geometry={waxRuntime.geometry}
             castShadow
             receiveShadow
-            onPointerMove={handlePointerMove}
-            onPointerDown={handlePointerDown}
+            frustumCulled={false}
+            renderOrder={1}
+            onPointerMove={handleWaxPointerMove}
+            onPointerDown={handleWaxPointerDown}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerCancel}
             onPointerOver={() => {
@@ -375,52 +1252,59 @@ export function ButterSquishy({
               document.body.style.cursor = 'pointer'
             }}
             onPointerOut={() => {
-              hoverGoalRef.current = 0
+              if (activePressesRef.current.size === 0) {
+                hoverGoalRef.current = 0
+              }
               document.body.style.cursor = ''
             }}
           >
             <meshPhysicalMaterial
-              color="#ffe07a"
-              clearcoat={0.7}
-              clearcoatRoughness={0.22}
+              attach="material-0"
+              color="#ffe17b"
+              clearcoat={0.42}
+              clearcoatRoughness={0.31}
               ior={1.42}
               metalness={0}
-              roughness={0.3}
-              sheen={0.22}
-              sheenColor="#fff4c4"
+              roughness={0.44}
+              sheen={0.16}
+              sheenColor="#fff3bd"
             />
-            <mesh
-              position={[0, 0, 0.672]}
-              raycast={NO_RAYCAST}
-              renderOrder={2}
-            >
-              <planeGeometry args={[3.72, 1.02]} />
-              <meshBasicMaterial
-                map={labelTexture}
-                transparent
-                depthWrite={false}
-                alphaTest={0.015}
-                opacity={0.92}
-                polygonOffset
-                polygonOffsetFactor={-8}
-                toneMapped={false}
-              />
-            </mesh>
-            {waxBreaks.map((record) => (
-              <WaxBreak
-                key={record.impact.id}
-                crackTexture={crackTexture}
-                record={record}
-              />
-            ))}
+            <meshStandardMaterial
+              attach="material-1"
+              color="#bd811d"
+              metalness={0}
+              roughness={0.62}
+              side={THREE.DoubleSide}
+            />
+            <meshStandardMaterial
+              attach="material-2"
+              color="#8f5512"
+              metalness={0}
+              polygonOffset
+              polygonOffsetFactor={4}
+              polygonOffsetUnits={4}
+              roughness={0.72}
+              side={THREE.DoubleSide}
+            />
           </mesh>
         </group>
       </group>
+      {debrisClusters.length > 0 ? (
+        <Suspense fallback={null}>
+          <LazyRapierDebris
+            generation="butter-shell"
+            clusters={debrisClusters}
+            staticColliders={staticColliders}
+            onTransform={handleDebrisTransform}
+            onSettled={handleDebrisSettled}
+          />
+        </Suspense>
+      ) : null}
       <pointLight
         ref={hoverLightRef}
         color="#fff8dc"
         decay={2}
-        distance={1.7}
+        distance={1.5}
         intensity={0}
       />
     </>

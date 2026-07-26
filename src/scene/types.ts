@@ -10,6 +10,17 @@ export type SquishyImpact = Readonly<{
   worldNormal: VectorTuple
 }>
 
+export type SurfaceLayer = 'wax' | 'butter'
+
+export type SurfaceHit = SquishyImpact &
+  Readonly<{
+    faceIndex: number
+    fragmentId: number | null
+    layer: SurfaceLayer
+    pointerId: number
+    pressure: number
+  }>
+
 export type DentImpact = {
   id: string
   localPoint: VectorTuple

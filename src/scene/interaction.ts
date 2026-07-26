@@ -1,5 +1,10 @@
 import * as THREE from 'three'
-import type { SquishyImpact, VectorTuple } from './types'
+import type {
+  SquishyImpact,
+  SurfaceHit,
+  SurfaceLayer,
+  VectorTuple,
+} from './types'
 
 function tuple(vector: THREE.Vector3): VectorTuple {
   return Object.freeze([vector.x, vector.y, vector.z]) as VectorTuple
@@ -68,6 +73,48 @@ export function createSquishyImpact({
     localNormal: tuple(localNormal),
     worldPoint: tuple(worldPoint),
     worldNormal: tuple(worldNormal),
+  })
+}
+
+export function createSurfaceHit({
+  id,
+  timestampMs,
+  pointerType,
+  pointerId,
+  pressure,
+  layer,
+  fragmentId,
+  faceIndex,
+  object,
+  worldPoint,
+  face,
+}: {
+  id: string
+  timestampMs: number
+  pointerType: SquishyImpact['pointerType']
+  pointerId: number
+  pressure: number
+  layer: SurfaceLayer
+  fragmentId: number | null
+  faceIndex: number
+  object: THREE.Mesh
+  worldPoint: THREE.Vector3
+  face: THREE.Face
+}): SurfaceHit {
+  return Object.freeze({
+    ...createSquishyImpact({
+      id,
+      timestampMs,
+      pointerType,
+      object,
+      worldPoint,
+      face,
+    }),
+    faceIndex,
+    fragmentId,
+    layer,
+    pointerId,
+    pressure,
   })
 }
 

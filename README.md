@@ -1,8 +1,8 @@
 # Squishy
 
 Squishy is a customer-facing Codefair project: a tactile, procedural
-wax-covered butter stick that responds to pointer and touch presses with local
-dents and a springy rebound.
+wax-covered butter stick whose continuous shell dents, cracks, peels, and
+breaks apart under pointer and touch pressure.
 
 ## Stack
 
@@ -12,6 +12,7 @@ dents and a springy rebound.
 - React Three Fiber
 - Three.js
 - Drei
+- Rapier, loaded only when detached debris needs rigid-body simulation
 - Plain CSS
 - Vitest and Oxlint
 - Vercel static deployment
@@ -34,19 +35,36 @@ npm run build
 
 ## Architecture
 
-The butter stick is generated from a densely subdivided box whose vertices are
-projected onto a rounded-cuboid surface. The inner body and outer wax shell
-share base positions, normals, and dent fields, which keeps the shell separated
-while both surfaces deform. Pointer intersections are copied into immutable
-local/world impact records so future crack decals, wax fragments, and audio can
-subscribe without changing the core interaction contract.
+The butter body begins as a densely subdivided box projected onto a smooth,
+rounded-cuboid surface. That watertight source is deterministically partitioned
+into 128 connected plates and extruded into one physically thick wax coating.
+Neighboring plates share a persistent bond graph, so every press accumulates
+damage in the existing shell and extends nearby fissures instead of spawning a
+decorative break artifact.
+
+Butter, attached wax, and the conformal label consume the same dent field.
+Pointer raycasts retain the exact surface point, normal, triangle, and wax
+fragment. A fixed-step, typed-array damage simulation converts tap and hold
+pressure into irreversible bond breaks, exposed seams, peeling plates, and
+eventual detachment. A short tap cannot immediately release a loose piece:
+detachment requires continued local peel load. Same-frame neighboring plates
+leave as connected sheets of up to six pieces. Rapier is lazy-loaded only after
+debris exists; its stable generation pool is capped at 24 mobile or 40 desktop
+bodies, and overflow pieces settle deterministically.
+
+The interaction layer supports mouse, pen, and up to two simultaneous mobile
+touches. Touch motion beyond the scroll threshold cancels the press. Responsive
+camera framing, capped device pixel ratio, deterministic geometry, and bounded
+debris counts keep the experience suitable for mobile browsers and Codefair
+iframes.
 
 ## First-prototype boundary
 
-This version includes one squishy, procedural materials, exact surface
-raycasting, dents, compression, rebound, persistent thick-shell wax breaks,
-butter-label decals, a pointer-following wax highlight, idle invitation motion,
-responsive framing, and reduced-motion behavior.
+This version includes one butter squishy, the persistent thick wax shell,
+progressive damage and crack merging, local dents, compression and rebound,
+peeling and rigid-body debris, butter-label decals, pointer-following wax
+highlight, idle invitation motion, reduced-motion behavior, completion
+feedback, and in-page **Re-coat wax** replay.
 
-Detached fragment physics, audio, haptics, additional squishies, persistence,
-analytics, and Codefair-specific messaging are intentionally deferred.
+Cracking and impact audio, haptics, additional squishy shapes, saved progress,
+analytics, and Codefair-specific messaging remain intentionally deferred.

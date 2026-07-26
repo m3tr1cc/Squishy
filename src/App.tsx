@@ -1,5 +1,5 @@
 import { Canvas } from '@react-three/fiber'
-import { Suspense, useMemo } from 'react'
+import { Suspense, useCallback, useMemo, useState } from 'react'
 import { SquishyScene } from './scene/SquishyScene'
 
 function hasWebGl2Support() {
@@ -14,17 +14,26 @@ function hasWebGl2Support() {
 function LoadingState() {
   return (
     <div className="status-card" role="status">
-      Warming the wax…
+      Warming the wax...
     </div>
   )
 }
 
 export function App() {
   const webGlSupported = useMemo(hasWebGl2Support, [])
+  const [resetKey, setResetKey] = useState(0)
+  const [isComplete, setIsComplete] = useState(false)
   const maximumDpr =
     typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
       ? 1.5
       : 1.75
+  const handleComplete = useCallback(() => {
+    setIsComplete(true)
+  }, [])
+  const handleReset = useCallback(() => {
+    setIsComplete(false)
+    setResetKey((current) => current + 1)
+  }, [])
 
   if (!webGlSupported) {
     return (
@@ -55,9 +64,26 @@ export function App() {
           }}
           shadows="percentage"
         >
-          <SquishyScene />
+          <SquishyScene
+            onComplete={handleComplete}
+            resetKey={resetKey}
+          />
         </Canvas>
       </Suspense>
+      {isComplete ? (
+        <button
+          className="recoat-button"
+          onClick={handleReset}
+          type="button"
+        >
+          Re-coat wax
+        </button>
+      ) : null}
+      <div className="visually-hidden" aria-live="polite">
+        {isComplete
+          ? 'The wax layer is fully broken. Re-coat the butter to play again.'
+          : ''}
+      </div>
     </main>
   )
 }

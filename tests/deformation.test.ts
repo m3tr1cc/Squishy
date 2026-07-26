@@ -5,6 +5,7 @@ import {
 import { createRoundedCuboidGeometry } from '../src/scene/createRoundedCuboidGeometry'
 import {
   captureDeformationSource,
+  sampleDentDepth,
   smoothDentWeight,
   writeDeformedPositions,
 } from '../src/scene/deformation'
@@ -38,6 +39,24 @@ describe('squishy deformation', () => {
     expect(smoothDentWeight(0.26)).toBeCloseTo(0.5, 5)
     expect(smoothDentWeight(0.52)).toBe(0)
     expect(smoothDentWeight(2)).toBe(0)
+  })
+
+  it('exposes the same bounded dent field for attached wax sampling', () => {
+    const depth = sampleDentDepth(
+      [0, 0, 0.625],
+      [0, 0, 1],
+      [
+        {
+          id: 'sample',
+          localPoint: [0, 0, 0.625],
+          localNormal: [0, 0, 1],
+          amount: 1,
+          velocity: 0,
+        },
+      ],
+    )
+
+    expect(depth).toBeCloseTo(0.14, 5)
   })
 
   it('dents the hit side while preserving the shell offset', () => {

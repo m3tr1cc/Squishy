@@ -87,6 +87,40 @@ canvas {
   backdrop-filter: blur(16px);
 }
 
+.recoat-button {
+  position: absolute;
+  z-index: 4;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  min-height: 2.75rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid rgba(86, 62, 31, 0.18);
+  border-radius: 999px;
+  color: #4c381e;
+  background: rgba(255, 250, 226, 0.9);
+  box-shadow:
+    0 8px 28px rgba(81, 52, 22, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 650;
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+}
+
+.recoat-button:hover {
+  background: rgba(255, 247, 207, 0.96);
+}
+
+.recoat-button:focus-visible {
+  outline: 3px solid rgba(26, 81, 105, 0.55);
+  outline-offset: 3px;
+}
+
+.recoat-button:active {
+  transform: translateY(1px);
+}
+
 .fallback-butter {
   width: min(76vw, 34rem);
   aspect-ratio: 3.55;

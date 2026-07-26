@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { createRoundedCuboidGeometry } from '../src/scene/createRoundedCuboidGeometry'
 import {
+  createSurfaceHit,
   createSquishyImpact,
   isQualifiedTap,
 } from '../src/scene/interaction'
@@ -44,6 +45,35 @@ describe('impact records', () => {
       intersection.point.z,
     ])
 
+    geometry.dispose()
+  })
+
+  it('preserves the struck layer and fragment alongside exact hit data', () => {
+    const geometry = new THREE.BoxGeometry(2, 2, 2)
+    const mesh = new THREE.Mesh(geometry)
+    const raycaster = new THREE.Raycaster(
+      new THREE.Vector3(0, 0, 4),
+      new THREE.Vector3(0, 0, -1),
+    )
+    const intersection = raycaster.intersectObject(mesh)[0]
+    const hit = createSurfaceHit({
+      id: 'wax-press',
+      timestampMs: 18,
+      pointerType: 'touch',
+      pointerId: 4,
+      pressure: 0.5,
+      layer: 'wax',
+      fragmentId: 12,
+      faceIndex: intersection.faceIndex ?? 0,
+      object: mesh,
+      worldPoint: intersection.point,
+      face: intersection.face!,
+    })
+
+    expect(hit.layer).toBe('wax')
+    expect(hit.fragmentId).toBe(12)
+    expect(hit.pointerId).toBe(4)
+    expect(Math.hypot(...hit.worldNormal)).toBeCloseTo(1, 5)
     geometry.dispose()
   })
 
