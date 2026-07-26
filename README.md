@@ -44,8 +44,9 @@ subscribe without changing the core interaction contract.
 ## First-prototype boundary
 
 This version includes one squishy, procedural materials, exact surface
-raycasting, dents, compression, rebound, a pointer-following wax highlight,
-idle invitation motion, responsive framing, and reduced-motion behavior.
+raycasting, dents, compression, rebound, persistent thick-shell wax breaks,
+butter-label decals, a pointer-following wax highlight, idle invitation motion,
+responsive framing, and reduced-motion behavior.
 
-Cracks, fragment physics, audio, haptics, additional squishies, persistence,
+Detached fragment physics, audio, haptics, additional squishies, persistence,
 analytics, and Codefair-specific messaging are intentionally deferred.

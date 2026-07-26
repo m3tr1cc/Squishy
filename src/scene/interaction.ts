@@ -70,3 +70,22 @@ export function createSquishyImpact({
     worldNormal: tuple(worldNormal),
   })
 }
+
+export function isQualifiedTap({
+  startX,
+  startY,
+  endX,
+  endY,
+  durationMs,
+}: {
+  startX: number
+  startY: number
+  endX: number
+  endY: number
+  durationMs: number
+}) {
+  return (
+    Math.hypot(endX - startX, endY - startY) <= 10 &&
+    durationMs <= 450
+  )
+}

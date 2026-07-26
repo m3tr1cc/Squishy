@@ -1,23 +1,26 @@
 import type { ThreeEvent } from '@react-three/fiber'
 import { useFrame } from '@react-three/fiber'
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import {
   MAX_ACTIVE_IMPACTS,
   SHELL_OFFSET,
 } from './constants'
 import { createRoundedCuboidGeometry } from './createRoundedCuboidGeometry'
+import { createButterLabelTexture } from './createButterLabelTexture'
 import {
   captureDeformationSource,
   writeDeformedPositions,
 } from './deformation'
-import { createSquishyImpact } from './interaction'
+import { createSquishyImpact, isQualifiedTap } from './interaction'
 import {
   INTRO_SPRING,
   PRESS_SPRING,
   stepSpring,
 } from './spring'
 import type { DentImpact, SquishyImpact } from './types'
+import { WaxBreak, type WaxBreakRecord } from './WaxBreak'
+import { createCrackTexture } from './createWaxBreakAssets'
 
 type ButterSquishyProps = {
   reducedMotion: boolean
@@ -33,6 +36,7 @@ type PendingTouch = {
 
 let impactSequence = 0
 const DEFAULT_NORMAL = [0, 0, 1] as const
+const NO_RAYCAST = () => null
 const REDUCED_PRESS_SPRING = {
   ...PRESS_SPRING,
   damping: 31,
@@ -54,11 +58,14 @@ export function ButterSquishy({
   const hoverLightRef = useRef<THREE.PointLight>(null)
   const innerGeometry = useMemo(() => createRoundedCuboidGeometry(), [])
   const shellGeometry = useMemo(() => innerGeometry.clone(), [innerGeometry])
+  const labelTexture = useMemo(createButterLabelTexture, [])
+  const crackTexture = useMemo(createCrackTexture, [])
   const source = useMemo(
     () => captureDeformationSource(innerGeometry),
     [innerGeometry],
   )
   const impactsRef = useRef<DentImpact[]>([])
+  const [waxBreaks, setWaxBreaks] = useState<WaxBreakRecord[]>([])
   const historyRef = useRef<SquishyImpact[]>([])
   const pendingTouchesRef = useRef(new Map<number, PendingTouch>())
   const hoverTargetRef = useRef(new THREE.Vector3(0, 0, 2))
@@ -79,9 +86,17 @@ export function ButterSquishy({
     return () => {
       innerGeometry.dispose()
       shellGeometry.dispose()
+      labelTexture.dispose()
+      crackTexture.dispose()
       document.body.style.cursor = ''
     }
-  }, [innerGeometry, shellGeometry, source])
+  }, [
+    crackTexture,
+    innerGeometry,
+    labelTexture,
+    shellGeometry,
+    source,
+  ])
 
   const commitImpact = useCallback(
     (impact: SquishyImpact) => {
@@ -108,6 +123,13 @@ export function ButterSquishy({
 
       lastInteractionRef.current = performance.now()
       needsBaselineRestoreRef.current = true
+      setWaxBreaks((current) => [
+        ...current.slice(-7),
+        {
+          impact,
+          seed: impactSequence * 7919,
+        },
+      ])
       onImpact?.(impact)
     },
     [onImpact],
@@ -177,6 +199,15 @@ export function ButterSquishy({
       setHoverTarget(impact)
 
       if (impact.pointerType === 'touch') {
+        const captureTarget = event.target as EventTarget & {
+          setPointerCapture?: (pointerId: number) => void
+        }
+        try {
+          captureTarget.setPointerCapture?.(event.nativeEvent.pointerId)
+        } catch {
+          // Pointer capture is an enhancement; the stored tap still works
+          // when a browser declines capture for a synthetic or canceled event.
+        }
         pendingTouchesRef.current.set(event.nativeEvent.pointerId, {
           clientX: event.nativeEvent.clientX,
           clientY: event.nativeEvent.clientY,
@@ -194,18 +225,35 @@ export function ButterSquishy({
   const handlePointerUp = useCallback(
     (event: ThreeEvent<PointerEvent>) => {
       const pending = pendingTouchesRef.current.get(event.nativeEvent.pointerId)
+      const captureTarget = event.target as EventTarget & {
+        hasPointerCapture?: (pointerId: number) => boolean
+        releasePointerCapture?: (pointerId: number) => void
+      }
+
+      if (captureTarget.hasPointerCapture?.(event.nativeEvent.pointerId)) {
+        try {
+          captureTarget.releasePointerCapture?.(event.nativeEvent.pointerId)
+        } catch {
+          // The browser may already have released a canceled touch pointer.
+        }
+      }
+
       if (!pending) {
         return
       }
 
       pendingTouchesRef.current.delete(event.nativeEvent.pointerId)
-      const movement = Math.hypot(
-        event.nativeEvent.clientX - pending.clientX,
-        event.nativeEvent.clientY - pending.clientY,
-      )
       const duration = performance.now() - pending.startedAt
 
-      if (movement <= 10 && duration <= 450) {
+      if (
+        isQualifiedTap({
+          startX: pending.clientX,
+          startY: pending.clientY,
+          endX: event.nativeEvent.clientX,
+          endY: event.nativeEvent.clientY,
+          durationMs: duration,
+        })
+      ) {
         commitImpact(pending.impact)
         hoverGoalRef.current = 1
       }
@@ -328,7 +376,6 @@ export function ButterSquishy({
             }}
             onPointerOut={() => {
               hoverGoalRef.current = 0
-              pendingTouchesRef.current.clear()
               document.body.style.cursor = ''
             }}
           >
@@ -342,6 +389,30 @@ export function ButterSquishy({
               sheen={0.22}
               sheenColor="#fff4c4"
             />
+            <mesh
+              position={[0, 0, 0.672]}
+              raycast={NO_RAYCAST}
+              renderOrder={2}
+            >
+              <planeGeometry args={[3.72, 1.02]} />
+              <meshBasicMaterial
+                map={labelTexture}
+                transparent
+                depthWrite={false}
+                alphaTest={0.015}
+                opacity={0.92}
+                polygonOffset
+                polygonOffsetFactor={-8}
+                toneMapped={false}
+              />
+            </mesh>
+            {waxBreaks.map((record) => (
+              <WaxBreak
+                key={record.impact.id}
+                crackTexture={crackTexture}
+                record={record}
+              />
+            ))}
           </mesh>
         </group>
       </group>

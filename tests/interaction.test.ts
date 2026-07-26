@@ -1,7 +1,10 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { createRoundedCuboidGeometry } from '../src/scene/createRoundedCuboidGeometry'
-import { createSquishyImpact } from '../src/scene/interaction'
+import {
+  createSquishyImpact,
+  isQualifiedTap,
+} from '../src/scene/interaction'
 
 describe('impact records', () => {
   it('copies normalized local and world surface data', () => {
@@ -42,5 +45,35 @@ describe('impact records', () => {
     ])
 
     geometry.dispose()
+  })
+
+  it('qualifies taps without accepting scroll gestures or long presses', () => {
+    expect(
+      isQualifiedTap({
+        startX: 20,
+        startY: 20,
+        endX: 27,
+        endY: 24,
+        durationMs: 180,
+      }),
+    ).toBe(true)
+    expect(
+      isQualifiedTap({
+        startX: 20,
+        startY: 20,
+        endX: 20,
+        endY: 44,
+        durationMs: 180,
+      }),
+    ).toBe(false)
+    expect(
+      isQualifiedTap({
+        startX: 20,
+        startY: 20,
+        endX: 20,
+        endY: 20,
+        durationMs: 500,
+      }),
+    ).toBe(false)
   })
 })
