@@ -37,7 +37,8 @@ npm run build
 
 The butter body begins as a densely subdivided box projected onto a smooth,
 rounded-cuboid surface. That watertight source is deterministically partitioned
-into 128 connected plates and extruded into one physically thick wax coating.
+into 48 irregular connected plates and extruded into one physically thick wax
+coating.
 Neighboring plates share a persistent bond graph, so every press accumulates
 damage in the existing shell and extends nearby fissures instead of spawning a
 decorative break artifact.
@@ -48,7 +49,7 @@ fragment. A fixed-step, typed-array damage simulation converts tap and hold
 pressure into irreversible bond breaks, exposed seams, peeling plates, and
 eventual detachment. A short tap cannot immediately release a loose piece:
 detachment requires continued local peel load. Same-frame neighboring plates
-leave as connected sheets of up to six pieces. Rapier is lazy-loaded only after
+leave as connected sheets of up to four pieces. Rapier is lazy-loaded only after
 debris exists; its stable generation pool is capped at 24 mobile or 40 desktop
 bodies, and overflow pieces settle deterministically.
 
@@ -58,13 +59,17 @@ camera framing, capped device pixel ratio, deterministic geometry, and bounded
 debris counts keep the experience suitable for mobile browsers and Codefair
 iframes.
 
+Five short crack recordings are decoded once through Web Audio. Playback is
+driven only by actual bond-break events, uses every recording once per shuffled
+cycle, avoids immediate repeats, and caps overlap during sustained fractures.
+
 ## First-prototype boundary
 
 This version includes one butter squishy, the persistent thick wax shell,
 progressive damage and crack merging, local dents, compression and rebound,
-peeling and rigid-body debris, butter-label decals, pointer-following wax
-highlight, idle invitation motion, reduced-motion behavior, completion
-feedback, and in-page **Re-coat wax** replay.
+peeling and rigid-body debris, butter-label decals, exact surface raycasting,
+idle invitation motion, reduced-motion behavior, randomized crack audio,
+completion feedback, and in-page **Re-coat wax** replay.
 
-Cracking and impact audio, haptics, additional squishy shapes, saved progress,
+Impact/debris audio, haptics, additional squishy shapes, saved progress,
 analytics, and Codefair-specific messaging remain intentionally deferred.

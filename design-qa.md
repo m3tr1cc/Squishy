@@ -185,3 +185,40 @@ with angle changes retained only where real shard boundaries meet.
    comparison found no remaining P0/P1/P2 issue.
 
 final result: passed
+
+## Fracture audio iteration
+
+### Implementation
+
+- The five supplied 48 kHz stereo PCM WAV files are imported through Vite URL
+  assets, decoded once after the first pointer gesture, and retained in one
+  app-owned Web Audio context across wax-shell remounts.
+- Audio is requested only when the fracture simulation emits one or more real
+  `bond-break` events. A press that only dents the squishy remains silent.
+- A seeded shuffle bag plays all five recordings once before reshuffling and
+  prevents an immediate repeat at cycle boundaries.
+- Per-track gain correction, a restrained master gain, a dynamics compressor,
+  a 70 ms minimum interval, and a four-source overlap cap keep sustained
+  cracking audible without clipping or turning into a wall of sound.
+- Re-coating resets the shuffle state and stops sounds from the prior coating
+  without closing the unlocked audio context.
+
+### Mobile browser verification
+
+- Viewport: 390 x 844 CSS pixels at DPR 1.5.
+- All five recordings loaded and decoded successfully.
+- Four nearby presses generated seven audible crack bursts from actual bond
+  breaks; visual-only dent frames did not request playback.
+- The first five played indices were `0, 4, 1, 3, 2`, proving one complete
+  five-track cycle. The observed sequence contained no adjacent repeats.
+- Post-fracture performance across 300 frames: 60.00 FPS average, 16.8 ms p95,
+  16.9 ms maximum, 16 draw calls, and no browser-console errors.
+- Production build output contains five fingerprinted WAV assets totaling
+  approximately 567 KiB.
+
+### Release note
+
+- The supplied `crack5.wav` contains embedded artist/source metadata. Confirm
+  redistribution rights for all five recordings before the public launch.
+
+final result: passed

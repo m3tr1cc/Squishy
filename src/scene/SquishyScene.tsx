@@ -132,12 +132,14 @@ function ResponsiveCamera() {
 type SquishySceneProps = {
   coatingSeed: number
   onComplete: () => void
+  playCrackSound: (brokenBondCount: number) => void
   resetKey: number
 }
 
 export function SquishyScene({
   coatingSeed,
   onComplete,
+  playCrackSound,
   resetKey,
 }: SquishySceneProps) {
   const reducedMotion = useReducedMotion()
@@ -170,6 +172,7 @@ export function SquishyScene({
         key={resetKey}
         coatingSeed={coatingSeed}
         onComplete={onComplete}
+        playCrackSound={playCrackSound}
         reducedMotion={reducedMotion}
       />
       <mesh

@@ -1,5 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import { Suspense, useCallback, useMemo, useState } from 'react'
+import { useCrackAudio } from './audio/useCrackAudio'
 import { SquishyScene } from './scene/SquishyScene'
 
 function createCoatingSeed() {
@@ -42,6 +43,7 @@ export function App() {
   const [resetKey, setResetKey] = useState(0)
   const [coatingSeed, setCoatingSeed] = useState(createCoatingSeed)
   const [isComplete, setIsComplete] = useState(false)
+  const crackAudio = useCrackAudio(coatingSeed)
   const maximumDpr =
     typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
       ? 1.5
@@ -68,7 +70,10 @@ export function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main
+      className="app-shell"
+      onPointerDownCapture={crackAudio.unlock}
+    >
       <h1 className="visually-hidden">Interactive wax-covered butter squishy</h1>
       <p className="visually-hidden">
         Click or tap the butter stick to press its wax surface.
@@ -88,6 +93,7 @@ export function App() {
           <SquishyScene
             coatingSeed={coatingSeed}
             onComplete={handleComplete}
+            playCrackSound={crackAudio.play}
             resetKey={resetKey}
           />
         </Canvas>

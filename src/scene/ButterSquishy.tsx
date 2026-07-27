@@ -63,6 +63,7 @@ type ButterSquishyProps = {
   coatingSeed: number
   reducedMotion: boolean
   onComplete: () => void
+  playCrackSound: (brokenBondCount: number) => void
   onImpact?: (impact: SquishyImpact) => void
 }
 
@@ -327,6 +328,7 @@ export function ButterSquishy({
   coatingSeed,
   reducedMotion,
   onComplete,
+  playCrackSound,
   onImpact,
 }: ButterSquishyProps) {
   const presentationRef = useRef<THREE.Group>(null)
@@ -1131,8 +1133,11 @@ export function ButterSquishy({
       geometryDirtyRef.current = true
       const newClusters: DebrisCluster[] = []
       const detachedFragments: number[] = []
+      let brokenBondCount = 0
       for (const event of fractureState.events) {
-        if (event.type === 'fragment-detach') {
+        if (event.type === 'bond-break') {
+          brokenBondCount += 1
+        } else if (event.type === 'fragment-detach') {
           detachedFragments.push(event.fragmentIndex)
         } else if (
           event.type === 'complete' &&
@@ -1141,6 +1146,9 @@ export function ButterSquishy({
           completionSentRef.current = true
           onComplete()
         }
+      }
+      if (brokenBondCount > 0) {
+        playCrackSound(brokenBondCount)
       }
       const connectedGroups = groupConnectedFragments(
         detachedFragments,
