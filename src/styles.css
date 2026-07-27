@@ -27,7 +27,8 @@ body {
 
 button,
 canvas,
-.app-shell {
+.app-shell,
+.squishy-canvas-stage {
   -webkit-tap-highlight-color: transparent;
 }
 

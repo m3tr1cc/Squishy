@@ -134,6 +134,7 @@ type SquishySceneProps = {
   onComplete: () => void
   playCrackSound: (brokenBondCount: number) => void
   resetKey: number
+  unlockCrackAudio: () => void
 }
 
 export function SquishyScene({
@@ -141,6 +142,7 @@ export function SquishyScene({
   onComplete,
   playCrackSound,
   resetKey,
+  unlockCrackAudio,
 }: SquishySceneProps) {
   const reducedMotion = useReducedMotion()
 
@@ -174,6 +176,7 @@ export function SquishyScene({
         onComplete={onComplete}
         playCrackSound={playCrackSound}
         reducedMotion={reducedMotion}
+        unlockCrackAudio={unlockCrackAudio}
       />
       <mesh
         position={[0, GROUND_Y, 0]}

@@ -225,14 +225,17 @@ final result: passed
 
 ## Mobile tap-highlight regression
 
-- Root cause: the browser applied its native pressed highlight to React Three
-  Fiber's full-screen event wrapper, while the CSS suppression covered only
-  the nested canvas.
-- Fix: the app shell now supplies a transparent inherited
-  `-webkit-tap-highlight-color`, covering the wrapper without disabling
-  keyboard focus outlines.
-- Verified at 390 x 844 and DPR 1.5: a center press still creates a physical
-  fracture, the screen remains black outside the model, and the console remains
-  free of errors.
+- Root cause: audio unlocking registered the full-screen app shell as a pointer
+  target. Suppressing its highlight color alone did not remove that interactive
+  ownership in physical mobile browsers.
+- Final fix: audio now unlocks synchronously from the butter mesh's real
+  pointer-down path. The full-screen app shell no longer owns a pointer handler,
+  and React Three Fiber's event wrapper has an explicit transparent tap
+  highlight without disabling keyboard focus outlines.
+- Verified at 390 x 844 and DPR 1.5: a black-background tap leaves audio locked
+  with no interaction, while the next butter press records trusted user
+  activation, decodes all five sounds, plays one real crack, and creates a
+  physical fracture. The screen remains black outside the model and the console
+  remains free of errors.
 
 final result: passed

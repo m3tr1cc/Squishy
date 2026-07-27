@@ -70,10 +70,7 @@ export function App() {
   }
 
   return (
-    <main
-      className="app-shell"
-      onPointerDownCapture={crackAudio.unlock}
-    >
+    <main className="app-shell">
       <h1 className="visually-hidden">Interactive wax-covered butter squishy</h1>
       <p className="visually-hidden">
         Click or tap the butter stick to press its wax surface.
@@ -82,6 +79,7 @@ export function App() {
         <Canvas
           aria-label="Interactive wax-covered butter squishy"
           camera={{ fov: 32, near: 0.1, far: 80 }}
+          className="squishy-canvas-stage"
           dpr={canvasDpr}
           gl={{
             alpha: false,
@@ -95,6 +93,7 @@ export function App() {
             onComplete={handleComplete}
             playCrackSound={crackAudio.play}
             resetKey={resetKey}
+            unlockCrackAudio={crackAudio.unlock}
           />
         </Canvas>
       </Suspense>

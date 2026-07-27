@@ -64,6 +64,7 @@ type ButterSquishyProps = {
   reducedMotion: boolean
   onComplete: () => void
   playCrackSound: (brokenBondCount: number) => void
+  unlockCrackAudio: () => void
   onImpact?: (impact: SquishyImpact) => void
 }
 
@@ -329,6 +330,7 @@ export function ButterSquishy({
   reducedMotion,
   onComplete,
   playCrackSound,
+  unlockCrackAudio,
   onImpact,
 }: ButterSquishyProps) {
   const presentationRef = useRef<THREE.Group>(null)
@@ -632,6 +634,7 @@ export function ButterSquishy({
 
   const handlePointerDown = useCallback(
     (event: ThreeEvent<PointerEvent>, layer: SurfaceLayer) => {
+      unlockCrackAudio()
       const hit = hitFromEvent(event, layer)
       if (!hit) {
         return
@@ -689,7 +692,7 @@ export function ButterSquishy({
       }
       lastInteractionRef.current = performance.now()
     },
-    [addDent, hitFromEvent, rememberImpact],
+    [addDent, hitFromEvent, rememberImpact, unlockCrackAudio],
   )
 
   const handlePointerMove = useCallback(
