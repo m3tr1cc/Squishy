@@ -1,5 +1,5 @@
 import type { ThreeEvent } from '@react-three/fiber'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import {
   lazy,
   Suspense,
@@ -44,7 +44,11 @@ import {
   createWaxTopology,
   getWaxTriangleMetadata,
 } from './fracture/topology'
-import { createSurfaceHit, isQualifiedTap } from './interaction'
+import {
+  bindPointerCancellation,
+  createSurfaceHit,
+  isQualifiedTap,
+} from './interaction'
 import {
   INTRO_SPRING,
   PRESS_SPRING,
@@ -422,6 +426,7 @@ export function ButterSquishy({
   const worldPositionRef = useRef(new THREE.Vector3())
   const localPositionRef = useRef(new THREE.Vector3())
   const [debrisClusters, setDebrisClusters] = useState<DebrisCluster[]>([])
+  const canvasElement = useThree((state) => state.gl.domElement)
 
   const staticColliders = useMemo<readonly DebrisStaticCollider[]>(() => {
     const quaternion = new THREE.Quaternion().setFromEuler(
@@ -478,7 +483,7 @@ export function ButterSquishy({
       labelGeometry.dispose()
       waxRuntime.geometry.dispose()
       labelTexture.dispose()
-      document.body.style.cursor = ''
+      canvasElement.classList.remove('wax-pointer-hover')
     }
   }, [
     fractureModel,
@@ -487,6 +492,7 @@ export function ButterSquishy({
     labelGeometry,
     labelSource,
     labelTexture,
+    canvasElement,
     waxRuntime,
     waxTopology,
   ])
@@ -632,9 +638,21 @@ export function ButterSquishy({
     [rememberImpact],
   )
 
+  useEffect(() => {
+    const eventSurface =
+      canvasElement.closest('.squishy-canvas-stage') ?? canvasElement
+    return bindPointerCancellation(eventSurface, (event) => {
+      releaseActivePress(
+        event.pointerId,
+        event.clientX,
+        event.clientY,
+        false,
+      )
+    })
+  }, [canvasElement, releaseActivePress])
+
   const handlePointerDown = useCallback(
     (event: ThreeEvent<PointerEvent>, layer: SurfaceLayer) => {
-      unlockCrackAudio()
       const hit = hitFromEvent(event, layer)
       if (!hit) {
         return
@@ -656,6 +674,10 @@ export function ButterSquishy({
         return
       }
 
+      if (event.nativeEvent.cancelable) {
+        event.nativeEvent.preventDefault()
+      }
+      unlockCrackAudio()
       event.stopPropagation()
       const captureTarget = event.target as EventTarget & {
         setPointerCapture?: (pointerId: number) => void
@@ -695,6 +717,20 @@ export function ButterSquishy({
     [addDent, hitFromEvent, rememberImpact, unlockCrackAudio],
   )
 
+  const handleWaxPointerOver = useCallback(
+    (event: ThreeEvent<PointerEvent>) => {
+      const canHover =
+        event.nativeEvent.pointerType === 'mouse' &&
+        window.matchMedia('(hover: hover) and (pointer: fine)').matches
+      canvasElement.classList.toggle('wax-pointer-hover', canHover)
+    },
+    [canvasElement],
+  )
+
+  const handleWaxPointerOut = useCallback(() => {
+    canvasElement.classList.remove('wax-pointer-hover')
+  }, [canvasElement])
+
   const handlePointerMove = useCallback(
     (event: ThreeEvent<PointerEvent>) => {
       const active = activePressesRef.current.get(
@@ -720,6 +756,13 @@ export function ButterSquishy({
 
   const handlePointerUp = useCallback(
     (event: ThreeEvent<PointerEvent>) => {
+      releaseActivePress(
+        event.nativeEvent.pointerId,
+        event.nativeEvent.clientX,
+        event.nativeEvent.clientY,
+        true,
+      )
+
       const captureTarget = event.target as EventTarget & {
         hasPointerCapture?: (pointerId: number) => boolean
         releasePointerCapture?: (pointerId: number) => void
@@ -733,12 +776,6 @@ export function ButterSquishy({
           // The browser may already have released a canceled pointer.
         }
       }
-      releaseActivePress(
-        event.nativeEvent.pointerId,
-        event.nativeEvent.clientX,
-        event.nativeEvent.clientY,
-        true,
-      )
     },
     [releaseActivePress],
   )
@@ -1340,12 +1377,8 @@ export function ButterSquishy({
             onPointerDown={handleWaxPointerDown}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerCancel}
-            onPointerOver={() => {
-              document.body.style.cursor = 'pointer'
-            }}
-            onPointerOut={() => {
-              document.body.style.cursor = ''
-            }}
+            onPointerOver={handleWaxPointerOver}
+            onPointerOut={handleWaxPointerOut}
           >
             <meshPhysicalMaterial
               attach="material-0"

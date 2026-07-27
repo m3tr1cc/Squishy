@@ -225,17 +225,31 @@ final result: passed
 
 ## Mobile tap-highlight regression
 
-- Root cause: audio unlocking registered the full-screen app shell as a pointer
-  target. Suppressing its highlight color alone did not remove that interactive
-  ownership in physical mobile browsers.
-- Final fix: audio now unlocks synchronously from the butter mesh's real
-  pointer-down path. The full-screen app shell no longer owns a pointer handler,
-  and React Three Fiber's event wrapper has an explicit transparent tap
-  highlight without disabling keyboard focus outlines.
-- Verified at 390 x 844 and DPR 1.5: a black-background tap leaves audio locked
-  with no interaction, while the next butter press records trusted user
-  activation, decodes all five sounds, plays one real crack, and creates a
-  physical fracture. The screen remains black outside the model and the console
-  remains free of errors.
+- The earlier desktop-emulation check did not reproduce Android's compositor
+  highlight, so its pass was insufficient to close the physical-device issue.
+- Root cause: the wax `pointerover` handler changed `document.body` to
+  `cursor: pointer`. Touch pointers also emit pointer-over events. Android
+  Chromium can then choose the largest enclosing hand-cursor node as its tap
+  target, which made the viewport-sized body flash blue.
+- Final fix: no scene event mutates the body. Fine-pointer mouse hover now
+  toggles a cursor class only on the WebGL canvas, while touch input always
+  leaves the document cursor untouched.
+- React Three Fiber's canvas event manager no longer installs unused click,
+  double-click, context-menu, or wheel handlers. Pointer-down is explicitly
+  non-passive, and only a validated butter/wax raycast calls `preventDefault()`;
+  background touches retain their normal host-page behavior.
+- Native pointer-cancel and lost-capture events now release their matching
+  press directly. Scroll takeover cannot strand a dent or consume one of the
+  two supported touch slots.
+- Root, wrapper, sizing div, and canvas styles all use a zero-alpha tap
+  highlight. The stage also disables selection and touch callouts while
+  preserving `touch-action: pan-y`. The browser theme color is now black.
+- Verified at 390 x 844: the butter press still cracks and plays audio, body
+  cursor remains empty, focus remains on the body rather than the full-screen
+  event wrapper, computed tap highlight is `rgba(0, 0, 0, 0)`, and no runtime
+  errors are logged.
+- Regression tests verify the custom event manager lifecycle, non-passive
+  pointer-down, absence of full-screen click handlers, and native cancellation
+  cleanup.
 
-final result: passed
+final result: implementation passed; physical Android confirmation pending

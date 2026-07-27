@@ -6,6 +6,34 @@ import type {
   VectorTuple,
 } from './types'
 
+type PointerCancellation = Readonly<{
+  pointerId: number
+  clientX: number
+  clientY: number
+}>
+
+export function bindPointerCancellation(
+  target: EventTarget,
+  onCancel: (event: PointerCancellation) => void,
+) {
+  const handleCancellation = (event: Event) => {
+    const pointerEvent = event as PointerEvent
+    onCancel({
+      pointerId: pointerEvent.pointerId,
+      clientX: pointerEvent.clientX,
+      clientY: pointerEvent.clientY,
+    })
+  }
+
+  target.addEventListener('pointercancel', handleCancellation)
+  target.addEventListener('lostpointercapture', handleCancellation)
+
+  return () => {
+    target.removeEventListener('pointercancel', handleCancellation)
+    target.removeEventListener('lostpointercapture', handleCancellation)
+  }
+}
+
 function tuple(vector: THREE.Vector3): VectorTuple {
   return Object.freeze([vector.x, vector.y, vector.z]) as VectorTuple
 }

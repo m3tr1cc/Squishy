@@ -1,6 +1,7 @@
 import { Canvas } from '@react-three/fiber'
 import { Suspense, useCallback, useMemo, useState } from 'react'
 import { useCrackAudio } from './audio/useCrackAudio'
+import { createSquishyPointerEvents } from './scene/createSquishyPointerEvents'
 import { SquishyScene } from './scene/SquishyScene'
 
 function createCoatingSeed() {
@@ -70,17 +71,20 @@ export function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main
+      aria-label="Interactive wax-covered butter squishy"
+      className="app-shell"
+    >
       <h1 className="visually-hidden">Interactive wax-covered butter squishy</h1>
       <p className="visually-hidden">
         Click or tap the butter stick to press its wax surface.
       </p>
       <Suspense fallback={<LoadingState />}>
         <Canvas
-          aria-label="Interactive wax-covered butter squishy"
           camera={{ fov: 32, near: 0.1, far: 80 }}
           className="squishy-canvas-stage"
           dpr={canvasDpr}
+          events={createSquishyPointerEvents}
           gl={{
             alpha: false,
             antialias: true,

@@ -2,10 +2,26 @@ import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { createRoundedCuboidGeometry } from '../src/scene/createRoundedCuboidGeometry'
 import {
+  bindPointerCancellation,
   createSurfaceHit,
   createSquishyImpact,
   isQualifiedTap,
 } from '../src/scene/interaction'
+
+function createPointerEvent(
+  type: 'lostpointercapture' | 'pointercancel',
+  pointerId: number,
+  clientX: number,
+  clientY: number,
+) {
+  const event = new Event(type)
+  Object.defineProperties(event, {
+    clientX: { value: clientX },
+    clientY: { value: clientY },
+    pointerId: { value: pointerId },
+  })
+  return event
+}
 
 describe('impact records', () => {
   it('copies normalized local and world surface data', () => {
@@ -105,5 +121,30 @@ describe('impact records', () => {
         durationMs: 500,
       }),
     ).toBe(false)
+  })
+
+  it('releases presses canceled by native touch ownership changes', () => {
+    const target = new EventTarget()
+    const cancellations: Array<{
+      pointerId: number
+      clientX: number
+      clientY: number
+    }> = []
+    const unbind = bindPointerCancellation(target, (event) => {
+      cancellations.push(event)
+    })
+
+    target.dispatchEvent(createPointerEvent('pointercancel', 4, 18, 29))
+    target.dispatchEvent(
+      createPointerEvent('lostpointercapture', 8, 41, 52),
+    )
+    expect(cancellations).toEqual([
+      { pointerId: 4, clientX: 18, clientY: 29 },
+      { pointerId: 8, clientX: 41, clientY: 52 },
+    ])
+
+    unbind()
+    target.dispatchEvent(createPointerEvent('pointercancel', 9, 63, 74))
+    expect(cancellations).toHaveLength(2)
   })
 })
