@@ -222,3 +222,17 @@ final result: passed
   redistribution rights for all five recordings before the public launch.
 
 final result: passed
+
+## Mobile tap-highlight regression
+
+- Root cause: the browser applied its native pressed highlight to React Three
+  Fiber's full-screen event wrapper, while the CSS suppression covered only
+  the nested canvas.
+- Fix: the app shell now supplies a transparent inherited
+  `-webkit-tap-highlight-color`, covering the wrapper without disabling
+  keyboard focus outlines.
+- Verified at 390 x 844 and DPR 1.5: a center press still creates a physical
+  fracture, the screen remains black outside the model, and the console remains
+  free of errors.
+
+final result: passed

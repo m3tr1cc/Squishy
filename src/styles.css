@@ -26,7 +26,8 @@ body {
 }
 
 button,
-canvas {
+canvas,
+.app-shell {
   -webkit-tap-highlight-color: transparent;
 }
 
