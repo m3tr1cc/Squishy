@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest'
+import { createRoundedCuboidGeometry } from '../src/scene/createRoundedCuboidGeometry'
 import {
   DEFAULT_WAX_INNER_CLEARANCE,
   DEFAULT_WAX_OUTER_OFFSET,
@@ -27,6 +28,91 @@ function positionKey(topologyValue: WaxTopology, vertex: number) {
 
 function edgeKey(a: string, b: string) {
   return a < b ? `${a}|${b}` : `${b}|${a}`
+}
+
+function sourceEdgeKey(a: number, b: number) {
+  return a < b ? `${a}:${b}` : `${b}:${a}`
+}
+
+function orderBoundaryChains(boundaryEdges: Uint32Array) {
+  const adjacency = new Map<number, number[]>()
+  const remaining = new Set<string>()
+  for (let offset = 0; offset < boundaryEdges.length; offset += 2) {
+    const a = boundaryEdges[offset]
+    const b = boundaryEdges[offset + 1]
+    adjacency.set(a, [...(adjacency.get(a) ?? []), b])
+    adjacency.set(b, [...(adjacency.get(b) ?? []), a])
+    remaining.add(sourceEdgeKey(a, b))
+  }
+
+  const chains: number[][] = []
+  const starts = [...adjacency.entries()]
+    .filter(([, neighbors]) => neighbors.length !== 2)
+    .map(([vertex]) => vertex)
+  for (const start of starts) {
+    for (const firstNeighbor of adjacency.get(start) ?? []) {
+      if (!remaining.delete(sourceEdgeKey(start, firstNeighbor))) {
+        continue
+      }
+      const chain = [start, firstNeighbor]
+      let previous = start
+      let current = firstNeighbor
+      while ((adjacency.get(current)?.length ?? 0) === 2) {
+        const neighbors = adjacency.get(current)!
+        const next =
+          neighbors[0] === previous ? neighbors[1] : neighbors[0]
+        if (!remaining.delete(sourceEdgeKey(current, next))) {
+          break
+        }
+        chain.push(next)
+        previous = current
+        current = next
+      }
+      chains.push(chain)
+    }
+  }
+  return chains
+}
+
+function countSharpBoundaryTurns(
+  topologyValue: WaxTopology,
+  positions: ArrayLike<number>,
+) {
+  let sharpTurns = 0
+  let totalTurns = 0
+
+  for (const bond of topologyValue.bonds) {
+    if (bond.midpoint[2] <= 0.45) {
+      continue
+    }
+    for (const chain of orderBoundaryChains(bond.boundaryEdges)) {
+      for (let index = 1; index < chain.length - 1; index += 1) {
+        const previousOffset = chain[index - 1] * 3
+        const currentOffset = chain[index] * 3
+        const nextOffset = chain[index + 1] * 3
+        const incomingX =
+          positions[currentOffset] - positions[previousOffset]
+        const incomingY =
+          positions[currentOffset + 1] - positions[previousOffset + 1]
+        const outgoingX =
+          positions[nextOffset] - positions[currentOffset]
+        const outgoingY =
+          positions[nextOffset + 1] - positions[currentOffset + 1]
+        const directionDot =
+          (incomingX * outgoingX + incomingY * outgoingY) /
+          Math.max(
+            1e-9,
+            Math.hypot(incomingX, incomingY) *
+              Math.hypot(outgoingX, outgoingY),
+          )
+        totalTurns += 1
+        if (directionDot < 0.25) {
+          sharpTurns += 1
+        }
+      }
+    }
+  }
+  return { sharpTurns, totalTurns }
 }
 
 describe('wax shell topology', () => {
@@ -278,6 +364,96 @@ describe('wax shell topology', () => {
         ])
       }
     }
+  })
+
+  it('replaces front-face stair steps with stable long seam segments', () => {
+    const originalGeometry = createRoundedCuboidGeometry()
+    const originalPositions = originalGeometry.getAttribute('position')
+      .array as Float32Array
+    const cleanedPositions = topology.source.positions
+
+    expect(cleanedPositions).toHaveLength(originalPositions.length)
+    let movedVertexCount = 0
+    let maximumDisplacement = 0
+    for (let vertex = 0; vertex < topology.source.vertexCount; vertex += 1) {
+      const offset = vertex * 3
+      const displacement = Math.hypot(
+        cleanedPositions[offset] - originalPositions[offset],
+        cleanedPositions[offset + 1] - originalPositions[offset + 1],
+        cleanedPositions[offset + 2] - originalPositions[offset + 2],
+      )
+      if (displacement > 1e-6) {
+        movedVertexCount += 1
+      }
+      maximumDisplacement = Math.max(maximumDisplacement, displacement)
+    }
+    expect(movedVertexCount).toBeGreaterThan(100)
+    expect(maximumDisplacement).toBeLessThanOrEqual(0.090_001)
+
+    for (
+      let triangle = 0;
+      triangle < topology.source.triangleCount;
+      triangle += 1
+    ) {
+      const indexOffset = triangle * 3
+      const a = topology.source.indices[indexOffset] * 3
+      const b = topology.source.indices[indexOffset + 1] * 3
+      const c = topology.source.indices[indexOffset + 2] * 3
+      const abX = cleanedPositions[b] - cleanedPositions[a]
+      const abY = cleanedPositions[b + 1] - cleanedPositions[a + 1]
+      const abZ = cleanedPositions[b + 2] - cleanedPositions[a + 2]
+      const acX = cleanedPositions[c] - cleanedPositions[a]
+      const acY = cleanedPositions[c + 1] - cleanedPositions[a + 1]
+      const acZ = cleanedPositions[c + 2] - cleanedPositions[a + 2]
+      const crossX = abY * acZ - abZ * acY
+      const crossY = abZ * acX - abX * acZ
+      const crossZ = abX * acY - abY * acX
+      const originalAbX = originalPositions[b] - originalPositions[a]
+      const originalAbY =
+        originalPositions[b + 1] - originalPositions[a + 1]
+      const originalAbZ =
+        originalPositions[b + 2] - originalPositions[a + 2]
+      const originalAcX = originalPositions[c] - originalPositions[a]
+      const originalAcY =
+        originalPositions[c + 1] - originalPositions[a + 1]
+      const originalAcZ =
+        originalPositions[c + 2] - originalPositions[a + 2]
+      const originalCrossX =
+        originalAbY * originalAcZ - originalAbZ * originalAcY
+      const originalCrossY =
+        originalAbZ * originalAcX - originalAbX * originalAcZ
+      const originalCrossZ =
+        originalAbX * originalAcY - originalAbY * originalAcX
+      const orientation =
+        crossX * originalCrossX +
+        crossY * originalCrossY +
+        crossZ * originalCrossZ
+      const area = Math.hypot(crossX, crossY, crossZ) * 0.5
+      const originalArea =
+        Math.hypot(originalCrossX, originalCrossY, originalCrossZ) * 0.5
+
+      expect(orientation).toBeGreaterThan(0)
+      expect(area / originalArea).toBeGreaterThanOrEqual(0.15 - 1e-6)
+    }
+
+    const originalTurns = countSharpBoundaryTurns(
+      topology,
+      originalPositions,
+    )
+    const cleanedTurns = countSharpBoundaryTurns(
+      topology,
+      cleanedPositions,
+    )
+    expect(cleanedTurns.totalTurns).toBe(originalTurns.totalTurns)
+    expect(originalTurns.sharpTurns).toBeGreaterThan(100)
+    expect(cleanedTurns.sharpTurns / originalTurns.sharpTurns).toBeLessThan(
+      0.4,
+    )
+    expect(cleanedTurns.sharpTurns / cleanedTurns.totalTurns).toBeLessThan(
+      0.2,
+    )
+
+    originalGeometry.dispose()
   })
 
   it('builds a connected role-weighted bond graph with complete raycast lookup data', () => {

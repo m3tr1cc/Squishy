@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { createRoundedCuboidGeometry } from '../createRoundedCuboidGeometry'
+import { straightenBoundaryPositions } from './cleanSeams'
 import {
   WAX_FRACTURE_ROLE,
   WAX_SURFACE_KIND,
@@ -1615,6 +1616,11 @@ export function createWaxTopology({
       triangleAreas: graphData.triangleAreas,
       triangleNeighbors: graphData.triangleNeighbors,
     }
+    straightenBoundaryPositions(
+      source,
+      graphData.edgeRecords,
+      sourceTriangleFragmentIds,
+    )
     const assembled = assembleGeometry(
       source,
       graphData.triangles,

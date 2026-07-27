@@ -121,4 +121,67 @@ resolution.
 - Audio, haptics, wax dust, additional squishies, persistence, and analytics
   remain intentionally outside this update.
 
+## Clean fracture-line iteration
+
+### Evidence and normalization
+
+- Source visual truth:
+  `C:\Users\jleon\Documents\Codex\2026-07-26\inspect-the-existing-codefair-project-and\.codex-remote-attachments\019f9ef9-371e-7273-962c-a044e8110cb3\419c07b7-6f7f-4005-82a8-099786fb1deb\1-Photo-1.jpg`
+- Browser-rendered implementation:
+  `C:\Users\jleon\Documents\promptparty_projects\Squishy\qa\mobile-clean-seams-final.png`
+- Focused side-by-side comparison:
+  `C:\Users\jleon\Documents\promptparty_projects\Squishy\qa\clean-seam-reference-vs-implementation-final.png`
+- Source pixels: 591 × 1055, including mobile browser chrome.
+- Implementation pixels and CSS viewport: 390 × 844 at density 1.
+- Comparison normalization: the butter region was cropped from each artifact,
+  scaled proportionally into two 680 × 430 slots, and placed in one 1400 × 470
+  black comparison canvas.
+- State: three nearby taps on a fresh seeded coating after the intro settled.
+
+The focused comparison was required because the requested change concerns the
+small fracture silhouette rather than the unchanged full-screen composition.
+The left reference shows repeated one-cell horizontal, vertical, and diagonal
+steps. The right implementation shows long straight or gently bent segments,
+with angle changes retained only where real shard boundaries meet.
+
+### Findings
+
+- No actionable P0, P1, or P2 differences remain for the requested seam
+  cleanup.
+- The topology pass reduces sharp front-face mesh-grid turns from 151 to 52, a
+  65.6% reduction; sharp turns now account for less than 20% of measured
+  boundary turns and are concentrated at real multi-shard junctions.
+- Existing boundary vertices are redistributed along simplified deterministic
+  line segments. No crack decal, shader mask, or second visual shell was added.
+- Both sides of every intact seam continue to share identical positions.
+  Opened seams remain symmetrical and retain the existing wax thickness.
+- Every moved source triangle preserves its winding and at least 15% of its
+  original area. Maximum source-vertex displacement is capped at 0.09 model
+  units, and surrounding non-boundary vertices receive a short falloff so the
+  surface does not form needle triangles.
+
+### Required fidelity surfaces
+
+- **Fonts and typography:** unchanged; label type remains muted beneath wax and
+  crisp through openings.
+- **Spacing and layout rhythm:** unchanged; the same centered 390 × 844 framing
+  was used for the comparison.
+- **Colors and visual tokens:** unchanged; black background, neutral wax, warm
+  butter, and blue label ink remain consistent.
+- **Image quality and asset fidelity:** the cleaned fracture is still generated
+  by the physical procedural shell. The focused crop shows no repeated
+  staircase artifact, transparency halo, or raster crack overlay.
+- **Copy and content:** unchanged.
+
+### Comparison history
+
+1. **P2 — fracture silhouettes followed the source triangle grid.** The source
+   screenshot showed repeated sawtooth steps on every exposed edge.
+2. Added deterministic boundary-chain ordering, surface-aware line
+   simplification, capped vertex redistribution, two-ring falloff, and
+   triangle-winding/area validation.
+3. Re-captured two random coatings at 390 × 844. Both produced connected long
+   cuts without the repeated mesh-grid teeth. The focused side-by-side
+   comparison found no remaining P0/P1/P2 issue.
+
 final result: passed
