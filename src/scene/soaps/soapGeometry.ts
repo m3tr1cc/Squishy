@@ -14,8 +14,8 @@ const DECAL_HEIGHT_RATIO = 0.5
 const DECAL_SURFACE_OFFSET = 0.004
 const DECAL_WIDTH_SEGMENTS = 16
 const DECAL_HEIGHT_SEGMENTS = 6
-const SOAP_WAIST_DEPTH = 0.25
-const SOAP_SQUIRCLE_STRENGTH = 0.32
+const SOAP_WAIST_DEPTH = 0.21
+const SOAP_SQUIRCLE_STRENGTH = 0.36
 const SOAP_PUFF_DEPTH = 0.055
 
 export const SOAP_SHARED_SIZE = Object.freeze([
@@ -25,9 +25,9 @@ export const SOAP_SHARED_SIZE = Object.freeze([
 ] as const)
 export const SOAP_SHARED_CORNER_RADIUS = 0.49
 export const SOAP_SHARED_SEGMENTS = Object.freeze([
-  36,
-  15,
-  4,
+  41,
+  14,
+  3,
 ] as const)
 
 export function getSoapShapedPosition(

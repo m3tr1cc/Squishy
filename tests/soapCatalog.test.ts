@@ -7,6 +7,7 @@ import {
   SOAP_LABEL_ATLAS_COLUMNS,
   SOAP_LABEL_ATLAS_ENTRIES,
   SOAP_LABEL_ATLAS_ROWS,
+  SOAP_SHARED_SEGMENTS,
   SOAP_SHARED_SIZE,
   SOAP_SOURCE_TRIANGLE_BUDGET,
   getSoapDefinition,
@@ -179,6 +180,7 @@ describe('soap catalog', () => {
 
 describe('soap procedural geometry', () => {
   it('creates identical finite pinched source meshes inside the mobile budget', () => {
+    expect(SOAP_SHARED_SEGMENTS).toEqual([41, 14, 3])
     let expectedPositions: Float32Array | null = null
     for (const definition of SOAP_DEFINITIONS) {
       const geometry = definition.geometry.createSourceGeometry()
@@ -240,10 +242,10 @@ describe('soap procedural geometry', () => {
         }
       }
       const waistRatio = centerHalfHeight / lobeHalfHeight
-      expect(waistRatio).toBeGreaterThanOrEqual(0.84)
-      expect(waistRatio).toBeLessThanOrEqual(0.9)
+      expect(waistRatio).toBeGreaterThanOrEqual(0.88)
+      expect(waistRatio).toBeLessThanOrEqual(0.93)
 
-      const contourSamples = [0, 0.2, 0.4, 0.6, 0.8].map(
+      const contourSamples = [0, 0.2, 0.4, 0.6, 0.8, 1].map(
         (normalizedX) =>
           Math.abs(
             getSoapShapedPosition(
@@ -254,11 +256,15 @@ describe('soap procedural geometry', () => {
             )[1],
           ),
       )
-      for (let index = 1; index < contourSamples.length; index += 1) {
+      for (let index = 1; index <= 3; index += 1) {
         expect(contourSamples[index]).toBeGreaterThanOrEqual(
           contourSamples[index - 1] - 1e-4,
         )
       }
+      expect(contourSamples[4]).toBeGreaterThan(
+        contourSamples[3] * 0.98,
+      )
+      expect(contourSamples[5]).toBeLessThan(contourSamples[4])
       const endMidpointX = getSoapShapedPosition(
         halfWidth * 0.95,
         0,

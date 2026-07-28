@@ -569,3 +569,47 @@ final result: passed
   `npm run build` pass.
 - No Supabase change or migration is required.
 - Final result: passed.
+
+## Softened lobe peaks
+
+### Source and implementation evidence
+
+- Source visual truth:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/0dc98d30-a316-4025-ae4b-556bf59ceca0/1-Photo-1.jpg`
+  at 1280 x 952 pixels.
+- Desktop implementation: `qa/soap-soft-lobes-desktop.png` at
+  1920 x 911.
+- Mobile implementation: `qa/soap-soft-lobes-mobile.png` at
+  390 x 844.
+- Mobile interaction state:
+  `qa/soap-soft-lobes-mobile-interaction.png` at 390 x 844.
+- Focused side-by-side comparison:
+  `qa/soap-soft-lobes-comparison.png` at 1200 x 620.
+
+### Findings and comparison history
+
+- [Resolved P1] The four outer lobe peaks read as slightly angular at the
+  points marked in the supplied reference. The shared source mesh now
+  concentrates more of its fixed triangle budget along the horizontal
+  contour, increasing width resolution from 36 to 41 segments.
+- [Resolved P1] The waist pull is reduced from 25% to 21%, and the continuous
+  squircular shoulder projection is slightly stronger. Together these changes
+  turn the four peak transitions into broad arcs while preserving the approved
+  hourglass waist and convex ends.
+- [Passed] The same revised source geometry drives the colored core, wax
+  topology, decal, deformation, and raycasting. No cosmetic overlay or
+  alternate interaction mesh was introduced.
+- [Passed] Typography, glossy tinted wax, six-soap layout, sound, debris, and
+  navigation remain unchanged.
+
+### Interaction and regression QA
+
+- Desktop and 390 x 844 portrait captures show the broader four-lobe contour
+  without clipping, overlap, or navigation collisions.
+- Mobile press QA retains the existing zoom response and topology-driven wax
+  interaction after the smoothing change.
+- Automated geometry coverage locks the 41 x 14 x 3 segment distribution,
+  the softened crest profile, the closed manifold, and the 3,000-triangle
+  mobile budget.
+- No Supabase change or migration is required.
+- Final result: passed.
