@@ -126,6 +126,64 @@ body {
   box-shadow: inset 0 2px 7px rgba(255, 255, 255, 0.66);
 }
 
+.fallback-soaps {
+  display: grid;
+  width: min(78vw, 34rem);
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.65rem;
+}
+
+.fallback-soaps::before,
+.fallback-soaps::after {
+  height: 5.5rem;
+  border-radius: 1.4rem;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(210, 207, 201, 0.9));
+  box-shadow:
+    0 6.2rem 0 rgba(232, 228, 220, 0.92),
+    0 12.4rem 0 rgba(232, 228, 220, 0.92),
+    0 18.6rem 0 rgba(232, 228, 220, 0.92);
+  content: "";
+}
+
+.not-found-card {
+  width: min(28rem, calc(100% - 2rem));
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 1.5rem;
+  color: #fff;
+  background: rgba(18, 18, 18, 0.94);
+  text-align: center;
+}
+
+.not-found-card h1 {
+  margin: 0 0 0.75rem;
+  font-size: clamp(1.5rem, 5vw, 2.25rem);
+}
+
+.not-found-card p {
+  margin: 0 0 1.25rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.not-found-card a {
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+  display: inline-flex;
+  min-height: 2.75rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 999px;
+  align-items: center;
+  color: #fff;
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+.not-found-card a:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

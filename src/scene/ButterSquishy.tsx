@@ -31,6 +31,18 @@ import {
   stepFracture,
   type FracturePress,
 } from './fracture/damage'
+import {
+  createFragmentFadeState,
+  detachFragmentForFade,
+  isFragmentRetired,
+  markFragmentSleepingForFade,
+  shouldSimulateFragment,
+  stepFragmentFade,
+} from './fracture/fragmentFade'
+import {
+  attachFragmentFadeColorAttribute,
+  writeFragmentFadeColorAlpha,
+} from './fracture/fragmentFadeGeometry'
 import type {
   DebrisCluster,
   DebrisStaticCollider,
@@ -362,6 +374,10 @@ export function ButterSquishy({
     () => createWaxGeometryRuntime(waxTopology),
     [waxTopology],
   )
+  const waxColorAttribute = useMemo(
+    () => attachFragmentFadeColorAttribute(waxRuntime.geometry),
+    [waxRuntime],
+  )
   const fractureModel = useMemo(
     () =>
       createFractureModel(
@@ -399,6 +415,12 @@ export function ButterSquishy({
     [waxTopology],
   )
   const fractureStateRef = useRef(createFractureState(fractureModel))
+  const fragmentFadeStateRef = useRef(
+    createFragmentFadeState(waxTopology.plateCount),
+  )
+  const lastFragmentAlphaRef = useRef(
+    new Float32Array(waxTopology.plateCount).fill(1),
+  )
   const impactsRef = useRef<DentImpact[]>([])
   const activeDentsRef = useRef(new Set<DentImpact>())
   const activePressesRef = useRef(new Map<number, ActivePress>())
@@ -426,6 +448,8 @@ export function ButterSquishy({
   const worldPositionRef = useRef(new THREE.Vector3())
   const localPositionRef = useRef(new THREE.Vector3())
   const [debrisClusters, setDebrisClusters] = useState<DebrisCluster[]>([])
+  const [physicsDebrisClusters, setPhysicsDebrisClusters] =
+    useState<DebrisCluster[]>([])
   const canvasElement = useThree((state) => state.gl.domElement)
 
   const staticColliders = useMemo<readonly DebrisStaticCollider[]>(() => {
@@ -1008,6 +1032,12 @@ export function ButterSquishy({
       if (!parent || !binding) {
         return
       }
+      for (const fragmentIndex of binding.fragmentIndices) {
+        detachFragmentForFade(
+          fragmentFadeStateRef.current,
+          fragmentIndex,
+        )
+      }
 
       parent.updateWorldMatrix(true, false)
       inverseWorldMatrixRef.current.copy(parent.matrixWorld).invert()
@@ -1068,12 +1098,21 @@ export function ButterSquishy({
       handleDebrisTransform(clusterId, transform)
       const binding = clusterBindingsRef.current.get(clusterId)
       if (binding) {
+        for (const fragmentIndex of binding.fragmentIndices) {
+          markFragmentSleepingForFade(
+            fragmentFadeStateRef.current,
+            fragmentIndex,
+          )
+        }
         markFragmentsSettled(
           fractureModel,
           fractureStateRef.current,
           binding.fragmentIndices,
         )
       }
+      setPhysicsDebrisClusters((current) =>
+        current.filter((cluster) => cluster.id !== clusterId),
+      )
     },
     [fractureModel, handleDebrisTransform],
   )
@@ -1179,6 +1218,12 @@ export function ButterSquishy({
           brokenBondCount += 1
         } else if (event.type === 'fragment-detach') {
           detachedFragments.push(event.fragmentIndex)
+          if (reducedMotion) {
+            detachFragmentForFade(
+              fragmentFadeStateRef.current,
+              event.fragmentIndex,
+            )
+          }
         } else if (
           event.type === 'complete' &&
           !completionSentRef.current
@@ -1204,6 +1249,10 @@ export function ButterSquishy({
       }
       if (newClusters.length > 0) {
         setDebrisClusters((current) => [...current, ...newClusters])
+        setPhysicsDebrisClusters((current) => [
+          ...current,
+          ...newClusters,
+        ])
       }
     }
 
@@ -1237,6 +1286,94 @@ export function ButterSquishy({
         peelAmounts[fragment] = next
         geometryDirtyRef.current = true
       }
+    }
+
+    const fadeState = fragmentFadeStateRef.current
+    stepFragmentFade(fadeState, delta, reducedMotion)
+    if (fadeState.fadeStartedCount > 0) {
+      setPhysicsDebrisClusters((current) =>
+        current.filter((cluster) => {
+          const binding = clusterBindingsRef.current.get(cluster.id)
+          return (
+            binding?.fragmentIndices.some((fragmentIndex) =>
+              shouldSimulateFragment(fadeState, fragmentIndex),
+            ) ?? false
+          )
+        }),
+      )
+    }
+    let retiredClusterCount = 0
+    for (
+      let fragmentIndex = 0;
+      fragmentIndex < waxTopology.plateCount;
+      fragmentIndex += 1
+    ) {
+      const alpha = fadeState.alpha[fragmentIndex]
+      if (
+        Math.abs(
+          alpha - lastFragmentAlphaRef.current[fragmentIndex],
+        ) > 0.001
+      ) {
+        const fragment = waxTopology.fragments[fragmentIndex]
+        writeFragmentFadeColorAlpha(
+          waxColorAttribute,
+          fragment.vertexRange.start,
+          fragment.vertexRange.count,
+          alpha,
+        )
+        lastFragmentAlphaRef.current[fragmentIndex] = alpha
+      }
+    }
+    for (
+      let retiredIndex = 0;
+      retiredIndex < fadeState.retiredCount;
+      retiredIndex += 1
+    ) {
+      const fragmentIndex = fadeState.retiredIndices[retiredIndex]
+      const positionOffset = fragmentIndex * 3
+      fragmentPosesRef.current.positions[positionOffset + 1] = -100
+      geometryDirtyRef.current = true
+    }
+    for (const binding of clusterBindingsRef.current.values()) {
+      let clusterRetired = true
+      for (const fragmentIndex of binding.fragmentIndices) {
+        if (!isFragmentRetired(fadeState, fragmentIndex)) {
+          clusterRetired = false
+          break
+        }
+      }
+      if (clusterRetired) {
+        retiredClusterCount += 1
+      }
+    }
+    if (retiredClusterCount > 0) {
+      setPhysicsDebrisClusters((current) =>
+        current.filter((cluster) => {
+          const binding = clusterBindingsRef.current.get(cluster.id)
+          return (
+            binding?.fragmentIndices.some(
+              (fragmentIndex) =>
+                !isFragmentRetired(fadeState, fragmentIndex),
+            ) ?? false
+          )
+        }),
+      )
+      setDebrisClusters((current) =>
+        current.filter((cluster) => {
+          const binding = clusterBindingsRef.current.get(cluster.id)
+          if (!binding) {
+            return false
+          }
+          const retired = binding.fragmentIndices.every(
+            (fragmentIndex) =>
+              isFragmentRetired(fadeState, fragmentIndex),
+          )
+          if (retired) {
+            clusterBindingsRef.current.delete(cluster.id)
+          }
+          return !retired
+        }),
+      )
     }
 
     if (impacts.length > 0) {
@@ -1370,7 +1507,6 @@ export function ButterSquishy({
           </mesh>
           <mesh
             geometry={waxRuntime.geometry}
-            castShadow
             receiveShadow
             frustumCulled={false}
             onPointerMove={handleWaxPointerMove}
@@ -1381,17 +1517,22 @@ export function ButterSquishy({
             onPointerOut={handleWaxPointerOut}
           >
             <meshPhysicalMaterial
+              alphaHash
               attach="material-0"
               {...WAX_OUTER_MATERIAL}
+              vertexColors
             />
             <meshStandardMaterial
+              alphaHash
               attach="material-1"
               color="#d2ccc2"
               metalness={0}
               roughness={0.82}
               side={THREE.FrontSide}
+              vertexColors
             />
             <meshStandardMaterial
+              alphaHash
               attach="material-2"
               color="#b8b0a4"
               metalness={0}
@@ -1400,6 +1541,7 @@ export function ButterSquishy({
               polygonOffsetUnits={4}
               roughness={0.88}
               side={THREE.FrontSide}
+              vertexColors
             />
           </mesh>
           <mesh
@@ -1422,11 +1564,11 @@ export function ButterSquishy({
           </mesh>
         </group>
       </group>
-      {debrisClusters.length > 0 ? (
+      {physicsDebrisClusters.length > 0 ? (
         <Suspense fallback={null}>
           <LazyRapierDebris
             generation={coatingSeed}
-            clusters={debrisClusters}
+            clusters={physicsDebrisClusters}
             staticColliders={staticColliders}
             onTransform={handleDebrisTransform}
             onSettled={handleDebrisSettled}

@@ -341,10 +341,17 @@ function DebrisPool({
   onSettledRef.current = onSettled
   inputClusterIdsRef.current = new Set(clusters.map((cluster) => cluster.id))
 
-  // Input is append-only for one generation. A mounted body remains in the
-  // Rapier world until the generation unmounts, including after it sleeps.
-  // This keeps every WASM handle stable and avoids body recycling during a
-  // physics step.
+  // Parents may retire faded visual clusters. Filtering them here unmounts
+  // their matching rigid bodies after the React commit, which releases the
+  // Rapier handles and makes capacity available to later flakes.
+  physicsClustersRef.current = physicsClustersRef.current.filter(
+    (cluster) => inputClusterIdsRef.current.has(cluster.id),
+  )
+  physicsClusterIdsRef.current.clear()
+  for (const cluster of physicsClustersRef.current) {
+    physicsClusterIdsRef.current.add(cluster.id)
+  }
+
   for (const cluster of clusters) {
     if (
       physicsClusterIdsRef.current.has(cluster.id) ||

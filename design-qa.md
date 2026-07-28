@@ -253,3 +253,55 @@ final result: passed
   cleanup.
 
 final result: implementation passed; physical Android confirmation pending
+
+## Eight-soap experience
+
+### Reference and final captures
+
+- Product reference: `Photo 1.jpg` supplied in the task, used for the two-column
+  soap assortment, varied material personalities, and centered SOAP branding.
+- Desktop final: `qa/soap-desktop-pristine.png` at 1440 x 900.
+- Mobile final: `qa/soap-mobile-pristine.png` at 390 x 844.
+- Mobile interaction: `qa/soap-mobile-cracked.png` after one press on Hard Wax.
+
+### Visual and interaction findings
+
+- `/soaps` presents all eight coated bars at once in a 4 x 2 landscape grid and
+  a 2 x 4 portrait grid. The composition stays on the same seamless black
+  studio background as the butter page.
+- Each bar has a distinct silhouette, spring profile, bright core color,
+  material response, coating seed, and SOAP decal. Sprinkles and Sugar add
+  restrained procedural surface accents without additional texture downloads.
+- The intact layer remains neutral milky paraffin. Decals are muted on the
+  coating and the saturated core becomes crisp through real fracture openings.
+- A press on one bar affects only its own topology. The resulting opening is a
+  connected region with long plate boundaries and exposes the correct core;
+  there are no press-specific crack meshes or decals.
+- Detached soap plates use the shared deterministic fade policy. Butter debris
+  retains Rapier motion, then retires from both the combined geometry and the
+  rigid-body pool after its fade.
+- Previous/next controls are 44–48 px circular targets with safe-area offsets,
+  real links, keyboard focus styles, and non-wrapping disabled endpoints.
+  Direct `/soaps` loads, browser Back/Forward, and a fresh scene on re-entry
+  were verified.
+- Existing soap damage remained intact while switching the live viewport from
+  390 x 844 portrait to 1440 x 900 landscape; only grid positions and camera
+  fit changed.
+- A route-return regression repeated three center presses before and after a
+  butter → soaps → browser-Back sequence. Both fresh butter sessions emitted
+  two real crack-audio bursts, confirming that no stale topology/state arrays
+  survive route changes.
+
+### Mobile performance
+
+- Viewport: 390 x 844 CSS pixels, Canvas DPR capped at 1.25.
+- Full hydrated grid: 56,180 rendered triangles and 47 draw calls.
+- Idle 300-frame sample: 59.21 FPS average and 17.1 ms p95.
+- Post-press 300-frame sample: 59.99 FPS average and 17.1 ms p95.
+- The eight low-density fracture runtimes hydrate progressively after the
+  lightweight grid appears, avoiding one large topology-construction spike.
+- No uncaught browser, Three.js, audio, or Rapier errors were observed.
+- The canvas retains transparent tap highlights, no text selection, and
+  `touch-action: pan-y`; a mobile-sized press produced no viewport flash.
+
+final result: passed

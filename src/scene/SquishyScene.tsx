@@ -25,7 +25,7 @@ declare global {
   }
 }
 
-function PerformanceDiagnostics() {
+export function PerformanceDiagnostics() {
   const { gl } = useThree()
   const diagnosticsRef = useRef<SquishyDiagnostics>({
     frameCount: 0,
@@ -72,7 +72,7 @@ function PerformanceDiagnostics() {
   return null
 }
 
-function useReducedMotion() {
+export function useReducedMotion() {
   const [reducedMotion, setReducedMotion] = useState(() =>
     window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   )
