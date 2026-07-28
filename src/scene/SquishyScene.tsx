@@ -2,7 +2,6 @@ import { useFrame, useThree } from '@react-three/fiber'
 import {
   lazy,
   Suspense,
-  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -12,7 +11,6 @@ import * as THREE from 'three'
 import {
   ButterSquishy,
   createButterStaticColliders,
-  type ButterPhysicsDebrisSource,
 } from './ButterSquishy'
 import {
   BUTTER_DEBRIS_BODY_LIMIT,
@@ -21,21 +19,20 @@ import {
   BUTTER_STACK_HEIGHT,
   BUTTER_STACK_POSITIONS,
   mixButterSeed,
-  type ButterId,
 } from './butters'
 import {
   BUTTER_SIZE,
   SHELL_OFFSET,
 } from './constants'
 import { createButterLabelTexture } from './createButterLabelTexture'
-import type {
-  DebrisCluster,
-  DebrisTransform,
-} from './fracture/RapierDebris'
+import { usePhysicsDebrisSources } from './fracture/usePhysicsDebrisSources'
 
 export const SCENE_BACKGROUND = '#000000'
 
 const LazyRapierDebris = lazy(() => import('./fracture/RapierDebris'))
+const BUTTER_SOURCE_IDS = Object.freeze(
+  BUTTER_DEFINITIONS.map(({ id }) => id),
+)
 
 type SquishyDiagnostics = {
   frameCount: number
@@ -173,56 +170,7 @@ export function SquishyScene({
 }: SquishySceneProps) {
   const reducedMotion = useReducedMotion()
   const labelTexture = useMemo(createButterLabelTexture, [])
-  const [physicsDebrisSources, setPhysicsDebrisSources] = useState<
-    ReadonlyMap<ButterId, ButterPhysicsDebrisSource>
-  >(() => new Map())
-  const handlePhysicsDebrisChange = useCallback(
-    (
-      instanceId: ButterId,
-      source: ButterPhysicsDebrisSource | null,
-    ) => {
-      setPhysicsDebrisSources((current) => {
-        if (source === null) {
-          if (!current.has(instanceId)) {
-            return current
-          }
-          const next = new Map(current)
-          next.delete(instanceId)
-          return next
-        }
-        if (current.get(instanceId) === source) {
-          return current
-        }
-        const next = new Map(current)
-        next.set(instanceId, source)
-        return next
-      })
-    },
-    [],
-  )
-  const physicsDebrisRuntime = useMemo(() => {
-    const clusters: DebrisCluster[] = []
-    const sourceByClusterId = new Map<
-      string,
-      ButterPhysicsDebrisSource
-    >()
-    for (const definition of BUTTER_DEFINITIONS) {
-      const source = physicsDebrisSources.get(definition.id)
-      if (!source) {
-        continue
-      }
-      for (const cluster of source.clusters) {
-        clusters.push(cluster)
-        sourceByClusterId.set(cluster.id, source)
-      }
-    }
-    return {
-      clusters,
-      sourceByClusterId,
-    }
-  }, [physicsDebrisSources])
-  const physicsDebrisRuntimeRef = useRef(physicsDebrisRuntime)
-  physicsDebrisRuntimeRef.current = physicsDebrisRuntime
+  const physicsDebris = usePhysicsDebrisSources(BUTTER_SOURCE_IDS)
   const staticColliders = useMemo(
     () =>
       createButterStaticColliders(
@@ -231,23 +179,6 @@ export function SquishyScene({
       ),
     [],
   )
-  const handleDebrisTransform = useCallback(
-    (clusterId: string, transform: DebrisTransform) => {
-      physicsDebrisRuntimeRef.current.sourceByClusterId
-        .get(clusterId)
-        ?.onTransform(clusterId, transform)
-    },
-    [],
-  )
-  const handleDebrisSettled = useCallback(
-    (clusterId: string, transform: DebrisTransform) => {
-      physicsDebrisRuntimeRef.current.sourceByClusterId
-        .get(clusterId)
-        ?.onSettled(clusterId, transform)
-    },
-    [],
-  )
-
   useEffect(() => () => labelTexture.dispose(), [labelTexture])
 
   return (
@@ -282,7 +213,7 @@ export function SquishyScene({
           instanceId={definition.id}
           labelTexture={labelTexture}
           onComplete={onComplete}
-          onPhysicsDebrisChange={handlePhysicsDebrisChange}
+          onPhysicsDebrisChange={physicsDebris.registerSource}
           playCrackSound={playCrackSound}
           position={definition.position}
           reducedMotion={reducedMotion}
@@ -290,15 +221,15 @@ export function SquishyScene({
           waxPalette={definition.wax}
         />
       ))}
-      {physicsDebrisRuntime.clusters.length > 0 ? (
+      {physicsDebris.clusters.length > 0 ? (
         <Suspense fallback={null}>
           <LazyRapierDebris
             generation={coatingSeed}
-            clusters={physicsDebrisRuntime.clusters}
+            clusters={physicsDebris.clusters}
             maxActiveBodies={BUTTER_DEBRIS_BODY_LIMIT}
             staticColliders={staticColliders}
-            onTransform={handleDebrisTransform}
-            onSettled={handleDebrisSettled}
+            onTransform={physicsDebris.handleTransform}
+            onSettled={physicsDebris.handleSettled}
           />
         </Suspense>
       ) : null}

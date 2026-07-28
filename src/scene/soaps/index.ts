@@ -23,6 +23,13 @@ export {
   SOAP_WAX_PHYSICAL_PROPERTIES,
   getSoapWaxPalette,
 } from './soapWaxPalette'
+export {
+  SOAP_DEBRIS_BODY_LIMIT,
+  SOAP_DEBRIS_FADE_POLICY,
+  SOAP_DEBRIS_FLOOR_CLEARANCE,
+  SOAP_DEBRIS_MAX_CLUSTER_SIZE,
+  createSoapDebrisLaunch,
+} from './soapDebris'
 export type {
   SoapAtlasUvBounds,
   SoapDecalDefinition,

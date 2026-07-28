@@ -2,11 +2,13 @@ import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import {
   createButterStaticColliders,
-  groupConnectedFragments,
   PRESENTATION_ROTATION,
-  selectColliderSupportPoints,
   WAX_OUTER_MATERIAL,
 } from '../src/scene/ButterSquishy'
+import {
+  groupConnectedFragments,
+  selectColliderSupportPoints,
+} from '../src/scene/fracture/debrisGeometry'
 import {
   BUTTER_DEFINITIONS,
   BUTTER_STACK_HEIGHT,

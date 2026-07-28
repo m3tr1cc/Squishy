@@ -1,11 +1,17 @@
 import { useThree } from '@react-three/fiber'
 import {
+  lazy,
+  Suspense,
   useEffect,
   useMemo,
   useState,
 } from 'react'
 import * as THREE from 'three'
+import type { DebrisStaticCollider } from './fracture/RapierDebris'
+import { usePhysicsDebrisSources } from './fracture/usePhysicsDebrisSources'
 import {
+  SOAP_DEBRIS_BODY_LIMIT,
+  SOAP_DEBRIS_FLOOR_CLEARANCE,
   SOAP_DEFINITIONS,
   SOAP_WAX_PHYSICAL_PROPERTIES,
   createSoapLabelAtlasTexture,
@@ -13,7 +19,10 @@ import {
   mixSoapSeed,
   type SoapId,
 } from './soaps'
-import { SoapSquishy } from './SoapSquishy'
+import {
+  SOAP_OUTER_OFFSET,
+  SoapSquishy,
+} from './SoapSquishy'
 import {
   PerformanceDiagnostics,
   SCENE_BACKGROUND,
@@ -29,11 +38,16 @@ type SoapSceneProps = Readonly<{
   unlockCrackAudio: () => void
 }>
 
-const SOAP_PRESENTATION_SCALE = [0.68, 1, 1] as const
+const LazyRapierDebris = lazy(() => import('./fracture/RapierDebris'))
+
+export const SOAP_PRESENTATION_SCALE = [0.68, 1, 1] as const
 const PORTRAIT_COLUMN_GAP = 3.08
 const PORTRAIT_ROW_GAP = 2.08
 const LANDSCAPE_COLUMN_GAP = 3.08
 const LANDSCAPE_ROW_GAP = 2.18
+const SOAP_SOURCE_IDS = SOAP_DEFINITIONS.map(
+  (definition) => definition.id,
+)
 
 const SOAP_GRID_POSITIONS = {
   portrait: Array.from({ length: 8 }, (_, index) => {
@@ -99,6 +113,79 @@ export function getResponsiveSoapCameraPose(
   }
 }
 
+export function getSoapDebrisFloorY(layout: SoapLayout) {
+  let lowestSurfaceY = Number.POSITIVE_INFINITY
+  for (let index = 0; index < SOAP_DEFINITIONS.length; index += 1) {
+    const definition = SOAP_DEFINITIONS[index]
+    const position = getSoapGridPosition(index, layout)
+    const halfHeight =
+      definition.geometry.size[1] *
+        SOAP_PRESENTATION_SCALE[1] *
+        0.5 +
+      SOAP_OUTER_OFFSET
+    lowestSurfaceY = Math.min(
+      lowestSurfaceY,
+      position[1] - halfHeight,
+    )
+  }
+  return lowestSurfaceY - SOAP_DEBRIS_FLOOR_CLEARANCE
+}
+
+export function createSoapStaticColliders(
+  layout: SoapLayout,
+): readonly DebrisStaticCollider[] {
+  const colliders: DebrisStaticCollider[] = SOAP_DEFINITIONS.map(
+    (definition, index) => {
+      const [width, height, depth] = definition.geometry.size
+      const position = getSoapGridPosition(index, layout)
+      const scaledWidth = width * SOAP_PRESENTATION_SCALE[0]
+      const scaledHeight = height * SOAP_PRESENTATION_SCALE[1]
+      const scaledDepth = depth * SOAP_PRESENTATION_SCALE[2]
+      const scaledRadius =
+        definition.geometry.cornerRadius *
+        Math.min(...SOAP_PRESENTATION_SCALE)
+      const shrink = 0.025
+      const borderRadius = Math.max(
+        0.025,
+        scaledRadius - shrink,
+      )
+
+      return {
+        id: `soap-body-${definition.id}`,
+        kind: 'round-cuboid',
+        halfExtents: [
+          Math.max(
+            0.02,
+            scaledWidth * 0.5 - scaledRadius - shrink,
+          ),
+          Math.max(
+            0.02,
+            scaledHeight * 0.5 - scaledRadius - shrink,
+          ),
+          Math.max(
+            0.02,
+            scaledDepth * 0.5 - scaledRadius - shrink,
+          ),
+        ],
+        borderRadius,
+        position,
+        friction: 0.88,
+        restitution: 0.015,
+      }
+    },
+  )
+  const floorY = getSoapDebrisFloorY(layout)
+  colliders.push({
+    id: 'soap-debris-floor',
+    kind: 'cuboid',
+    halfExtents: [20, 0.05, 20],
+    position: [0, floorY - 0.05, 0],
+    friction: 0.94,
+    restitution: 0.01,
+  })
+  return colliders
+}
+
 function ResponsiveSoapCamera() {
   const { camera, size } = useThree()
 
@@ -128,6 +215,9 @@ type SoapFieldProps = Pick<
 > & {
   reducedMotion: boolean
   layout: SoapLayout
+  onPhysicsDebrisChange: Parameters<
+    typeof SoapSquishy
+  >[0]['onPhysicsDebrisChange']
 }
 
 function SoapPreview({
@@ -161,6 +251,7 @@ function SoapField({
   coatingSeed,
   layout,
   onComplete,
+  onPhysicsDebrisChange,
   playCrackSound,
   reducedMotion,
   unlockCrackAudio,
@@ -191,6 +282,7 @@ function SoapField({
             introDelay={index * 0.045}
             labelTexture={labelTexture}
             onComplete={onComplete}
+            onPhysicsDebrisChange={onPhysicsDebrisChange}
             playCrackSound={playCrackSound}
             position={getSoapGridPosition(index, layout)}
             reducedMotion={reducedMotion}
@@ -218,6 +310,12 @@ export function SoapScene({
   const reducedMotion = useReducedMotion()
   const size = useThree((state) => state.size)
   const layout = resolveSoapLayout(size.width, size.height)
+  const physicsDebris =
+    usePhysicsDebrisSources<SoapId>(SOAP_SOURCE_IDS)
+  const staticColliders = useMemo(
+    () => createSoapStaticColliders(layout),
+    [layout],
+  )
 
   return (
     <>
@@ -243,10 +341,23 @@ export function SoapScene({
         coatingSeed={coatingSeed}
         layout={layout}
         onComplete={onComplete}
+        onPhysicsDebrisChange={physicsDebris.registerSource}
         playCrackSound={playCrackSound}
         reducedMotion={reducedMotion}
         unlockCrackAudio={unlockCrackAudio}
       />
+      {physicsDebris.clusters.length > 0 ? (
+        <Suspense fallback={null}>
+          <LazyRapierDebris
+            clusters={physicsDebris.clusters}
+            generation={coatingSeed}
+            maxActiveBodies={SOAP_DEBRIS_BODY_LIMIT}
+            onSettled={physicsDebris.handleSettled}
+            onTransform={physicsDebris.handleTransform}
+            staticColliders={staticColliders}
+          />
+        </Suspense>
+      ) : null}
     </>
   )
 }

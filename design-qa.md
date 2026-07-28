@@ -380,3 +380,21 @@ final result: passed
 - `npm run build`
 - The production build retains the independently lazy-loaded soap and Rapier
   chunks and adds no dependency or Supabase migration.
+
+## Soap debris gravity and floor
+
+- Removed the soap-only ballistic approximation that applied weak downward
+  movement and a conspicuous fixed-axis spin.
+- Detached neighboring plates now form connected one-to-four-piece flakes and
+  enter one shared, lazy Rapier world for all eight soaps.
+- Launch velocity has a small downward bias, low angular velocity, and full
+  gravity. Eight rounded body colliders let flakes glance off lower soaps, while
+  an invisible collision floor below the final row gives every flake a clear
+  fall destination before its 2.75-second timeout fade.
+- The world remains capped at 24 active bodies. Convex collider support points
+  remain capped at 48 per plate while the visible wax geometry stays
+  full-resolution.
+- Automated coverage verifies deterministic launches, restrained angular
+  velocity, floor clearance in both responsive layouts, positive collider
+  dimensions, the shared body cap, and enough fade time for a top-row flake to
+  reach the floor.

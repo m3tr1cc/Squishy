@@ -63,8 +63,11 @@ SOAP decal, deformation profile, and seeded fracture network. A stronger
 topology-level seam pass redistributes the existing boundary samples into long
 clean segments while retaining the same raycast IDs, real shell thickness, and
 triangle winding. The grid hydrates each fracture runtime progressively and
-uses lightweight local debris motion, preserving one Canvas and a bounded
-mobile workload while all eight soaps remain independently interactive.
+routes detached connected flakes through one shared, lazy-loaded Rapier world.
+Eight rounded soap colliders and one invisible floor make every flake fall
+through the grid and settle below the final row before fading. The aggregate
+pool remains capped at 24 bodies, preserving one Canvas and a bounded mobile
+workload while all eight soaps remain independently interactive.
 
 The interaction layer supports mouse, pen, and up to two simultaneous mobile
 touches. Touch motion beyond the scroll threshold cancels the press. Responsive
