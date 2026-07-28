@@ -62,7 +62,10 @@ smooth hourglass silhouette with a broad flowing waist, rounded shoulders, and
 softly curved ends, while its bright core, glossy translucent wax tint,
 material response, and seeded fracture network remain distinct. Each core
 carries the same locally hosted Fredoka `Soap` mark in a darker tone of its own
-color, rendered as one clean fill without a stroke. A topology-level seam pass
+color, rendered as one clean fill without a stroke. A continuous squircular
+mapping rounds the complete front contour independently of the shell depth, so
+the end caps stay fully convex instead of inheriting cuboid-like bevels. A
+topology-level seam pass
 redistributes boundary samples into long clean segments while retaining the
 same raycast IDs, real shell thickness, and triangle winding. The 3 x 2
 landscape grid becomes 2 x 3 in portrait, hydrates each fracture runtime

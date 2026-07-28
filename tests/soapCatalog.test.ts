@@ -204,10 +204,10 @@ describe('soap procedural geometry', () => {
         definition.geometry.size[0],
       )
       expect(size.y).toBeGreaterThan(
-        definition.geometry.size[1] * 0.97,
+        definition.geometry.size[1] * 0.84,
       )
       expect(size.y).toBeLessThanOrEqual(
-        definition.geometry.size[1],
+        definition.geometry.size[1] * 0.92,
       )
       expect(size.z).toBeCloseTo(
         definition.geometry.size[2] + 0.11,
@@ -240,8 +240,8 @@ describe('soap procedural geometry', () => {
         }
       }
       const waistRatio = centerHalfHeight / lobeHalfHeight
-      expect(waistRatio).toBeGreaterThanOrEqual(0.81)
-      expect(waistRatio).toBeLessThanOrEqual(0.86)
+      expect(waistRatio).toBeGreaterThanOrEqual(0.84)
+      expect(waistRatio).toBeLessThanOrEqual(0.9)
 
       const contourSamples = [0, 0.2, 0.4, 0.6, 0.8].map(
         (normalizedX) =>
@@ -271,7 +271,14 @@ describe('soap procedural geometry', () => {
         0,
         definition.geometry.size,
       )[0]
-      expect(endShoulderX).toBeLessThan(endMidpointX * 0.91)
+      const endQuarterX = getSoapShapedPosition(
+        halfWidth * 0.95,
+        definition.geometry.size[1] * 0.25,
+        0,
+        definition.geometry.size,
+      )[0]
+      expect(endShoulderX).toBeLessThan(endMidpointX * 0.84)
+      expect(endQuarterX).toBeLessThan(endMidpointX * 0.97)
       geometry.dispose()
     }
   })

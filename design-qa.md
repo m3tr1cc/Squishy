@@ -525,3 +525,47 @@ final result: passed
   `npm run build` pass.
 - No Supabase change or migration is required.
 - Final result: passed.
+
+## Fully rounded outer contour
+
+### Source and implementation evidence
+
+- Source visual truth:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/d7719999-0b9a-4340-917a-03c9808d1b99/1-Photo-1.jpg`
+  at 1200 x 960 pixels.
+- Desktop implementation: `qa/soap-rounded-contour-desktop.png` at
+  1440 x 900, CSS viewport 1440 x 900, DPR 1.
+- Mobile implementation: `qa/soap-rounded-contour-mobile.png` at
+  390 x 844, CSS viewport 390 x 844, DPR 1.5 with CSS-pixel-normalized
+  capture.
+- Mobile cracked state: `qa/soap-rounded-contour-mobile-cracked.png` at
+  390 x 844 with the same viewport and normalization.
+- Equal-height focused comparison:
+  `qa/soap-rounded-contour-comparison.png` at 1200 x 600.
+
+### Findings and comparison history
+
+- [Resolved P1] The first rounding pass still produced short vertical end
+  segments. Increasing only the end taper overcorrected into a pointed,
+  diamond-like midpoint. The final implementation replaces that approximation
+  with a continuous two-axis squircular mapping.
+- [Passed] Post-fix evidence shows fully convex end caps, broad rounded lobes,
+  and a soft central waist closely matching the red traced source contour.
+  There is no bevel-to-side corner or pointed side midpoint.
+- [Passed] Typography, color, wax transmission, grid spacing, and copy remain
+  unchanged from the previously approved pass.
+- [Passed] The same shaped source feeds the inner body, decal, wax topology,
+  previews, dents, and raycasting; the visual fix is not a separate shell or
+  overlay.
+
+### Interaction and regression QA
+
+- Six repeated mobile presses on the upper-left soap still produced connected
+  cracks and detachable wax across the rounded contour.
+- Automated geometry checks cover the rounded top shoulder, half-height side
+  curvature, monotonic waist, closed manifold output, and existing triangle
+  budget.
+- `npm run lint`, `npm run check`, `npm test` (24 files, 123 tests), and
+  `npm run build` pass.
+- No Supabase change or migration is required.
+- Final result: passed.
