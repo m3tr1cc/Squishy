@@ -3,11 +3,9 @@ import type * as THREE from 'three'
 export type SoapId =
   | 'hard-wax'
   | 'plaster'
-  | 'soft-wax'
   | 'nail-polish'
   | 'jelly'
   | 'sprinkles'
-  | 'slime'
   | 'sugar'
 
 export type SoapVector3 = readonly [
@@ -75,13 +73,12 @@ export type SoapAtlasUvBounds = readonly [
 ]
 
 export type SoapDecalDefinition = Readonly<{
-  title: string
-  subtitle: string
+  text: 'Soap'
   inkColor: string
   atlasSlot: number
   atlasUvBounds: SoapAtlasUvBounds
   createGeometry: () => THREE.BufferGeometry
-  createTexture: () => THREE.CanvasTexture
+  createTexture: () => Promise<THREE.CanvasTexture>
 }>
 
 export type SoapDefinition = Readonly<{

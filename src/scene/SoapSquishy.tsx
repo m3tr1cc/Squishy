@@ -62,6 +62,7 @@ import {
   SOAP_DEBRIS_FADE_POLICY,
   SOAP_DEBRIS_MAX_CLUSTER_SIZE,
   createSoapDebrisLaunch,
+  getSoapShapedPosition,
   getSoapWaxPalette,
   type SoapDefinition,
 } from './soaps'
@@ -147,83 +148,6 @@ function hashUint32(value: number) {
   return hash >>> 0
 }
 
-function signedNoise(seed: number) {
-  return (hashUint32(seed) / 0xffffffff) * 2 - 1
-}
-
-function styleSoapGeometry(
-  geometry: THREE.BufferGeometry,
-  definition: SoapDefinition,
-  isDecal = false,
-) {
-  const positions = geometry.getAttribute('position') as THREE.BufferAttribute
-  const [width, height, depth] = definition.geometry.size
-  const behavior = definition.deformation.behavior
-
-  for (let index = 0; index < positions.count; index += 1) {
-    let x = positions.getX(index)
-    let y = positions.getY(index)
-    let z = positions.getZ(index)
-    const normalizedX = x / (width * 0.5)
-    const normalizedY = y / (height * 0.5)
-    const normalizedZ = z / (depth * 0.5)
-    const centerFalloff = Math.max(
-      0,
-      (1 - normalizedX * normalizedX) *
-        (1 - normalizedY * normalizedY),
-    )
-
-    if (behavior === 'chalky') {
-      x += normalizedY * 0.035
-    } else if (behavior === 'supple') {
-      z += Math.sign(z || 1) * centerFalloff * 0.045
-      y += Math.sin(normalizedX * Math.PI) * 0.018
-    } else if (behavior === 'snappy') {
-      x *= 1 + normalizedY * 0.022
-    } else if (behavior === 'wobbly') {
-      y += Math.sin(normalizedX * Math.PI * 1.25) * 0.032
-      z += Math.sign(z || 1) * centerFalloff * 0.035
-    } else if (behavior === 'crunchy' && !isDecal) {
-      const grain =
-        signedNoise(
-          definition.seedSalt ^
-            Math.imul(index + 1, 0x9e3779b1),
-        ) * 0.012
-      z += grain * Math.max(0.25, Math.abs(normalizedZ))
-    } else if (behavior === 'gooey') {
-      const bottomWeight = Math.max(0, -normalizedY)
-      y -=
-        bottomWeight *
-        Math.max(0, 1 - normalizedX * normalizedX) *
-        0.055
-      z += Math.sign(z || 1) * centerFalloff * 0.05
-    } else if (behavior === 'granular' && !isDecal) {
-      const grain =
-        signedNoise(
-          definition.seedSalt ^
-            Math.imul(index + 7, 0x85ebca6b),
-        ) * 0.009
-      x += grain * normalizedX
-      y += grain * normalizedY
-      z += grain * Math.sign(normalizedZ || 1)
-    }
-
-    if (isDecal) {
-      z +=
-        behavior === 'crunchy' || behavior === 'granular'
-          ? 0.016
-          : 0.001
-    }
-    positions.setXYZ(index, x, y, z)
-  }
-
-  positions.needsUpdate = true
-  geometry.computeVertexNormals()
-  geometry.computeBoundingBox()
-  geometry.computeBoundingSphere()
-  return geometry
-}
-
 function createAccentGeometry(definition: SoapDefinition) {
   if (
     definition.id !== 'sprinkles' &&
@@ -245,9 +169,15 @@ function createAccentGeometry(definition: SoapDefinition) {
     )
     const xRoll = hashUint32(seed ^ 0xa341316c) / 0xffffffff
     const yRoll = hashUint32(seed ^ 0xc8013ea4) / 0xffffffff
-    positions[index * 3] = (xRoll - 0.5) * width * 0.78
-    positions[index * 3 + 1] = (yRoll - 0.5) * height * 0.62
-    positions[index * 3 + 2] = depth * 0.5 + 0.012
+    const shaped = getSoapShapedPosition(
+      (xRoll - 0.5) * width * 0.78,
+      (yRoll - 0.5) * height * 0.62,
+      depth * 0.5,
+      definition.geometry.size,
+    )
+    positions[index * 3] = shaped[0]
+    positions[index * 3 + 1] = shaped[1]
+    positions[index * 3 + 2] = shaped[2] + 0.012
     normals[index * 3 + 2] = 1
     const paletteIndex =
       seed % definition.style.accentPalette.length
@@ -289,20 +219,11 @@ export const SoapSquishy = memo(function SoapSquishy({
   const presentationRef = useRef<THREE.Group>(null)
   const compressionRef = useRef<THREE.Group>(null)
   const innerGeometry = useMemo(
-    () =>
-      styleSoapGeometry(
-        definition.geometry.createSourceGeometry(),
-        definition,
-      ),
+    () => definition.geometry.createSourceGeometry(),
     [definition],
   )
   const labelGeometry = useMemo(
-    () =>
-      styleSoapGeometry(
-        definition.decal.createGeometry(),
-        definition,
-        true,
-      ),
+    () => definition.decal.createGeometry(),
     [definition],
   )
   const accentGeometry = useMemo(
@@ -1459,11 +1380,12 @@ export const SoapSquishy = memo(function SoapSquishy({
           </mesh>
           <mesh
             geometry={labelGeometry}
+            position={[0, 0, SOAP_OUTER_OFFSET * 0.4]}
             raycast={NO_RAYCAST}
             renderOrder={1}
           >
             <meshBasicMaterial
-              alphaTest={0.015}
+              alphaTest={0.5}
               depthTest
               depthWrite
               map={labelTexture}
@@ -1489,24 +1411,6 @@ export const SoapSquishy = memo(function SoapSquishy({
               attenuationColor={waxPalette.attenuationColor}
               color={waxPalette.surfaceColor}
               vertexColors
-            />
-          </mesh>
-          <mesh
-            geometry={labelGeometry}
-            position={[0, 0, SOAP_OUTER_OFFSET + 0.006]}
-            raycast={NO_RAYCAST}
-            renderOrder={3}
-          >
-            <meshBasicMaterial
-              alphaTest={0.015}
-              depthTest
-              depthWrite={false}
-              map={labelTexture}
-              opacity={0.52}
-              polygonOffset
-              polygonOffsetFactor={-5}
-              toneMapped={false}
-              transparent
             />
           </mesh>
           {accentGeometry ? (

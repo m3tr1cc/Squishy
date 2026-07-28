@@ -46,10 +46,10 @@ describe('soap wax palette', () => {
       expect(
         circularHueDistance(coreHsl.h, attenuationHsl.h),
       ).toBeLessThan(0.025)
-      expect(surfaceHsl.l).toBeGreaterThanOrEqual(0.76)
-      expect(surfaceHsl.l).toBeLessThanOrEqual(0.8)
-      expect(surfaceHsl.s).toBeGreaterThanOrEqual(0.28)
-      expect(surfaceHsl.s).toBeLessThanOrEqual(0.58)
+      expect(surfaceHsl.l).toBeGreaterThanOrEqual(0.84)
+      expect(surfaceHsl.l).toBeLessThanOrEqual(0.88)
+      expect(surfaceHsl.s).toBeGreaterThanOrEqual(0.18)
+      expect(surfaceHsl.s).toBeLessThanOrEqual(0.4)
       expect(attenuationHsl.l).toBeLessThan(surfaceHsl.l)
       expect(attenuationHsl.s).toBeGreaterThan(surfaceHsl.s)
     }
@@ -67,10 +67,22 @@ describe('soap wax palette', () => {
     expect(SOAP_WAX_PHYSICAL_PROPERTIES.transparent).toBe(false)
     expect(
       SOAP_WAX_PHYSICAL_PROPERTIES.transmission,
-    ).toBeGreaterThan(0.12)
+    ).toBeGreaterThanOrEqual(0.45)
     expect(
       SOAP_WAX_PHYSICAL_PROPERTIES.transmission,
-    ).toBeLessThanOrEqual(0.25)
+    ).toBeLessThanOrEqual(0.7)
+    expect(SOAP_WAX_PHYSICAL_PROPERTIES.roughness).toBeGreaterThanOrEqual(
+      0.12,
+    )
+    expect(SOAP_WAX_PHYSICAL_PROPERTIES.roughness).toBeLessThanOrEqual(
+      0.24,
+    )
+    expect(SOAP_WAX_PHYSICAL_PROPERTIES.clearcoat).toBeGreaterThanOrEqual(
+      0.4,
+    )
+    expect(SOAP_WAX_PHYSICAL_PROPERTIES.clearcoat).toBeLessThanOrEqual(
+      0.7,
+    )
     expect(SOAP_WAX_PHYSICAL_PROPERTIES.ior).toBeGreaterThan(1)
     expect(SOAP_WAX_PHYSICAL_PROPERTIES.thickness).toBeGreaterThan(0)
     expect(Object.isFrozen(SOAP_WAX_PHYSICAL_PROPERTIES)).toBe(true)

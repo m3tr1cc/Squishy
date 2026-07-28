@@ -6,29 +6,29 @@ import {
 } from '../src/scene/SoapScene'
 
 describe('soap grid presentation', () => {
-  it('uses two columns and four rows in portrait viewports', () => {
+  it('uses two columns and three rows in portrait viewports', () => {
     expect(resolveSoapLayout(390, 844)).toBe('portrait')
-    const positions = Array.from({ length: 8 }, (_, index) =>
+    const positions = Array.from({ length: 6 }, (_, index) =>
       getSoapGridPosition(index, 'portrait'),
     )
 
     expect(new Set(positions.map(([x]) => x)).size).toBe(2)
-    expect(new Set(positions.map(([, y]) => y)).size).toBe(4)
+    expect(new Set(positions.map(([, y]) => y)).size).toBe(3)
     expect(new Set(positions.map((position) => position.join(':'))).size).toBe(
-      8,
+      6,
     )
   })
 
-  it('uses four columns and two rows in landscape viewports', () => {
+  it('uses three columns and two rows in landscape viewports', () => {
     expect(resolveSoapLayout(1440, 900)).toBe('landscape')
-    const positions = Array.from({ length: 8 }, (_, index) =>
+    const positions = Array.from({ length: 6 }, (_, index) =>
       getSoapGridPosition(index, 'landscape'),
     )
 
-    expect(new Set(positions.map(([x]) => x)).size).toBe(4)
+    expect(new Set(positions.map(([x]) => x)).size).toBe(3)
     expect(new Set(positions.map(([, y]) => y)).size).toBe(2)
     expect(new Set(positions.map((position) => position.join(':'))).size).toBe(
-      8,
+      6,
     )
   })
 

@@ -10,10 +10,102 @@ export const SOAP_SOURCE_TRIANGLE_BUDGET = 3_000
 export const SOAP_DECAL_TRIANGLE_BUDGET = 512
 
 const DECAL_WIDTH_RATIO = 0.72
-const DECAL_HEIGHT_RATIO = 0.44
+const DECAL_HEIGHT_RATIO = 0.5
 const DECAL_SURFACE_OFFSET = 0.004
 const DECAL_WIDTH_SEGMENTS = 16
 const DECAL_HEIGHT_SEGMENTS = 6
+const SOAP_WAIST_DEPTH = 0.21
+const SOAP_SQUIRCLE_STRENGTH = 0.36
+const SOAP_PUFF_DEPTH = 0.055
+
+export const SOAP_SHARED_SIZE = Object.freeze([
+  4,
+  1.82,
+  1.05,
+] as const)
+export const SOAP_SHARED_CORNER_RADIUS = 0.49
+export const SOAP_SHARED_SEGMENTS = Object.freeze([
+  41,
+  14,
+  3,
+] as const)
+
+export function getSoapShapedPosition(
+  x: number,
+  y: number,
+  z: number,
+  size: SoapVector3,
+): readonly [number, number, number] {
+  const [width, height] = size
+  const normalizedX = THREE.MathUtils.clamp(
+    x / (width * 0.5),
+    -1,
+    1,
+  )
+  const normalizedY = THREE.MathUtils.clamp(
+    y / (height * 0.5),
+    -1,
+    1,
+  )
+  const waist =
+    Math.cos(Math.abs(normalizedX) * Math.PI * 0.5) ** 2
+  const roundedXScale = Math.sqrt(
+    Math.max(
+      0,
+      1 -
+        SOAP_SQUIRCLE_STRENGTH *
+          normalizedY *
+          normalizedY,
+    ),
+  )
+  const roundedYScale = Math.sqrt(
+    Math.max(
+      0,
+      1 -
+        SOAP_SQUIRCLE_STRENGTH *
+          normalizedX *
+          normalizedX,
+    ),
+  )
+  const shapedX = x * roundedXScale
+  const shapedY =
+    y * roundedYScale * (1 - SOAP_WAIST_DEPTH * waist)
+  const shapedNormalizedY = THREE.MathUtils.clamp(
+    shapedY / (height * 0.5),
+    -1,
+    1,
+  )
+  const puff =
+    SOAP_PUFF_DEPTH *
+    Math.max(0, 1 - normalizedX * normalizedX) *
+    Math.max(0, 1 - shapedNormalizedY * shapedNormalizedY)
+  const shapedZ = z + Math.sign(z || 1) * puff
+
+  return [shapedX, shapedY, shapedZ]
+}
+
+function applySoapShape(
+  geometry: THREE.BufferGeometry,
+  size: SoapVector3,
+) {
+  const positions = geometry.getAttribute(
+    'position',
+  ) as THREE.BufferAttribute
+  for (let index = 0; index < positions.count; index += 1) {
+    const shaped = getSoapShapedPosition(
+      positions.getX(index),
+      positions.getY(index),
+      positions.getZ(index),
+      size,
+    )
+    positions.setXYZ(index, shaped[0], shaped[1], shaped[2])
+  }
+  positions.needsUpdate = true
+  geometry.computeVertexNormals()
+  geometry.computeBoundingBox()
+  geometry.computeBoundingSphere()
+  return geometry
+}
 
 function roundedFrontZ(
   x: number,
@@ -45,7 +137,7 @@ export function createSoapSourceGeometry({
   SoapGeometryDefinition,
   'size' | 'cornerRadius' | 'segments'
 >) {
-  return createRoundedCuboidGeometry({
+  return applySoapShape(createRoundedCuboidGeometry({
     width: size[0],
     height: size[1],
     depth: size[2],
@@ -53,7 +145,7 @@ export function createSoapSourceGeometry({
     widthSegments: segments[0],
     heightSegments: segments[1],
     depthSegments: segments[2],
-  })
+  }), size)
 }
 
 export function createSoapDecalGeometry({
@@ -78,10 +170,17 @@ export function createSoapDecalGeometry({
   for (let index = 0; index < positions.count; index += 1) {
     const x = positions.getX(index)
     const y = positions.getY(index)
-    positions.setZ(
+    const shaped = getSoapShapedPosition(
+      x,
+      y,
+      roundedFrontZ(x, y, size, cornerRadius),
+      size,
+    )
+    positions.setXYZ(
       index,
-      roundedFrontZ(x, y, size, cornerRadius) +
-        DECAL_SURFACE_OFFSET,
+      shaped[0],
+      shaped[1],
+      shaped[2] + DECAL_SURFACE_OFFSET,
     )
 
     const localU = uvs.getX(index)

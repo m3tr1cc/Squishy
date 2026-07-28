@@ -6,18 +6,25 @@ export {
 } from './soapCatalog'
 export {
   SOAP_DECAL_TRIANGLE_BUDGET,
+  SOAP_SHARED_CORNER_RADIUS,
+  SOAP_SHARED_SEGMENTS,
+  SOAP_SHARED_SIZE,
   SOAP_SOURCE_TRIANGLE_BUDGET,
   createSoapDecalGeometry,
   createSoapSourceGeometry,
+  getSoapShapedPosition,
 } from './soapGeometry'
 export {
   SOAP_LABEL_ATLAS_COLUMNS,
   SOAP_LABEL_ATLAS_ENTRIES,
+  SOAP_LABEL_FONT_FAMILY,
   SOAP_LABEL_ATLAS_HEIGHT,
   SOAP_LABEL_ATLAS_ROWS,
   SOAP_LABEL_ATLAS_WIDTH,
   createSoapLabelAtlasTexture,
+  createSoapLabelAtlasTextureAsync,
   getSoapLabelAtlasEntry,
+  loadSoapLabelFont,
 } from './soapLabelAtlas'
 export {
   SOAP_WAX_PHYSICAL_PROPERTIES,

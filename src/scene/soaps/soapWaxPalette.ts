@@ -6,16 +6,17 @@ export type SoapWaxPalette = Readonly<{
 }>
 
 export const SOAP_WAX_PHYSICAL_PROPERTIES = Object.freeze({
-  attenuationDistance: 0.3,
-  clearcoat: 0,
+  attenuationDistance: 0.75,
+  clearcoat: 0.65,
+  clearcoatRoughness: 0.12,
   ior: 1.44,
   metalness: 0,
   opacity: 1,
-  roughness: 0.68,
-  sheen: 0.03,
-  specularIntensity: 0.26,
-  thickness: 0.04,
-  transmission: 0.18,
+  roughness: 0.16,
+  sheen: 0.08,
+  specularIntensity: 0.72,
+  thickness: 0.045,
+  transmission: 0.62,
   transparent: false,
 } as const)
 
@@ -43,25 +44,29 @@ export function getSoapWaxPalette(bodyColor: string): SoapWaxPalette {
 
   const core = new THREE.Color(bodyColor)
   core.getHSL(hslScratch)
-  const surfaceSaturation = clamp(hslScratch.s * 0.55, 0.3, 0.56)
-  const attenuationSaturation = clamp(
-    hslScratch.s * 0.64,
+  const surfaceSaturation = clamp(
+    hslScratch.s * 0.38,
+    0.2,
     0.38,
-    0.68,
+  )
+  const attenuationSaturation = clamp(
+    hslScratch.s * 0.72,
+    0.5,
+    0.72,
   )
   const palette = Object.freeze({
     surfaceColor: toCssHex(
       new THREE.Color().setHSL(
         hslScratch.h,
         surfaceSaturation,
-        0.78,
+        0.86,
       ),
     ),
     attenuationColor: toCssHex(
       new THREE.Color().setHSL(
         hslScratch.h,
         attenuationSaturation,
-        0.67,
+        0.7,
       ),
     ),
   })

@@ -408,3 +408,208 @@ final result: passed
   deprecation warnings.
 - Final verification: `npm run lint`, `npm run check`, `npm test` (24 files,
   123 tests), and `npm run build`.
+
+## Six molded-soap redesign
+
+### Reference and captures
+
+- Visual reference:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/b9e14cec-c4d4-4a90-9a9e-8c0e4a449547/1-Photo-1.jpg`.
+- Desktop final: `qa/soap-redesign-desktop.png` at 1440 x 900.
+- Mobile final: `qa/soap-redesign-mobile.png` at 390 x 844.
+- Mobile cracked state: `qa/soap-redesign-mobile-cracked.png`.
+- Side-by-side reference comparison: `qa/soap-redesign-comparison.png`.
+
+### Fidelity decisions
+
+- Reduced the assortment from eight bars to six and changed the responsive
+  layout to 3 x 2 in landscape and 2 x 3 in portrait.
+- All pristine soaps now use one molded silhouette: rounded lobes taper into a
+  shallow center waist, with a subtle front/back puff. The shared geometry,
+  label surface, previews, raycast surface, and paired-lobe colliders all follow
+  that same profile.
+- Every label says `SOAP` in locally hosted Fredoka 700. Its ink is derived
+  from the product hue: amber on yellow, bright pink on soft pink, violet on
+  lavender, dark blue on light blue, coral on blush, and forest green on lime.
+- The wax is now glossier and more transparent (`0.62` transmission, `0.16`
+  roughness, `0.65` clearcoat). Its pastel tint still identifies the underlying
+  soap before breakage, while labels and Sprinkles/Sugar details remain visible
+  through the intact coating.
+- Fracture topology, clean long seam simplification, deformation, crack audio,
+  connected Rapier debris, falling behavior, and timed fade remain unchanged.
+
+### Comparison iterations
+
+- Initial comparison found the label pass too diffuse through the thicker
+  milky coating. Increasing transmission and lowering roughness made the core
+  color and tone-on-tone mark more legible.
+- Moving the label very near the shell temporarily caused letter fragments to
+  clip through the intact wax. Returning it to a shallow internal offset kept
+  the mark coherent and preserved the intended under-wax softness.
+- Final comparison confirms six complete shapes with no crop, consistent
+  pinched silhouettes, readable hue-matched `SOAP` marks, bright internal
+  designs, and unobstructed navigation at both target viewports.
+
+### Interaction QA
+
+- Six repeated mobile presses on the upper-left soap created connected clean
+  seams and exposed the bright core without selecting the page or producing a
+  blue viewport highlight.
+- Detached wax fell away from the soap and retired after its existing fade
+  timeout. The permanent opening remained physically consistent with the
+  broken coating.
+- The portrait grid retained all six soaps after interaction and kept the
+  previous/next controls clear of the products.
+
+### Verification
+
+- Automated catalog coverage enforces six entries, identical shared geometry,
+  the center waist, six `SOAP` atlas cells, hue-matched label inks, responsive
+  3 x 2 / 2 x 3 placement, two colliders per soap, and bounded triangle counts.
+- `npm run lint`, `npm run check`, `npm test` (24 files, 123 tests), and
+  `npm run build` all pass.
+- The redesign adds no runtime package and no Supabase migration.
+- Final result: passed.
+
+## Smooth hourglass contour and label refinement
+
+### Source and implementation evidence
+
+- Source visual truth:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/4333b263-3cba-4e3c-bb3c-31c0e0956269/1-Photo-1.jpg`
+  at 1536 x 532 pixels.
+- Desktop implementation: `qa/soap-hourglass-desktop.png` at 1440 x 900,
+  CSS viewport 1440 x 900, DPR 1.
+- Mobile implementation: `qa/soap-hourglass-mobile.png` at 390 x 844,
+  CSS viewport 390 x 844, DPR 1.5; the browser capture is normalized to CSS
+  pixels.
+- Mobile cracked state: `qa/soap-hourglass-mobile-cracked.png` at
+  390 x 844, CSS viewport 390 x 844, DPR 1.5 with the same normalization.
+- Focused equal-density label comparison:
+  `qa/soap-hourglass-label-comparison.png`. Both sides are normalized to
+  720 x 300 pixels.
+
+### Findings and comparison history
+
+- [Resolved P1] The prior contour retained box-like shoulders and relatively
+  flat ends. The source mesh now uses a cosine-squared waist across the full
+  width, a larger three-dimensional corner radius, and smooth vertical end
+  tapering. The post-fix desktop and mobile captures show one continuous
+  hourglass outline without the previous rectangular transition.
+- [Resolved P1] The prior all-caps mark used a faint darker stroke. The atlas
+  now draws one title-case `Soap` fill at Fredoka 600 with no `strokeText`
+  pass. Raising the opaque decal alpha cutoff removes the dark translucent
+  fringe without changing its depth behavior under intact wax.
+- [Passed] Fonts and typography: the focused comparison confirms the same
+  simple one-line title-case word, a rounded sans construction, no outline,
+  no wrap, and centered optical placement. Hue-matched ink remains intentional
+  from the preceding approved color direction.
+- [Passed] Spacing and layout rhythm: the six-item 3 x 2 desktop and 2 x 3
+  mobile grids remain centered, evenly spaced, and clear of navigation.
+- [Passed] Colors and visual tokens: glossy tinted coatings and tone-on-tone
+  marks are unchanged.
+- [Passed] Image quality and asset fidelity: the supplied crop is used only as
+  typography reference; the procedural geometry and local OFL font remain
+  crisp at both densities.
+- [Passed] Copy/content: every item now displays exactly `Soap`.
+
+### Interaction and regression QA
+
+- Repeated presses on the upper-left mobile soap still create connected
+  topology-driven cracks and detachable falling wax; no decorative overlay or
+  alternate fracture path was introduced.
+- The continuous source mesh remains finite, closed, manifold, and below the
+  established mobile triangle budget. Automated checks also verify a monotonic
+  waist curve and rounded shoulder taper.
+- `npm run lint`, `npm run check`, `npm test` (24 files, 123 tests), and
+  `npm run build` pass.
+- No Supabase change or migration is required.
+- Final result: passed.
+
+## Fully rounded outer contour
+
+### Source and implementation evidence
+
+- Source visual truth:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/d7719999-0b9a-4340-917a-03c9808d1b99/1-Photo-1.jpg`
+  at 1200 x 960 pixels.
+- Desktop implementation: `qa/soap-rounded-contour-desktop.png` at
+  1440 x 900, CSS viewport 1440 x 900, DPR 1.
+- Mobile implementation: `qa/soap-rounded-contour-mobile.png` at
+  390 x 844, CSS viewport 390 x 844, DPR 1.5 with CSS-pixel-normalized
+  capture.
+- Mobile cracked state: `qa/soap-rounded-contour-mobile-cracked.png` at
+  390 x 844 with the same viewport and normalization.
+- Equal-height focused comparison:
+  `qa/soap-rounded-contour-comparison.png` at 1200 x 600.
+
+### Findings and comparison history
+
+- [Resolved P1] The first rounding pass still produced short vertical end
+  segments. Increasing only the end taper overcorrected into a pointed,
+  diamond-like midpoint. The final implementation replaces that approximation
+  with a continuous two-axis squircular mapping.
+- [Passed] Post-fix evidence shows fully convex end caps, broad rounded lobes,
+  and a soft central waist closely matching the red traced source contour.
+  There is no bevel-to-side corner or pointed side midpoint.
+- [Passed] Typography, color, wax transmission, grid spacing, and copy remain
+  unchanged from the previously approved pass.
+- [Passed] The same shaped source feeds the inner body, decal, wax topology,
+  previews, dents, and raycasting; the visual fix is not a separate shell or
+  overlay.
+
+### Interaction and regression QA
+
+- Six repeated mobile presses on the upper-left soap still produced connected
+  cracks and detachable wax across the rounded contour.
+- Automated geometry checks cover the rounded top shoulder, half-height side
+  curvature, monotonic waist, closed manifold output, and existing triangle
+  budget.
+- `npm run lint`, `npm run check`, `npm test` (24 files, 123 tests), and
+  `npm run build` pass.
+- No Supabase change or migration is required.
+- Final result: passed.
+
+## Softened lobe peaks
+
+### Source and implementation evidence
+
+- Source visual truth:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/0dc98d30-a316-4025-ae4b-556bf59ceca0/1-Photo-1.jpg`
+  at 1280 x 952 pixels.
+- Desktop implementation: `qa/soap-soft-lobes-desktop.png` at
+  1920 x 911.
+- Mobile implementation: `qa/soap-soft-lobes-mobile.png` at
+  390 x 844.
+- Mobile interaction state:
+  `qa/soap-soft-lobes-mobile-interaction.png` at 390 x 844.
+- Focused side-by-side comparison:
+  `qa/soap-soft-lobes-comparison.png` at 1200 x 620.
+
+### Findings and comparison history
+
+- [Resolved P1] The four outer lobe peaks read as slightly angular at the
+  points marked in the supplied reference. The shared source mesh now
+  concentrates more of its fixed triangle budget along the horizontal
+  contour, increasing width resolution from 36 to 41 segments.
+- [Resolved P1] The waist pull is reduced from 25% to 21%, and the continuous
+  squircular shoulder projection is slightly stronger. Together these changes
+  turn the four peak transitions into broad arcs while preserving the approved
+  hourglass waist and convex ends.
+- [Passed] The same revised source geometry drives the colored core, wax
+  topology, decal, deformation, and raycasting. No cosmetic overlay or
+  alternate interaction mesh was introduced.
+- [Passed] Typography, glossy tinted wax, six-soap layout, sound, debris, and
+  navigation remain unchanged.
+
+### Interaction and regression QA
+
+- Desktop and 390 x 844 portrait captures show the broader four-lobe contour
+  without clipping, overlap, or navigation collisions.
+- Mobile press QA retains the existing zoom response and topology-driven wax
+  interaction after the smoothing change.
+- Automated geometry coverage locks the 41 x 14 x 3 segment distribution,
+  the softened crest profile, the closed manifold, and the 3,000-triangle
+  mobile budget.
+- No Supabase change or migration is required.
+- Final result: passed.

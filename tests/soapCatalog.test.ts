@@ -7,19 +7,20 @@ import {
   SOAP_LABEL_ATLAS_COLUMNS,
   SOAP_LABEL_ATLAS_ENTRIES,
   SOAP_LABEL_ATLAS_ROWS,
+  SOAP_SHARED_SEGMENTS,
+  SOAP_SHARED_SIZE,
   SOAP_SOURCE_TRIANGLE_BUDGET,
   getSoapDefinition,
+  getSoapShapedPosition,
   mixSoapSeed,
 } from '../src/scene/soaps'
 
 const EXPECTED_SOAPS = [
   ['hard-wax', 'Hard Wax', 0x4a7d2e19],
   ['plaster', 'Plaster', 0x91c5b30f],
-  ['soft-wax', 'Soft Wax', 0x26e8d4a3],
   ['nail-polish', 'Nail Polish', 0xd47a106d],
   ['jelly', 'Jelly', 0x6f32c9b5],
   ['sprinkles', 'Sprinkles', 0xb1e75943],
-  ['slime', 'Slime', 0x38adf271],
   ['sugar', 'Sugar', 0xe5068c9f],
 ] as const
 
@@ -77,9 +78,14 @@ function expectClosedManifold(geometry: THREE.BufferGeometry) {
   )
 }
 
+function circularHueDistance(left: number, right: number) {
+  const distance = Math.abs(left - right)
+  return Math.min(distance, 1 - distance)
+}
+
 describe('soap catalog', () => {
-  it('contains exactly the eight stable products in their intended order', () => {
-    expect(SOAP_DEFINITION_COUNT).toBe(8)
+  it('contains exactly the six stable products in their intended order', () => {
+    expect(SOAP_DEFINITION_COUNT).toBe(6)
     expect(
       SOAP_DEFINITIONS.map(({ id, name, seedSalt }) => [
         id,
@@ -97,21 +103,21 @@ describe('soap catalog', () => {
     const unique = (values: readonly unknown[]) =>
       new Set(values).size
 
-    expect(unique(SOAP_DEFINITIONS.map(({ id }) => id))).toBe(8)
+    expect(unique(SOAP_DEFINITIONS.map(({ id }) => id))).toBe(6)
     expect(unique(SOAP_DEFINITIONS.map(({ seedSalt }) => seedSalt))).toBe(
-      8,
+      6,
     )
     expect(
       unique(
         SOAP_DEFINITIONS.map(({ deformation }) => deformation.behavior),
       ),
-    ).toBe(8)
+    ).toBe(6)
     expect(
       unique(SOAP_DEFINITIONS.map(({ style }) => style.finish)),
-    ).toBe(8)
+    ).toBe(6)
     expect(
       unique(SOAP_DEFINITIONS.map(({ style }) => style.bodyColor)),
-    ).toBe(8)
+    ).toBe(6)
 
     for (const definition of SOAP_DEFINITIONS) {
       expect(definition.style.bodyColor).toMatch(/^#[0-9a-f]{6}$/i)
@@ -165,7 +171,7 @@ describe('soap catalog', () => {
         ({ seedSalt }) => (coatingSeed ^ seedSalt) >>> 0,
       ),
     )
-    expect(new Set(mixed).size).toBe(8)
+    expect(new Set(mixed).size).toBe(6)
     expect(
       mixSoapSeed(coatingSeed, SOAP_DEFINITIONS[0].id),
     ).toBe(mixed[0])
@@ -173,7 +179,9 @@ describe('soap catalog', () => {
 })
 
 describe('soap procedural geometry', () => {
-  it('creates indexed finite canonical source meshes inside the mobile budget', () => {
+  it('creates identical finite pinched source meshes inside the mobile budget', () => {
+    expect(SOAP_SHARED_SEGMENTS).toEqual([41, 14, 3])
+    let expectedPositions: Float32Array | null = null
     for (const definition of SOAP_DEFINITIONS) {
       const geometry = definition.geometry.createSourceGeometry()
       const index = geometry.getIndex()
@@ -190,15 +198,93 @@ describe('soap procedural geometry', () => {
       const bounds = geometry.boundingBox!
       const size = bounds.getSize(new THREE.Vector3())
       const center = bounds.getCenter(new THREE.Vector3())
-      expect(size.x).toBeCloseTo(definition.geometry.size[0], 4)
-      expect(size.y).toBeCloseTo(definition.geometry.size[1], 4)
-      expect(size.z).toBeCloseTo(definition.geometry.size[2], 4)
+      expect(definition.geometry.size).toEqual(SOAP_SHARED_SIZE)
+      expect(size.x).toBeGreaterThan(
+        definition.geometry.size[0] * 0.99,
+      )
+      expect(size.x).toBeLessThanOrEqual(
+        definition.geometry.size[0],
+      )
+      expect(size.y).toBeGreaterThan(
+        definition.geometry.size[1] * 0.84,
+      )
+      expect(size.y).toBeLessThanOrEqual(
+        definition.geometry.size[1] * 0.92,
+      )
+      expect(size.z).toBeCloseTo(
+        definition.geometry.size[2] + 0.11,
+        3,
+      )
       expect(center.length()).toBeLessThan(1e-5)
       expect(bounds.max.z).toBeGreaterThan(0)
-      expect(bounds.max.z).toBeCloseTo(
-        definition.geometry.size[2] / 2,
-        4,
+      const positions = geometry.getAttribute(
+        'position',
+      ).array as Float32Array
+      if (expectedPositions) {
+        expect([...positions]).toEqual([...expectedPositions])
+      } else {
+        expectedPositions = new Float32Array(positions)
+      }
+
+      let centerHalfHeight = 0
+      let lobeHalfHeight = 0
+      const halfWidth = definition.geometry.size[0] * 0.5
+      for (let index = 0; index < positions.length; index += 3) {
+        const normalizedX = Math.abs(positions[index] / halfWidth)
+        const absoluteY = Math.abs(positions[index + 1])
+        if (normalizedX < 0.04) {
+          centerHalfHeight = Math.max(
+            centerHalfHeight,
+            absoluteY,
+          )
+        } else if (normalizedX >= 0.65 && normalizedX <= 0.75) {
+          lobeHalfHeight = Math.max(lobeHalfHeight, absoluteY)
+        }
+      }
+      const waistRatio = centerHalfHeight / lobeHalfHeight
+      expect(waistRatio).toBeGreaterThanOrEqual(0.88)
+      expect(waistRatio).toBeLessThanOrEqual(0.93)
+
+      const contourSamples = [0, 0.2, 0.4, 0.6, 0.8, 1].map(
+        (normalizedX) =>
+          Math.abs(
+            getSoapShapedPosition(
+              normalizedX * halfWidth,
+              definition.geometry.size[1] * 0.5,
+              0,
+              definition.geometry.size,
+            )[1],
+          ),
       )
+      for (let index = 1; index <= 3; index += 1) {
+        expect(contourSamples[index]).toBeGreaterThanOrEqual(
+          contourSamples[index - 1] - 1e-4,
+        )
+      }
+      expect(contourSamples[4]).toBeGreaterThan(
+        contourSamples[3] * 0.98,
+      )
+      expect(contourSamples[5]).toBeLessThan(contourSamples[4])
+      const endMidpointX = getSoapShapedPosition(
+        halfWidth * 0.95,
+        0,
+        0,
+        definition.geometry.size,
+      )[0]
+      const endShoulderX = getSoapShapedPosition(
+        halfWidth * 0.95,
+        definition.geometry.size[1] * 0.5,
+        0,
+        definition.geometry.size,
+      )[0]
+      const endQuarterX = getSoapShapedPosition(
+        halfWidth * 0.95,
+        definition.geometry.size[1] * 0.25,
+        0,
+        definition.geometry.size,
+      )[0]
+      expect(endShoulderX).toBeLessThan(endMidpointX * 0.84)
+      expect(endQuarterX).toBeLessThan(endMidpointX * 0.97)
       geometry.dispose()
     }
   })
@@ -244,7 +330,7 @@ describe('soap procedural geometry', () => {
 
       geometry.computeBoundingBox()
       expect(geometry.boundingBox!.max.z).toBeCloseTo(
-        definition.geometry.size[2] / 2 + 0.004,
+        definition.geometry.size[2] / 2 + 0.055 + 0.004,
         4,
       )
       geometry.dispose()
@@ -254,13 +340,13 @@ describe('soap procedural geometry', () => {
 
 describe('shared SOAP label atlas', () => {
   it('assigns one immutable non-overlapping cell to every soap', () => {
-    expect(SOAP_LABEL_ATLAS_ENTRIES).toHaveLength(8)
+    expect(SOAP_LABEL_ATLAS_ENTRIES).toHaveLength(6)
     expect(Object.isFrozen(SOAP_LABEL_ATLAS_ENTRIES)).toBe(true)
     expect(
       new Set(
         SOAP_LABEL_ATLAS_ENTRIES.map(({ atlasSlot }) => atlasSlot),
       ).size,
-    ).toBe(8)
+    ).toBe(6)
 
     for (const entry of SOAP_LABEL_ATLAS_ENTRIES) {
       expect(Object.isFrozen(entry)).toBe(true)
@@ -277,6 +363,17 @@ describe('shared SOAP label atlas', () => {
       expect(maximumV).toBeLessThanOrEqual(1)
       expect(maximumU).toBeGreaterThan(minimumU)
       expect(maximumV).toBeGreaterThan(minimumV)
+      expect(entry.text).toBe('Soap')
+
+      const definition = getSoapDefinition(entry.id)
+      const coreHsl = { h: 0, s: 0, l: 0 }
+      const inkHsl = { h: 0, s: 0, l: 0 }
+      new THREE.Color(definition.style.bodyColor).getHSL(coreHsl)
+      new THREE.Color(entry.inkColor).getHSL(inkHsl)
+      expect(
+        circularHueDistance(coreHsl.h, inkHsl.h),
+      ).toBeLessThan(0.08)
+      expect(coreHsl.l - inkHsl.l).toBeGreaterThan(0.15)
     }
   })
 })

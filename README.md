@@ -57,17 +57,24 @@ work; overflow pieces settle deterministically. Detached pieces fade and retire
 from both rendering and physics so spent flakes do not accumulate.
 
 The `/soaps` experience uses the same damage, dent, raycast, and shell geometry
-contracts for eight lower-density procedural bars. Each soap has a distinct
-bright core, matching pastel-transmissive wax tint, responsive material style,
-SOAP decal, deformation profile, and seeded fracture network. A stronger
-topology-level seam pass redistributes the existing boundary samples into long
-clean segments while retaining the same raycast IDs, real shell thickness, and
-triangle winding. The grid hydrates each fracture runtime progressively and
-routes detached connected flakes through one shared, lazy-loaded Rapier world.
-Eight rounded soap colliders and one invisible floor make every flake fall
-through the grid and settle below the final row before fading. The aggregate
-pool remains capped at 24 bodies, preserving one Canvas and a bounded mobile
-workload while all eight soaps remain independently interactive.
+contracts for six lower-density procedural soaps. Every pristine bar shares a
+smooth hourglass silhouette with a broad flowing waist, rounded shoulders, and
+softly curved ends, while its bright core, glossy translucent wax tint,
+material response, and seeded fracture network remain distinct. Each core
+carries the same locally hosted Fredoka `Soap` mark in a darker tone of its own
+color, rendered as one clean fill without a stroke. A continuous squircular
+mapping rounds the complete front contour independently of the shell depth, so
+the end caps stay fully convex instead of inheriting cuboid-like bevels. A
+topology-level seam pass
+redistributes boundary samples into long clean segments while retaining the
+same raycast IDs, real shell thickness, and triangle winding. The 3 x 2
+landscape grid becomes 2 x 3 in portrait, hydrates each fracture runtime
+progressively, and routes detached connected flakes through one shared,
+lazy-loaded Rapier world. Twelve rounded lobe colliders and one invisible floor
+make every flake fall through the grid and settle below the final row before
+fading. The aggregate pool remains capped at 24 bodies, preserving one Canvas
+and a bounded mobile workload while all six soaps remain independently
+interactive.
 
 The interaction layer supports mouse, pen, and up to two simultaneous mobile
 touches. Touch motion beyond the scroll threshold cancels the press. Responsive
@@ -81,7 +88,7 @@ cycle, avoids immediate repeats, and caps overlap during sustained fractures.
 
 ## Experience boundary
 
-This version includes a three-butter page and an eight-soap page, persistent
+This version includes a three-butter page and a six-soap page, persistent
 thick color-tinted wax shells, progressive damage and crack merging, local
 dents, compression and rebound, peeling and fading debris, product decals,
 exact surface raycasting, idle invitation motion, reduced-motion behavior,

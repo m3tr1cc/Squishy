@@ -50,7 +50,7 @@ describe('soap debris launch', () => {
 
 describe('soap debris collision field', () => {
   it.each(['portrait', 'landscape'] as const)(
-    'creates eight soap colliders and a floor in %s layout',
+    'creates two lobe colliders per soap and a floor in %s layout',
     (layout) => {
       const colliders = createSoapStaticColliders(layout)
       const soapBodies = colliders.filter(
@@ -60,19 +60,21 @@ describe('soap debris collision field', () => {
         (collider) => collider.id === 'soap-debris-floor',
       )
 
-      expect(soapBodies).toHaveLength(SOAP_DEFINITIONS.length)
-      expect(colliders).toHaveLength(SOAP_DEFINITIONS.length + 1)
+      expect(soapBodies).toHaveLength(SOAP_DEFINITIONS.length * 2)
+      expect(colliders).toHaveLength(SOAP_DEFINITIONS.length * 2 + 1)
       expect(SOAP_DEBRIS_BODY_LIMIT).toBe(24)
       expect(floor?.kind).toBe('cuboid')
 
-      for (let index = 0; index < soapBodies.length; index += 1) {
-        const body = soapBodies[index]
-        expect(body.position).toEqual(
-          getSoapGridPosition(index, layout),
-        )
-        expect(body.halfExtents.every((value) => value > 0)).toBe(
-          true,
-        )
+      for (let index = 0; index < SOAP_DEFINITIONS.length; index += 1) {
+        const center = getSoapGridPosition(index, layout)
+        const left = soapBodies[index * 2]
+        const right = soapBodies[index * 2 + 1]
+        expect(left.position?.[0]).toBeLessThan(center[0])
+        expect(right.position?.[0]).toBeGreaterThan(center[0])
+        expect(left.position?.[1]).toBe(center[1])
+        expect(right.position?.[1]).toBe(center[1])
+        expect(left.halfExtents.every((value) => value > 0)).toBe(true)
+        expect(right.halfExtents).toEqual(left.halfExtents)
       }
     },
   )

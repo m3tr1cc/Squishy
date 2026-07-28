@@ -1,20 +1,22 @@
 import * as THREE from 'three'
+import fredokaFontUrl from '../../assets/fonts/Fredoka-Variable.ttf?url'
 import type {
   SoapAtlasUvBounds,
   SoapId,
 } from './types'
 
-export const SOAP_LABEL_ATLAS_COLUMNS = 4
+export const SOAP_LABEL_ATLAS_COLUMNS = 3
 export const SOAP_LABEL_ATLAS_ROWS = 2
 export const SOAP_LABEL_ATLAS_WIDTH = 1_024
 export const SOAP_LABEL_ATLAS_HEIGHT = 512
+export const SOAP_LABEL_FONT_FAMILY = 'Squishy Fredoka'
 
 const CELL_UV_PADDING = 0.055
+let soapLabelFontPromise: Promise<void> | null = null
 
 export type SoapLabelAtlasEntry = Readonly<{
   id: SoapId
-  title: string
-  subtitle: string
+  text: 'Soap'
   inkColor: string
   atlasSlot: number
   atlasUvBounds: SoapAtlasUvBounds
@@ -29,8 +31,7 @@ function createAtlasUvBounds(atlasSlot: number): SoapAtlasUvBounds {
     (column + localMinimum) / SOAP_LABEL_ATLAS_COLUMNS
   const maximumU =
     (column + localMaximum) / SOAP_LABEL_ATLAS_COLUMNS
-  const invertedRow =
-    SOAP_LABEL_ATLAS_ROWS - row - 1
+  const invertedRow = SOAP_LABEL_ATLAS_ROWS - row - 1
   const minimumV =
     (invertedRow + localMinimum) / SOAP_LABEL_ATLAS_ROWS
   const maximumV =
@@ -46,15 +47,12 @@ function createAtlasUvBounds(atlasSlot: number): SoapAtlasUvBounds {
 
 function label(
   id: SoapId,
-  title: string,
-  subtitle: string,
   inkColor: string,
   atlasSlot: number,
 ): SoapLabelAtlasEntry {
   return Object.freeze({
     id,
-    title,
-    subtitle,
+    text: 'Soap',
     inkColor,
     atlasSlot,
     atlasUvBounds: createAtlasUvBounds(atlasSlot),
@@ -62,14 +60,12 @@ function label(
 }
 
 export const SOAP_LABEL_ATLAS_ENTRIES = Object.freeze([
-  label('hard-wax', 'HARD WAX', 'PRESS & CRACK', '#5a160d', 0),
-  label('plaster', 'PLASTER', 'DRY CAST', '#f5f8ff', 1),
-  label('soft-wax', 'SOFT WAX', 'SLOW MELT', '#583100', 2),
-  label('nail-polish', 'NAIL POLISH', 'HIGH GLOSS', '#fff3f9', 3),
-  label('jelly', 'JELLY', 'WOBBLE BAR', '#003f39', 4),
-  label('sprinkles', 'SPRINKLES', 'PARTY CRUNCH', '#fff6ff', 5),
-  label('slime', 'SLIME', 'EXTRA GOO', '#153900', 6),
-  label('sugar', 'SUGAR', 'SWEET CRYSTAL', '#00394f', 7),
+  label('hard-wax', '#ad7400', 0),
+  label('plaster', '#e62f86', 1),
+  label('nail-polish', '#5940bd', 2),
+  label('jelly', '#175fa8', 3),
+  label('sprinkles', '#e94370', 4),
+  label('sugar', '#3f7d2c', 5),
 ] as const)
 
 const atlasEntryById = new Map(
@@ -84,19 +80,37 @@ export function getSoapLabelAtlasEntry(id: SoapId) {
   return entry
 }
 
-function resolveTitleFontSize(title: string) {
-  if (title.length >= 11) {
-    return 31
+export function loadSoapLabelFont() {
+  if (soapLabelFontPromise) {
+    return soapLabelFontPromise
   }
-  if (title.length >= 9) {
-    return 36
+  if (
+    typeof document === 'undefined' ||
+    typeof FontFace === 'undefined'
+  ) {
+    soapLabelFontPromise = Promise.resolve()
+    return soapLabelFontPromise
   }
-  return 43
+
+  soapLabelFontPromise = new FontFace(
+    SOAP_LABEL_FONT_FAMILY,
+    `url(${fredokaFontUrl})`,
+    {
+      style: 'normal',
+      weight: '600',
+    },
+  )
+    .load()
+    .then((font) => {
+      document.fonts.add(font)
+    })
+  return soapLabelFontPromise
 }
 
 /**
- * Creates one procedural atlas for every soap label. Decal geometry remaps its
- * UVs to one cell, so all active soap label passes can share this texture.
+ * Creates one procedural atlas after the bundled Fredoka face is ready. Decal
+ * geometry remaps its UVs to one cell, so every active Soap label shares one
+ * texture and one smooth display face.
  */
 export function createSoapLabelAtlasTexture() {
   if (typeof document === 'undefined') {
@@ -125,34 +139,18 @@ export function createSoapLabelAtlasTexture() {
       entry.atlasSlot / SOAP_LABEL_ATLAS_COLUMNS,
     )
     const centerX = column * cellWidth + cellWidth / 2
-    const top = row * cellHeight
+    const centerY = row * cellHeight + cellHeight / 2
 
     context.save()
+    context.font =
+      `600 88px "${SOAP_LABEL_FONT_FAMILY}", ` +
+      '"Arial Rounded MT", sans-serif'
     context.fillStyle = entry.inkColor
-    context.globalAlpha = 0.78
-    context.font =
-      '800 18px "Arial Narrow", "Roboto Condensed", sans-serif'
-    context.fillText('SOAP', centerX, top + cellHeight * 0.24)
-
-    context.globalAlpha = 1
-    context.font =
-      `900 ${resolveTitleFontSize(entry.title)}px ` +
-      '"Arial Narrow", "Roboto Condensed", sans-serif'
     context.fillText(
-      entry.title,
+      entry.text,
       centerX,
-      top + cellHeight * 0.49,
-      cellWidth * 0.82,
-    )
-
-    context.globalAlpha = 0.72
-    context.font =
-      '700 15px "Arial Narrow", "Roboto Condensed", sans-serif'
-    context.fillText(
-      entry.subtitle,
-      centerX,
-      top + cellHeight * 0.71,
-      cellWidth * 0.75,
+      centerY,
+      cellWidth * 0.72,
     )
     context.restore()
   }
@@ -168,4 +166,9 @@ export function createSoapLabelAtlasTexture() {
   texture.generateMipmaps = true
   texture.needsUpdate = true
   return texture
+}
+
+export async function createSoapLabelAtlasTextureAsync() {
+  await loadSoapLabelFont()
+  return createSoapLabelAtlasTexture()
 }
