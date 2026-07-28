@@ -253,3 +253,158 @@ final result: passed
   cleanup.
 
 final result: implementation passed; physical Android confirmation pending
+
+## Eight-soap experience
+
+### Reference and final captures
+
+- Product reference: `Photo 1.jpg` supplied in the task, used for the two-column
+  soap assortment, varied material personalities, and centered SOAP branding.
+- Desktop final: `qa/soap-desktop-pristine.png` at 1440 x 900.
+- Mobile final: `qa/soap-mobile-pristine.png` at 390 x 844.
+- Mobile interaction: `qa/soap-mobile-cracked.png` after one press on Hard Wax.
+
+### Visual and interaction findings
+
+- `/soaps` presents all eight coated bars at once in a 4 x 2 landscape grid and
+  a 2 x 4 portrait grid. The composition stays on the same seamless black
+  studio background as the butter page.
+- Each bar has a distinct silhouette, spring profile, bright core color,
+  material response, coating seed, and SOAP decal. Sprinkles and Sugar add
+  restrained procedural surface accents without additional texture downloads.
+- The intact layer is pale transmissive paraffin tinted toward each soap core.
+  Decals are muted on the coating and the saturated core becomes crisp through
+  real fracture openings.
+- A press on one bar affects only its own topology. The resulting opening is a
+  connected region with long plate boundaries and exposes the correct core;
+  there are no press-specific crack meshes or decals.
+- Detached soap plates use the shared deterministic fade policy. Butter debris
+  retains Rapier motion, then retires from both the combined geometry and the
+  rigid-body pool after its fade.
+- Previous/next controls are 44–48 px circular targets with safe-area offsets,
+  real links, keyboard focus styles, and non-wrapping disabled endpoints.
+  Direct `/soaps` loads, browser Back/Forward, and a fresh scene on re-entry
+  were verified.
+- Existing soap damage remained intact while switching the live viewport from
+  390 x 844 portrait to 1440 x 900 landscape; only grid positions and camera
+  fit changed.
+- A route-return regression repeated three center presses before and after a
+  butter → soaps → browser-Back sequence. Both fresh butter sessions emitted
+  two real crack-audio bursts, confirming that no stale topology/state arrays
+  survive route changes.
+
+### Mobile performance
+
+- Viewport: 390 x 844 CSS pixels, Canvas DPR capped at 1.25.
+- Original neutral-shell baseline: 56,180 rendered triangles and 47 draw calls.
+- Original idle 300-frame sample: 59.21 FPS average and 17.1 ms p95.
+- Original post-press 300-frame sample: 59.99 FPS average and 17.1 ms p95.
+- The eight low-density fracture runtimes hydrate progressively after the
+  lightweight grid appears, avoiding one large topology-construction spike.
+- No uncaught browser, Three.js, audio, or Rapier errors were observed.
+- The canvas retains transparent tap highlights, no text selection, and
+  `touch-action: pan-y`; a mobile-sized press produced no viewport flash.
+
+final result: passed
+
+## Tinted soap wax, long seams, and butter trio
+
+### Material and topology verification
+
+- Every soap coating now has a distinct cached pastel palette derived from its
+  core hue. Surface lightness remains between `0.76` and `0.80`; the
+  attenuation color is darker and more saturated so the intact shell hints at
+  the bright material beneath it.
+- Soap wax remains an opaque physical material (`opacity: 1`,
+  `transparent: false`) with `0.18` transmission. This avoids alpha sorting
+  halos and keeps the fully hydrated grid at the same 47-draw-call structure;
+  no tint overlay or crack-line mesh was added.
+- The long-seam topology profile uses a `0.24` simplification tolerance,
+  bounded `0.24` source-vertex movement, a 24-degree normal span, the existing
+  15% triangle-area guard, and deterministic closed-boundary handling. Each
+  boundary chain receives the largest safe update independently, so one tight
+  region cannot force every seam back toward its source-grid staircase.
+- Across all eight soap shapes and eight representative coating seeds, visible
+  front-facing non-junction seams retain at most a 22% sharp-turn ratio.
+  Fragment ownership, bond edges, source triangle IDs, raycast IDs, winding,
+  and deterministic seed output remain unchanged.
+- The denser front sampling required for clean soap cuts stays within 3,000
+  source triangles per bar. Complete hydrated body, wax, and two decal passes
+  total 85,668 visible triangles across the eight products, below the enforced
+  90,000-triangle budget.
+
+### Three-butter presentation and physics
+
+- The butter page now contains three straight horizontal bars stacked at
+  `y = 1.62`, `0`, and `-1.62`, with yellow, pink, and blue cores and matching
+  pale wax palettes. Expanded shells retain a `0.16` model-unit gap.
+- Each bar mixes a unique salt into the page coating seed, so its crack layout
+  is stable for one coating and distinct from its siblings.
+- The responsive camera fits the complete expanded stack within 90% normalized
+  viewport bounds at 280 x 560, 390 x 844, and 1440 x 900 while remaining
+  centered and straight-on.
+- Each independently deformable bar uses 4,000 source triangles and 32 wax
+  plates. Three bars total 12,000 source triangles, only 22% above the previous
+  single dense source.
+- All three bars feed one lazy Rapier world containing every butter collider and
+  the shared floor, preventing upper debris from falling through lower sticks
+  without duplicating solvers or fixed colliders. The aggregate pool is capped
+  at the prior mobile ceiling of 24 live debris bodies.
+- One shared butter-label texture serves all three bars. Butter-route DPR is
+  capped at 1.25 for coarse pointers and 1.5 otherwise.
+
+### Deployed preview QA
+
+- The Vercel preview returned HTTP 200 for both `/` and `/soaps`.
+- At the default desktop viewport, all three butter bars render straight,
+  centered, and fully inside the frame with visibly distinct cream-yellow,
+  pastel-pink, and pastel-blue coatings.
+- At 390 x 844, the butter stack remains centered with generous separation
+  between bars and unobstructed previous/next navigation controls.
+- A coordinate tap on the pink butter produced connected long diagonal seams
+  without a viewport highlight, text selection, or blue-screen flash.
+- At 390 x 844, all eight soaps remain visible in the 2 x 4 grid. Their intact
+  wax layers read as eight distinct pastel tints related to the underlying
+  coral, lavender, cream, pink, cyan, violet, green, and blue cores.
+- Repeated coordinate taps on Hard Wax exposed the bright coral core through
+  long straight-edged pieces. Detached pieces faded; attached peeled pieces
+  remained part of the coherent coating.
+- No uncaught application, Three.js, audio, or Rapier errors appeared. The
+  browser logged only Three.js's upstream `Clock` deprecation warning.
+
+### Automated verification
+
+- `npm run lint`
+- `npm run check`
+- `npm test`: 23 files, 118 tests
+- `npm run build`
+- The production build retains the independently lazy-loaded soap and Rapier
+  chunks and adds no dependency or Supabase migration.
+
+## Soap debris gravity and floor
+
+- Removed the soap-only ballistic approximation that applied weak downward
+  movement and a conspicuous fixed-axis spin.
+- Detached neighboring plates now form connected one-to-four-piece flakes and
+  enter one shared, lazy Rapier world for all eight soaps.
+- Launch velocity has a small downward bias, low angular velocity, and full
+  gravity. Eight rounded body colliders let flakes glance off lower soaps, while
+  an invisible collision floor below the final row gives every flake a clear
+  fall destination before its 2.75-second timeout fade.
+- The world remains capped at 24 active bodies. Convex collider support points
+  remain capped at 48 per plate while the visible wax geometry stays
+  full-resolution.
+- Automated coverage verifies deterministic launches, restrained angular
+  velocity, floor clearance in both responsive layouts, positive collider
+  dimensions, the shared body cap, and enough fade time for a top-row flake to
+  reach the floor.
+- Deployed preview QA on
+  `https://squishy-f0ktjq6a1-m3tr1ccs-projects.vercel.app/soaps` used seven
+  coordinate presses on Hard Wax. A detached flake visibly fell below the
+  second soap row to the bottom collision area, then was gone 1.8 seconds
+  later; it did not hover or spin in place.
+- No uncaught application, WebGL, or Rapier errors appeared. The console
+  retained only the existing Three.js Clock and Rapier initialization
+  deprecation warnings.
+- Final verification: `npm run lint`, `npm run check`, `npm test` (24 files,
+  123 tests), and `npm run build`.

@@ -1,5 +1,9 @@
 import * as THREE from 'three'
-import { sampleDentDepthValues } from '../deformation'
+import {
+  DEFAULT_DENT_PROFILE,
+  sampleDentDepthValues,
+  type DentProfile,
+} from '../deformation'
 import type { DentImpact } from '../types'
 import type { FractureModel, FractureState } from './damage'
 import { FRAGMENT_STATE } from './damage'
@@ -394,6 +398,7 @@ export function writeWaxGeometry({
   impacts,
   peelAmounts,
   fragmentPoses = runtime.poseScratch,
+  dentProfile = DEFAULT_DENT_PROFILE,
 }: {
   runtime: WaxGeometryRuntime
   topology: WaxTopology
@@ -402,6 +407,7 @@ export function writeWaxGeometry({
   impacts: readonly DentImpact[]
   peelAmounts: Float32Array
   fragmentPoses?: WaxFragmentPoses
+  dentProfile?: DentProfile
 }) {
   const positionAttribute = runtime.geometry.getAttribute(
     'position',
@@ -479,6 +485,7 @@ export function writeWaxGeometry({
         surfaceNormalY,
         surfaceNormalZ,
         impacts,
+        dentProfile,
       )
       const pivotX = runtime.pivots[fragmentOffset]
       const pivotY = runtime.pivots[fragmentOffset + 1]

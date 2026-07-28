@@ -1,14 +1,38 @@
 import { useFrame, useThree } from '@react-three/fiber'
-import { useEffect, useRef, useState } from 'react'
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import * as THREE from 'three'
-import { ButterSquishy } from './ButterSquishy'
+import {
+  ButterSquishy,
+  createButterStaticColliders,
+} from './ButterSquishy'
+import {
+  BUTTER_DEBRIS_BODY_LIMIT,
+  BUTTER_DEFINITIONS,
+  BUTTER_STACK_GROUND_Y,
+  BUTTER_STACK_HEIGHT,
+  BUTTER_STACK_POSITIONS,
+  mixButterSeed,
+} from './butters'
 import {
   BUTTER_SIZE,
-  GROUND_Y,
   SHELL_OFFSET,
 } from './constants'
+import { createButterLabelTexture } from './createButterLabelTexture'
+import { usePhysicsDebrisSources } from './fracture/usePhysicsDebrisSources'
 
 export const SCENE_BACKGROUND = '#000000'
+
+const LazyRapierDebris = lazy(() => import('./fracture/RapierDebris'))
+const BUTTER_SOURCE_IDS = Object.freeze(
+  BUTTER_DEFINITIONS.map(({ id }) => id),
+)
 
 type SquishyDiagnostics = {
   frameCount: number
@@ -25,7 +49,7 @@ declare global {
   }
 }
 
-function PerformanceDiagnostics() {
+export function PerformanceDiagnostics() {
   const { gl } = useThree()
   const diagnosticsRef = useRef<SquishyDiagnostics>({
     frameCount: 0,
@@ -72,7 +96,7 @@ function PerformanceDiagnostics() {
   return null
 }
 
-function useReducedMotion() {
+export function useReducedMotion() {
   const [reducedMotion, setReducedMotion] = useState(() =>
     window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   )
@@ -95,7 +119,7 @@ export function getResponsiveCameraPose(
   const verticalFov = THREE.MathUtils.degToRad(fieldOfViewDegrees)
   const aspect = Math.max(0.25, width / Math.max(1, height))
   const paddedWidth = (BUTTER_SIZE.width + SHELL_OFFSET * 2) * 1.16
-  const paddedHeight = (BUTTER_SIZE.height + SHELL_OFFSET * 2) * 1.32
+  const paddedHeight = BUTTER_STACK_HEIGHT * 1.12
   const fitWidth = paddedWidth / 2 / (Math.tan(verticalFov / 2) * aspect)
   const fitHeight = paddedHeight / 2 / Math.tan(verticalFov / 2)
   const distance =
@@ -145,6 +169,17 @@ export function SquishyScene({
   unlockCrackAudio,
 }: SquishySceneProps) {
   const reducedMotion = useReducedMotion()
+  const labelTexture = useMemo(createButterLabelTexture, [])
+  const physicsDebris = usePhysicsDebrisSources(BUTTER_SOURCE_IDS)
+  const staticColliders = useMemo(
+    () =>
+      createButterStaticColliders(
+        BUTTER_STACK_POSITIONS,
+        BUTTER_STACK_GROUND_Y,
+      ),
+    [],
+  )
+  useEffect(() => () => labelTexture.dispose(), [labelTexture])
 
   return (
     <>
@@ -170,16 +205,36 @@ export function SquishyScene({
         intensity={0.9}
         position={[4, 2, -3]}
       />
-      <ButterSquishy
-        key={resetKey}
-        coatingSeed={coatingSeed}
-        onComplete={onComplete}
-        playCrackSound={playCrackSound}
-        reducedMotion={reducedMotion}
-        unlockCrackAudio={unlockCrackAudio}
-      />
+      {BUTTER_DEFINITIONS.map((definition) => (
+        <ButterSquishy
+          key={`${resetKey}:${definition.id}`}
+          bodyColor={definition.bodyColor}
+          coatingSeed={mixButterSeed(coatingSeed, definition)}
+          instanceId={definition.id}
+          labelTexture={labelTexture}
+          onComplete={onComplete}
+          onPhysicsDebrisChange={physicsDebris.registerSource}
+          playCrackSound={playCrackSound}
+          position={definition.position}
+          reducedMotion={reducedMotion}
+          unlockCrackAudio={unlockCrackAudio}
+          waxPalette={definition.wax}
+        />
+      ))}
+      {physicsDebris.clusters.length > 0 ? (
+        <Suspense fallback={null}>
+          <LazyRapierDebris
+            generation={coatingSeed}
+            clusters={physicsDebris.clusters}
+            maxActiveBodies={BUTTER_DEBRIS_BODY_LIMIT}
+            staticColliders={staticColliders}
+            onTransform={physicsDebris.handleTransform}
+            onSettled={physicsDebris.handleSettled}
+          />
+        </Suspense>
+      ) : null}
       <mesh
-        position={[0, GROUND_Y, 0]}
+        position={[0, BUTTER_STACK_GROUND_Y, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
       >
         <planeGeometry args={[40, 40]} />

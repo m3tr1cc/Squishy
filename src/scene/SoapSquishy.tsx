@@ -1,31 +1,18 @@
 import type { ThreeEvent } from '@react-three/fiber'
 import { useFrame, useThree } from '@react-three/fiber'
 import {
-  memo,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
+  memo,
 } from 'react'
 import * as THREE from 'three'
 import {
-  BUTTER_SIZE,
-  CORNER_RADIUS,
-  MAX_ACTIVE_IMPACTS,
-} from './constants'
-import { createButterLabelGeometry } from './createButterLabelGeometry'
-import { createRoundedCuboidGeometry } from './createRoundedCuboidGeometry'
-import {
-  BUTTER_SOURCE_SEGMENTS,
-  BUTTER_STACK_PLATE_COUNT,
-  type ButterId,
-  type ButterVector3,
-  type ButterWaxPalette,
-} from './butters'
-import {
   captureDeformationSource,
   writeDeformedPositions,
+  type DentProfile,
 } from './deformation'
 import {
   createFractureModel,
@@ -51,60 +38,58 @@ import {
   attachFragmentFadeColorAttribute,
   writeFragmentFadeColorAlpha,
 } from './fracture/fragmentFadeGeometry'
-import type {
-  DebrisCluster,
-  DebrisStaticCollider,
-  DebrisTransform,
-} from './fracture/RapierDebris'
-import {
-  createWaxGeometryRuntime,
-  writeWaxGeometry,
-} from './fracture/waxGeometryRuntime'
 import {
   createWaxTopology,
   getWaxTriangleMetadata,
 } from './fracture/topology'
 import { WAX_SEAM_PROFILE } from './fracture/types'
+import type {
+  DebrisCluster,
+  DebrisTransform,
+} from './fracture/RapierDebris'
+import type { PhysicsDebrisSource } from './fracture/usePhysicsDebrisSources'
+import {
+  createWaxGeometryRuntime,
+  writeWaxGeometry,
+} from './fracture/waxGeometryRuntime'
 import {
   bindPointerCancellation,
   createSurfaceHit,
   isQualifiedTap,
 } from './interaction'
 import {
-  INTRO_SPRING,
-  PRESS_SPRING,
-  stepSpring,
-} from './spring'
+  SOAP_WAX_PHYSICAL_PROPERTIES,
+  SOAP_DEBRIS_FADE_POLICY,
+  SOAP_DEBRIS_MAX_CLUSTER_SIZE,
+  createSoapDebrisLaunch,
+  getSoapWaxPalette,
+  type SoapDefinition,
+} from './soaps'
+import { INTRO_SPRING, stepSpring } from './spring'
 import type {
   DentImpact,
-  SquishyImpact,
   SurfaceHit,
   SurfaceLayer,
 } from './types'
 
-type ButterSquishyProps = {
-  bodyColor: string
+type SoapSquishyProps = Readonly<{
+  definition: SoapDefinition
   coatingSeed: number
-  instanceId: ButterId
   labelTexture: THREE.Texture
-  position: ButterVector3
+  position: readonly [number, number, number]
+  scale?: readonly [number, number, number]
   reducedMotion: boolean
-  waxPalette: ButterWaxPalette
-  onComplete: () => void
+  onComplete: (soapId: SoapDefinition['id']) => void
   onPhysicsDebrisChange: (
-    instanceId: ButterId,
-    source: ButterPhysicsDebrisSource | null,
+    soapId: SoapDefinition['id'],
+    source: SoapPhysicsDebrisSource | null,
   ) => void
   playCrackSound: (brokenBondCount: number) => void
   unlockCrackAudio: () => void
-  onImpact?: (impact: SquishyImpact) => void
-}
-
-export type ButterPhysicsDebrisSource = Readonly<{
-  clusters: readonly DebrisCluster[]
-  onTransform: (clusterId: string, transform: DebrisTransform) => void
-  onSettled: (clusterId: string, transform: DebrisTransform) => void
+  introDelay?: number
 }>
+
+export type SoapPhysicsDebrisSource = PhysicsDebrisSource
 
 type MutableFracturePress = {
   fragmentIndex?: number
@@ -115,7 +100,6 @@ type MutableFracturePress = {
 }
 
 type ActivePress = {
-  pointerId: number
   pointerType: SurfaceHit['pointerType']
   startX: number
   startY: number
@@ -132,77 +116,19 @@ type TapPulse = {
 
 type DebrisClusterBinding = Readonly<{
   fragmentIndices: readonly number[]
-  /** Fragment-pivot offsets in the rigid body's local coordinate system. */
   localOffsets: Float32Array
 }>
 
-const DEFAULT_NORMAL = [0, 0, 1] as const
-export const PRESENTATION_ROTATION = [0, 0, 0] as const
-export const WAX_OUTER_MATERIAL = {
-  attenuationColor: '#ddd8cf',
-  attenuationDistance: 0.35,
-  color: '#e8e4dc',
-  clearcoat: 0,
-  ior: 1.44,
-  metalness: 0,
-  opacity: 1,
-  roughness: 0.74,
-  sheen: 0.03,
-  specularIntensity: 0.25,
-  thickness: 0.049,
-  transmission: 0.1,
-  transparent: false,
-} as const
+const SOAP_PLATE_COUNT = 16
+const SOAP_INNER_CLEARANCE = 0.008
+export const SOAP_OUTER_OFFSET = 0.045
+const MAX_ACTIVE_SOAP_IMPACTS = 3
 const MINIMUM_TAP_PULSE_SECONDS = 0.16
-const TOUCH_DAMAGE_DELAY_SECONDS = 0.08
-const MAX_DEBRIS_CLUSTER_SIZE = 4
+const TOUCH_DAMAGE_DELAY_SECONDS = 0.075
 const NO_RAYCAST = () => null
-const REDUCED_PRESS_SPRING = {
-  ...PRESS_SPRING,
-  damping: 31,
-} as const
+const DEFAULT_NORMAL = [0, 0, 1] as const
 
-let impactSequence = 0
-
-export function createButterStaticColliders(
-  bodyPositions: readonly ButterVector3[],
-  groundY: number,
-): readonly DebrisStaticCollider[] {
-  const quaternion = new THREE.Quaternion().setFromEuler(
-    new THREE.Euler(...PRESENTATION_ROTATION),
-  )
-  return [
-    ...bodyPositions.map(
-      (bodyPosition, index): DebrisStaticCollider => ({
-        id: `butter-body-${index}`,
-        kind: 'round-cuboid',
-        halfExtents: [
-          BUTTER_SIZE.width / 2 - CORNER_RADIUS - 0.06,
-          BUTTER_SIZE.height / 2 - CORNER_RADIUS - 0.06,
-          BUTTER_SIZE.depth / 2 - CORNER_RADIUS - 0.06,
-        ],
-        borderRadius: CORNER_RADIUS - 0.06,
-        position: bodyPosition,
-        quaternion: [
-          quaternion.x,
-          quaternion.y,
-          quaternion.z,
-          quaternion.w,
-        ],
-        friction: 0.88,
-        restitution: 0.015,
-      }),
-    ),
-    {
-      id: 'tabletop',
-      kind: 'cuboid',
-      halfExtents: [20, 0.05, 20],
-      position: [0, groundY - 0.05, 0],
-      friction: 0.94,
-      restitution: 0.01,
-    },
-  ]
-}
+let soapImpactSequence = 0
 
 function normalizePointerType(value: string): SurfaceHit['pointerType'] {
   if (value === 'touch' || value === 'pen') {
@@ -211,53 +137,182 @@ function normalizePointerType(value: string): SurfaceHit['pointerType'] {
   return 'mouse'
 }
 
-function findWeakestInactiveImpact(
-  impacts: DentImpact[],
-  activeDents: ReadonlySet<DentImpact>,
-) {
-  let selectedIndex = -1
-  let selectedAmount = Number.POSITIVE_INFINITY
-
-  for (let index = 0; index < impacts.length; index += 1) {
-    const impact = impacts[index]
-    if (
-      !activeDents.has(impact) &&
-      Math.abs(impact.amount) < selectedAmount
-    ) {
-      selectedIndex = index
-      selectedAmount = Math.abs(impact.amount)
-    }
-  }
-
-  return selectedIndex
+function hashUint32(value: number) {
+  let hash = value >>> 0
+  hash ^= hash >>> 16
+  hash = Math.imul(hash, 0x7feb352d)
+  hash ^= hash >>> 15
+  hash = Math.imul(hash, 0x846ca68b)
+  hash ^= hash >>> 16
+  return hash >>> 0
 }
 
-export const ButterSquishy = memo(function ButterSquishy({
-  bodyColor,
+function signedNoise(seed: number) {
+  return (hashUint32(seed) / 0xffffffff) * 2 - 1
+}
+
+function styleSoapGeometry(
+  geometry: THREE.BufferGeometry,
+  definition: SoapDefinition,
+  isDecal = false,
+) {
+  const positions = geometry.getAttribute('position') as THREE.BufferAttribute
+  const [width, height, depth] = definition.geometry.size
+  const behavior = definition.deformation.behavior
+
+  for (let index = 0; index < positions.count; index += 1) {
+    let x = positions.getX(index)
+    let y = positions.getY(index)
+    let z = positions.getZ(index)
+    const normalizedX = x / (width * 0.5)
+    const normalizedY = y / (height * 0.5)
+    const normalizedZ = z / (depth * 0.5)
+    const centerFalloff = Math.max(
+      0,
+      (1 - normalizedX * normalizedX) *
+        (1 - normalizedY * normalizedY),
+    )
+
+    if (behavior === 'chalky') {
+      x += normalizedY * 0.035
+    } else if (behavior === 'supple') {
+      z += Math.sign(z || 1) * centerFalloff * 0.045
+      y += Math.sin(normalizedX * Math.PI) * 0.018
+    } else if (behavior === 'snappy') {
+      x *= 1 + normalizedY * 0.022
+    } else if (behavior === 'wobbly') {
+      y += Math.sin(normalizedX * Math.PI * 1.25) * 0.032
+      z += Math.sign(z || 1) * centerFalloff * 0.035
+    } else if (behavior === 'crunchy' && !isDecal) {
+      const grain =
+        signedNoise(
+          definition.seedSalt ^
+            Math.imul(index + 1, 0x9e3779b1),
+        ) * 0.012
+      z += grain * Math.max(0.25, Math.abs(normalizedZ))
+    } else if (behavior === 'gooey') {
+      const bottomWeight = Math.max(0, -normalizedY)
+      y -=
+        bottomWeight *
+        Math.max(0, 1 - normalizedX * normalizedX) *
+        0.055
+      z += Math.sign(z || 1) * centerFalloff * 0.05
+    } else if (behavior === 'granular' && !isDecal) {
+      const grain =
+        signedNoise(
+          definition.seedSalt ^
+            Math.imul(index + 7, 0x85ebca6b),
+        ) * 0.009
+      x += grain * normalizedX
+      y += grain * normalizedY
+      z += grain * Math.sign(normalizedZ || 1)
+    }
+
+    if (isDecal) {
+      z +=
+        behavior === 'crunchy' || behavior === 'granular'
+          ? 0.016
+          : 0.001
+    }
+    positions.setXYZ(index, x, y, z)
+  }
+
+  positions.needsUpdate = true
+  geometry.computeVertexNormals()
+  geometry.computeBoundingBox()
+  geometry.computeBoundingSphere()
+  return geometry
+}
+
+function createAccentGeometry(definition: SoapDefinition) {
+  if (
+    definition.id !== 'sprinkles' &&
+    definition.id !== 'sugar'
+  ) {
+    return null
+  }
+
+  const count = definition.id === 'sprinkles' ? 44 : 72
+  const [width, height, depth] = definition.geometry.size
+  const positions = new Float32Array(count * 3)
+  const normals = new Float32Array(count * 3)
+  const colors = new Float32Array(count * 3)
+  const color = new THREE.Color()
+
+  for (let index = 0; index < count; index += 1) {
+    const seed = hashUint32(
+      definition.seedSalt ^ Math.imul(index + 1, 0x9e3779b1),
+    )
+    const xRoll = hashUint32(seed ^ 0xa341316c) / 0xffffffff
+    const yRoll = hashUint32(seed ^ 0xc8013ea4) / 0xffffffff
+    positions[index * 3] = (xRoll - 0.5) * width * 0.78
+    positions[index * 3 + 1] = (yRoll - 0.5) * height * 0.62
+    positions[index * 3 + 2] = depth * 0.5 + 0.012
+    normals[index * 3 + 2] = 1
+    const paletteIndex =
+      seed % definition.style.accentPalette.length
+    color.set(definition.style.accentPalette[paletteIndex])
+    colors[index * 3] = color.r
+    colors[index * 3 + 1] = color.g
+    colors[index * 3 + 2] = color.b
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute(
+    'position',
+    new THREE.BufferAttribute(positions, 3),
+  )
+  geometry.setAttribute(
+    'color',
+    new THREE.BufferAttribute(colors, 3),
+  )
+  geometry.setAttribute(
+    'normal',
+    new THREE.BufferAttribute(normals, 3),
+  )
+  return geometry
+}
+
+export const SoapSquishy = memo(function SoapSquishy({
+  definition,
   coatingSeed,
-  instanceId,
   labelTexture,
   position,
+  scale = [1, 1, 1],
   reducedMotion,
-  waxPalette,
   onComplete,
   onPhysicsDebrisChange,
   playCrackSound,
   unlockCrackAudio,
-  onImpact,
-}: ButterSquishyProps) {
+  introDelay = 0,
+}: SoapSquishyProps) {
   const presentationRef = useRef<THREE.Group>(null)
   const compressionRef = useRef<THREE.Group>(null)
   const innerGeometry = useMemo(
     () =>
-      createRoundedCuboidGeometry({
-        widthSegments: BUTTER_SOURCE_SEGMENTS.width,
-        heightSegments: BUTTER_SOURCE_SEGMENTS.height,
-        depthSegments: BUTTER_SOURCE_SEGMENTS.depth,
-      }),
-    [],
+      styleSoapGeometry(
+        definition.geometry.createSourceGeometry(),
+        definition,
+      ),
+    [definition],
   )
-  const labelGeometry = useMemo(() => createButterLabelGeometry(), [])
+  const labelGeometry = useMemo(
+    () =>
+      styleSoapGeometry(
+        definition.decal.createGeometry(),
+        definition,
+        true,
+      ),
+    [definition],
+  )
+  const accentGeometry = useMemo(
+    () => createAccentGeometry(definition),
+    [definition],
+  )
+  const waxPalette = useMemo(
+    () => getSoapWaxPalette(definition.style.bodyColor),
+    [definition.style.bodyColor],
+  )
   const innerSource = useMemo(
     () => captureDeformationSource(innerGeometry),
     [innerGeometry],
@@ -266,12 +321,30 @@ export const ButterSquishy = memo(function ButterSquishy({
     () => captureDeformationSource(labelGeometry),
     [labelGeometry],
   )
+  const accentSource = useMemo(
+    () =>
+      accentGeometry
+        ? captureDeformationSource(accentGeometry)
+        : null,
+    [accentGeometry],
+  )
+  const dentProfile = useMemo<DentProfile>(
+    () => ({
+      radius: definition.deformation.dentRadius,
+      depth: definition.deformation.dentDepth,
+      maximumDepth: definition.deformation.maximumDentDepth,
+      minimumDepth: -0.006,
+    }),
+    [definition],
+  )
   const waxTopology = useMemo(
     () =>
       createWaxTopology({
         sourceGeometry: innerGeometry,
         seed: coatingSeed,
-        plateCount: BUTTER_STACK_PLATE_COUNT,
+        plateCount: SOAP_PLATE_COUNT,
+        innerClearance: SOAP_INNER_CLEARANCE,
+        outerOffset: SOAP_OUTER_OFFSET,
         seamProfile: WAX_SEAM_PROFILE.long,
       }),
     [coatingSeed, innerGeometry],
@@ -303,47 +376,40 @@ export const ButterSquishy = memo(function ButterSquishy({
           })),
         },
         {
-          propagationRadius: 0.78,
-          damagePerSecond: 4.2,
-          holdRampSeconds: 0.25,
-          holdStrength: 0.8,
-          crackContinuation: 0.32,
-          globalCompressionFatigue: 0.01,
-          tipStressTransfer: 0.55,
+          propagationRadius:
+            definition.deformation.dentRadius * 1.55,
+          damagePerSecond: 4.8,
+          holdRampSeconds: 0.22,
+          holdStrength: 0.84,
+          crackContinuation: 0.34,
+          globalCompressionFatigue: 0.012,
+          tipStressTransfer: 0.58,
           tipStressDecay: 0.82,
           maxTipBranches: 2,
-          peelBrokenRatio: 0.78,
-          detachBrokenRatio: 0.99,
-          minimumPeelSeconds: 0.22,
-          settleCandidateSeconds: 0.2,
+          peelBrokenRatio: 0.62,
+          detachBrokenRatio: 0.88,
+          minimumPeelSeconds: 0.16,
+          settleCandidateSeconds: 0.16,
         },
       ),
-    [waxTopology],
+    [definition.deformation.dentRadius, waxTopology],
   )
   const fractureStateRef = useRef(createFractureState(fractureModel))
-  const fragmentFadeStateRef = useRef(
-    createFragmentFadeState(waxTopology.plateCount),
-  )
-  const lastFragmentAlphaRef = useRef(
-    new Float32Array(waxTopology.plateCount).fill(1),
+  const fadeStateRef = useRef(
+    createFragmentFadeState(
+      waxTopology.plateCount,
+      SOAP_DEBRIS_FADE_POLICY,
+    ),
   )
   const impactsRef = useRef<DentImpact[]>([])
   const activeDentsRef = useRef(new Set<DentImpact>())
   const activePressesRef = useRef(new Map<number, ActivePress>())
   const tapPulsesRef = useRef<TapPulse[]>([])
   const pressInputsRef = useRef<FracturePress[]>([])
-  const peelAmountsRef = useRef(new Float32Array(waxTopology.plateCount))
+  const peelAmountsRef = useRef(
+    new Float32Array(waxTopology.plateCount),
+  )
   const fragmentPosesRef = useRef(waxRuntime.poseScratch)
-  const geometryDirtyRef = useRef(true)
-  const bodyNeedsRestoreRef = useRef(true)
-  const historyRef = useRef<SquishyImpact[]>([])
-  const introRef = useRef({
-    value: reducedMotion ? 1 : 0.72,
-    velocity: 0,
-  })
-  const springScratchRef = useRef({ value: 0, velocity: 0 })
-  const lastInteractionRef = useRef(performance.now())
-  const completionSentRef = useRef(false)
   const clusterBindingsRef = useRef(
     new Map<string, DebrisClusterBinding>(),
   )
@@ -353,14 +419,49 @@ export const ButterSquishy = memo(function ButterSquishy({
   const localQuaternionRef = useRef(new THREE.Quaternion())
   const worldPositionRef = useRef(new THREE.Vector3())
   const localPositionRef = useRef(new THREE.Vector3())
-  const [debrisClusters, setDebrisClusters] = useState<DebrisCluster[]>([])
   const [physicsDebrisClusters, setPhysicsDebrisClusters] =
     useState<DebrisCluster[]>([])
+  const lastAlphaRef = useRef(
+    new Float32Array(waxTopology.plateCount).fill(1),
+  )
+  const geometryDirtyRef = useRef(true)
+  const bodyNeedsRestoreRef = useRef(true)
+  const completionSentRef = useRef(false)
+  const hasDetachedRef = useRef(false)
+  const introRef = useRef({
+    value: reducedMotion ? 1 : 0.82,
+    velocity: 0,
+  })
+  const springScratchRef = useRef({ value: 0, velocity: 0 })
+  const lastInteractionRef = useRef(
+    performance.now() + introDelay * 1000,
+  )
   const canvasElement = useThree((state) => state.gl.domElement)
 
   useEffect(() => {
-    writeDeformedPositions(innerGeometry, innerSource, [], 0)
-    writeDeformedPositions(labelGeometry, labelSource, [], 0)
+    writeDeformedPositions(
+      innerGeometry,
+      innerSource,
+      [],
+      0,
+      dentProfile,
+    )
+    writeDeformedPositions(
+      labelGeometry,
+      labelSource,
+      [],
+      0,
+      dentProfile,
+    )
+    if (accentGeometry && accentSource) {
+      writeDeformedPositions(
+        accentGeometry,
+        accentSource,
+        [],
+        0,
+        dentProfile,
+      )
+    }
     writeWaxGeometry({
       runtime: waxRuntime,
       topology: waxTopology,
@@ -368,50 +469,42 @@ export const ButterSquishy = memo(function ButterSquishy({
       fractureState: fractureStateRef.current,
       impacts: [],
       peelAmounts: peelAmountsRef.current,
+      dentProfile,
     })
     waxRuntime.geometry.boundingSphere = new THREE.Sphere(
       new THREE.Vector3(),
-      12,
+      8,
     )
 
     return () => {
       innerGeometry.dispose()
       labelGeometry.dispose()
+      accentGeometry?.dispose()
       waxRuntime.geometry.dispose()
       canvasElement.classList.remove('wax-pointer-hover')
     }
   }, [
+    accentGeometry,
+    accentSource,
+    canvasElement,
+    dentProfile,
     fractureModel,
     innerGeometry,
     innerSource,
     labelGeometry,
     labelSource,
-    canvasElement,
     waxRuntime,
     waxTopology,
   ])
 
-  const rememberImpact = useCallback(
-    (impact: SquishyImpact) => {
-      const history = historyRef.current
-      history.push(impact)
-      if (history.length > 16) {
-        history.shift()
-      }
-      onImpact?.(impact)
-    },
-    [onImpact],
-  )
-
   const addDent = useCallback((hit: SurfaceHit) => {
     const impacts = impactsRef.current
-    if (impacts.length >= MAX_ACTIVE_IMPACTS) {
-      const weakest = findWeakestInactiveImpact(
-        impacts,
-        activeDentsRef.current,
+    if (impacts.length >= MAX_ACTIVE_SOAP_IMPACTS) {
+      const removable = impacts.findIndex(
+        (impact) => !activeDentsRef.current.has(impact),
       )
-      if (weakest >= 0) {
-        impacts.splice(weakest, 1)
+      if (removable >= 0) {
+        impacts.splice(removable, 1)
       }
     }
 
@@ -424,8 +517,8 @@ export const ButterSquishy = memo(function ButterSquishy({
     }
     impacts.push(dent)
     activeDentsRef.current.add(dent)
-    bodyNeedsRestoreRef.current = true
     geometryDirtyRef.current = true
+    bodyNeedsRestoreRef.current = true
     return dent
   }, [])
 
@@ -454,9 +547,11 @@ export const ButterSquishy = memo(function ButterSquishy({
         fragmentId = metadata.fragmentId
       }
 
-      impactSequence += 1
+      soapImpactSequence += 1
       return createSurfaceHit({
-        id: `${instanceId}-press-${Math.round(performance.now())}-${impactSequence}`,
+        id:
+          `${definition.id}-${Math.round(performance.now())}-` +
+          soapImpactSequence,
         timestampMs: performance.now(),
         pointerType: normalizePointerType(
           event.nativeEvent.pointerType,
@@ -471,7 +566,7 @@ export const ButterSquishy = memo(function ButterSquishy({
         face: event.face,
       })
     },
-    [instanceId, waxTopology],
+    [definition.id, waxTopology],
   )
 
   const releaseActivePress = useCallback(
@@ -515,21 +610,17 @@ export const ButterSquishy = memo(function ButterSquishy({
         )
         if (remaining > 0) {
           active.damageInput.pressure = 1
-          active.damageInput.durationSeconds = durationSeconds
           tapPulsesRef.current.push({
             input: active.damageInput,
             remainingSeconds: remaining,
           })
-        }
-        if (active.pointerType === 'touch') {
-          rememberImpact(active.hit)
         }
       }
 
       geometryDirtyRef.current = true
       bodyNeedsRestoreRef.current = true
     },
-    [rememberImpact],
+    [],
   )
 
   useEffect(() => {
@@ -551,16 +642,13 @@ export const ButterSquishy = memo(function ButterSquishy({
       if (!hit) {
         return
       }
-
-      const fractureState = fractureStateRef.current
       if (
         hit.fragmentId !== null &&
-        fractureState.fragmentState[hit.fragmentId] >=
+        fractureStateRef.current.fragmentState[hit.fragmentId] >=
           FRAGMENT_STATE.DETACHED
       ) {
         return
       }
-
       if (
         hit.pointerType === 'touch' &&
         activePressesRef.current.size >= 2
@@ -571,15 +659,15 @@ export const ButterSquishy = memo(function ButterSquishy({
       if (event.nativeEvent.cancelable) {
         event.nativeEvent.preventDefault()
       }
-      unlockCrackAudio()
       event.stopPropagation()
+      unlockCrackAudio()
       const captureTarget = event.target as EventTarget & {
         setPointerCapture?: (pointerId: number) => void
       }
       try {
         captureTarget.setPointerCapture?.(event.nativeEvent.pointerId)
       } catch {
-        // Pointer capture may be unavailable for synthetic browser events.
+        // Synthetic events and older mobile webviews may not capture.
       }
 
       const dent = addDent(hit)
@@ -593,7 +681,6 @@ export const ButterSquishy = memo(function ButterSquishy({
         damageInput.fragmentIndex = hit.fragmentId
       }
       activePressesRef.current.set(event.nativeEvent.pointerId, {
-        pointerId: event.nativeEvent.pointerId,
         pointerType: hit.pointerType,
         startX: event.nativeEvent.clientX,
         startY: event.nativeEvent.clientY,
@@ -602,35 +689,17 @@ export const ButterSquishy = memo(function ButterSquishy({
         dent,
         damageInput,
       })
-
-      if (hit.pointerType !== 'touch') {
-        rememberImpact(hit)
-      }
       lastInteractionRef.current = performance.now()
     },
-    [addDent, hitFromEvent, rememberImpact, unlockCrackAudio],
+    [addDent, hitFromEvent, unlockCrackAudio],
   )
-
-  const handleWaxPointerOver = useCallback(
-    (event: ThreeEvent<PointerEvent>) => {
-      const canHover =
-        event.nativeEvent.pointerType === 'mouse' &&
-        window.matchMedia('(hover: hover) and (pointer: fine)').matches
-      canvasElement.classList.toggle('wax-pointer-hover', canHover)
-    },
-    [canvasElement],
-  )
-
-  const handleWaxPointerOut = useCallback(() => {
-    canvasElement.classList.remove('wax-pointer-hover')
-  }, [canvasElement])
 
   const handlePointerMove = useCallback(
     (event: ThreeEvent<PointerEvent>) => {
       const active = activePressesRef.current.get(
         event.nativeEvent.pointerId,
       )
-      if (active && active.pointerType === 'touch') {
+      if (active?.pointerType === 'touch') {
         const movement = Math.hypot(
           event.nativeEvent.clientX - active.startX,
           event.nativeEvent.clientY - active.startY,
@@ -656,20 +725,6 @@ export const ButterSquishy = memo(function ButterSquishy({
         event.nativeEvent.clientY,
         true,
       )
-
-      const captureTarget = event.target as EventTarget & {
-        hasPointerCapture?: (pointerId: number) => boolean
-        releasePointerCapture?: (pointerId: number) => void
-      }
-      if (captureTarget.hasPointerCapture?.(event.nativeEvent.pointerId)) {
-        try {
-          captureTarget.releasePointerCapture?.(
-            event.nativeEvent.pointerId,
-          )
-        } catch {
-          // The browser may already have released a canceled pointer.
-        }
-      }
     },
     [releaseActivePress],
   )
@@ -686,6 +741,22 @@ export const ButterSquishy = memo(function ButterSquishy({
     [releaseActivePress],
   )
 
+  const handlePointerOver = useCallback(
+    (event: ThreeEvent<PointerEvent>) => {
+      const canHover =
+        event.nativeEvent.pointerType === 'mouse' &&
+        window.matchMedia(
+          '(hover: hover) and (pointer: fine)',
+        ).matches
+      canvasElement.classList.toggle('wax-pointer-hover', canHover)
+    },
+    [canvasElement],
+  )
+
+  const handlePointerOut = useCallback(() => {
+    canvasElement.classList.remove('wax-pointer-hover')
+  }, [canvasElement])
+
   const createDebrisCluster = useCallback(
     (fragmentIndices: readonly number[]): DebrisCluster | null => {
       const parent = compressionRef.current
@@ -693,10 +764,6 @@ export const ButterSquishy = memo(function ButterSquishy({
         return null
       }
 
-      // Bake the last rendered dent/peel pose into the fragment's rigid rest
-      // shape before Rapier mounts. This makes the first physics transform
-      // continuous instead of snapping a freshly detached plate back to the
-      // pristine shell.
       const currentPositions = waxRuntime.geometry.getAttribute(
         'position',
       ).array as Float32Array
@@ -714,8 +781,7 @@ export const ButterSquishy = memo(function ButterSquishy({
           cursor < fragment.vertexRange.count;
           cursor += 1
         ) {
-          const vertex =
-            fragment.vertexRange.start + cursor
+          const vertex = fragment.vertexRange.start + cursor
           const offset = vertex * 3
           const x = currentPositions[offset]
           const y = currentPositions[offset + 1]
@@ -751,7 +817,7 @@ export const ButterSquishy = memo(function ButterSquishy({
       let normalY = 0
       let normalZ = 0
       let totalArea = 0
-      let clusterSeed = 0
+      let clusterSeed = coatingSeed
 
       for (
         let index = 0;
@@ -787,8 +853,7 @@ export const ButterSquishy = memo(function ButterSquishy({
         centroidX,
         centroidY,
         centroidZ,
-      )
-        .applyMatrix4(parent.matrixWorld)
+      ).applyMatrix4(parent.matrixWorld)
       const normal = new THREE.Vector3(normalX, normalY, normalZ)
         .normalize()
         .applyQuaternion(parentQuaternion)
@@ -810,9 +875,7 @@ export const ButterSquishy = memo(function ButterSquishy({
         const fragment = waxTopology.fragments[fragmentIndex]
         const pivotOffset = fragmentIndex * 3
         localPivot.fromArray(waxRuntime.pivots, pivotOffset)
-        worldPivot
-          .copy(localPivot)
-          .applyMatrix4(parent.matrixWorld)
+        worldPivot.copy(localPivot).applyMatrix4(parent.matrixWorld)
 
         const bindingOffset = index * 3
         localPivot
@@ -846,11 +909,11 @@ export const ButterSquishy = memo(function ButterSquishy({
             localOffsets[bindingOffset + 1],
             localOffsets[bindingOffset + 2],
           ],
-          density: 0.42,
+          density: 0.34,
         })
       }
 
-      const clusterId = `${instanceId}-wax-${orderedFragmentIndices.join('-')}`
+      const clusterId = `${definition.id}-soap-wax-${orderedFragmentIndices.join('-')}`
       clusterBindingsRef.current.set(clusterId, {
         fragmentIndices: orderedFragmentIndices,
         localOffsets,
@@ -870,6 +933,11 @@ export const ButterSquishy = memo(function ButterSquishy({
         fragmentPosesRef.current.quaternions[quaternionOffset + 2] = 0
         fragmentPosesRef.current.quaternions[quaternionOffset + 3] = 1
       }
+      const launch = createSoapDebrisLaunch(clusterSeed, [
+        normal.x,
+        normal.y,
+        normal.z,
+      ])
       return {
         id: clusterId,
         colliders,
@@ -879,20 +947,18 @@ export const ButterSquishy = memo(function ButterSquishy({
           worldCentroid.z,
         ],
         rotation: [euler.x, euler.y, euler.z],
-        linearVelocity: [
-          normal.x * 0.14,
-          normal.y * 0.1 - 0.06,
-          normal.z * 0.14,
-        ],
-        angularVelocity: [
-          Math.sin(clusterSeed * 1.71) * 0.55,
-          Math.cos(clusterSeed * 2.13) * 0.48,
-          Math.sin(clusterSeed * 0.83) * 0.52,
-        ],
+        linearVelocity: launch.linearVelocity,
+        angularVelocity: launch.angularVelocity,
+        gravityScale: launch.gravityScale,
         ccd: false,
       }
     },
-    [instanceId, waxRuntime, waxTopology.fragments],
+    [
+      coatingSeed,
+      definition.id,
+      waxRuntime,
+      waxTopology.fragments,
+    ],
   )
 
   const handleDebrisTransform = useCallback(
@@ -904,7 +970,7 @@ export const ButterSquishy = memo(function ButterSquishy({
       }
       for (const fragmentIndex of binding.fragmentIndices) {
         detachFragmentForFade(
-          fragmentFadeStateRef.current,
+          fadeStateRef.current,
           fragmentIndex,
         )
       }
@@ -970,7 +1036,7 @@ export const ButterSquishy = memo(function ButterSquishy({
       if (binding) {
         for (const fragmentIndex of binding.fragmentIndices) {
           markFragmentSleepingForFade(
-            fragmentFadeStateRef.current,
+            fadeStateRef.current,
             fragmentIndex,
           )
         }
@@ -988,33 +1054,31 @@ export const ButterSquishy = memo(function ButterSquishy({
   )
 
   useEffect(() => {
-    onPhysicsDebrisChange(instanceId, {
+    onPhysicsDebrisChange(definition.id, {
       clusters: physicsDebrisClusters,
       onTransform: handleDebrisTransform,
       onSettled: handleDebrisSettled,
     })
   }, [
+    definition.id,
     handleDebrisSettled,
     handleDebrisTransform,
-    instanceId,
     onPhysicsDebrisChange,
     physicsDebrisClusters,
   ])
 
   useEffect(
     () => () => {
-      onPhysicsDebrisChange(instanceId, null)
+      onPhysicsDebrisChange(definition.id, null)
     },
-    [instanceId, onPhysicsDebrisChange],
+    [definition.id, onPhysicsDebrisChange],
   )
 
   useFrame((_, delta) => {
     const now = performance.now()
     const impacts = impactsRef.current
     const activeDents = activeDentsRef.current
-    const activePresses = activePressesRef.current
     const pressInputs = pressInputsRef.current
-    const tapPulses = tapPulsesRef.current
     const fractureState = fractureStateRef.current
     pressInputs.length = 0
 
@@ -1025,7 +1089,7 @@ export const ButterSquishy = memo(function ButterSquishy({
       stepSpring(introRef.current, 1, delta, INTRO_SPRING)
     }
 
-    for (const active of activePresses.values()) {
+    for (const active of activePressesRef.current.values()) {
       const springScratch = springScratchRef.current
       springScratch.value = active.dent.amount
       springScratch.velocity = active.dent.velocity
@@ -1033,7 +1097,7 @@ export const ButterSquishy = memo(function ButterSquishy({
         springScratch,
         1,
         delta,
-        reducedMotion ? REDUCED_PRESS_SPRING : PRESS_SPRING,
+        definition.deformation.spring,
       )
       active.dent.amount = Math.min(1, springScratch.value)
       active.dent.velocity = springScratch.velocity
@@ -1042,7 +1106,11 @@ export const ButterSquishy = memo(function ButterSquishy({
       active.damageInput.pressure =
         Math.min(1, Math.max(0.3, active.dent.amount)) *
         (active.hit.pressure > 0
-          ? THREE.MathUtils.clamp(active.hit.pressure * 1.45, 0.7, 1)
+          ? THREE.MathUtils.clamp(
+              active.hit.pressure * 1.45,
+              0.7,
+              1,
+            )
           : 1)
       if (
         active.pointerType !== 'touch' ||
@@ -1054,6 +1122,7 @@ export const ButterSquishy = memo(function ButterSquishy({
       bodyNeedsRestoreRef.current = true
     }
 
+    const tapPulses = tapPulsesRef.current
     for (let index = tapPulses.length - 1; index >= 0; index -= 1) {
       const pulse = tapPulses[index]
       pulse.input.durationSeconds += delta
@@ -1076,12 +1145,11 @@ export const ButterSquishy = memo(function ButterSquishy({
         springScratch,
         0,
         delta,
-        reducedMotion ? REDUCED_PRESS_SPRING : PRESS_SPRING,
+        definition.deformation.spring,
       )
       impact.amount = springScratch.value
       impact.velocity = springScratch.velocity
     }
-
     for (let index = impacts.length - 1; index >= 0; index -= 1) {
       const impact = impacts[index]
       if (
@@ -1093,25 +1161,20 @@ export const ButterSquishy = memo(function ButterSquishy({
       }
     }
 
-    stepFracture(
-      fractureModel,
-      fractureState,
-      pressInputs,
-      delta,
-    )
+    stepFracture(fractureModel, fractureState, pressInputs, delta)
     if (fractureState.events.length > 0) {
-      geometryDirtyRef.current = true
-      const newClusters: DebrisCluster[] = []
       const detachedFragments: number[] = []
+      const newClusters: DebrisCluster[] = []
       let brokenBondCount = 0
       for (const event of fractureState.events) {
         if (event.type === 'bond-break') {
           brokenBondCount += 1
         } else if (event.type === 'fragment-detach') {
           detachedFragments.push(event.fragmentIndex)
+          hasDetachedRef.current = true
           if (reducedMotion) {
             detachFragmentForFade(
-              fragmentFadeStateRef.current,
+              fadeStateRef.current,
               event.fragmentIndex,
             )
           }
@@ -1120,7 +1183,7 @@ export const ButterSquishy = memo(function ButterSquishy({
           !completionSentRef.current
         ) {
           completionSentRef.current = true
-          onComplete()
+          onComplete(definition.id)
         }
       }
       if (brokenBondCount > 0) {
@@ -1129,7 +1192,7 @@ export const ButterSquishy = memo(function ButterSquishy({
       const connectedGroups = groupConnectedFragments(
         detachedFragments,
         waxTopology.fragments,
-        MAX_DEBRIS_CLUSTER_SIZE,
+        SOAP_DEBRIS_MAX_CLUSTER_SIZE,
         coatingSeed,
       )
       for (const group of connectedGroups) {
@@ -1139,47 +1202,100 @@ export const ButterSquishy = memo(function ButterSquishy({
         }
       }
       if (newClusters.length > 0) {
-        setDebrisClusters((current) => [...current, ...newClusters])
         setPhysicsDebrisClusters((current) => [
           ...current,
           ...newClusters,
         ])
       }
+      geometryDirtyRef.current = true
     }
 
     const peelAmounts = peelAmountsRef.current
     const peelEase = 1 - Math.exp(-delta * (reducedMotion ? 18 : 8))
     for (
-      let fragment = 0;
-      fragment < peelAmounts.length;
-      fragment += 1
+      let fragmentIndex = 0;
+      fragmentIndex < peelAmounts.length;
+      fragmentIndex += 1
     ) {
-      const fragmentState = fractureState.fragmentState[fragment]
+      const state = fractureState.fragmentState[fragmentIndex]
       const degree =
-        fractureModel.incidentStarts[fragment + 1] -
-        fractureModel.incidentStarts[fragment]
+        fractureModel.incidentStarts[fragmentIndex + 1] -
+        fractureModel.incidentStarts[fragmentIndex]
       const brokenRatio =
         degree > 0
-          ? fractureState.fragmentBrokenBonds[fragment] / degree
+          ? fractureState.fragmentBrokenBonds[fragmentIndex] / degree
           : 0
       const target =
-        fragmentState >= FRAGMENT_STATE.PEELING
+        state >= FRAGMENT_STATE.PEELING
           ? 1
-          : fragmentState === FRAGMENT_STATE.CRACKED
-            ? brokenRatio * 0.24
+          : state === FRAGMENT_STATE.CRACKED
+            ? brokenRatio * 0.22
             : 0
       const next = THREE.MathUtils.lerp(
-        peelAmounts[fragment],
+        peelAmounts[fragmentIndex],
         target,
         peelEase,
       )
-      if (Math.abs(next - peelAmounts[fragment]) > 0.0001) {
-        peelAmounts[fragment] = next
+      if (Math.abs(next - peelAmounts[fragmentIndex]) > 0.0001) {
+        peelAmounts[fragmentIndex] = next
         geometryDirtyRef.current = true
       }
     }
 
-    const fadeState = fragmentFadeStateRef.current
+    if (impacts.length > 0) {
+      writeDeformedPositions(
+        innerGeometry,
+        innerSource,
+        impacts,
+        0,
+        dentProfile,
+      )
+      writeDeformedPositions(
+        labelGeometry,
+        labelSource,
+        impacts,
+        0,
+        dentProfile,
+      )
+      if (accentGeometry && accentSource) {
+        writeDeformedPositions(
+          accentGeometry,
+          accentSource,
+          impacts,
+          0,
+          dentProfile,
+        )
+      }
+      bodyNeedsRestoreRef.current = true
+    } else if (bodyNeedsRestoreRef.current) {
+      writeDeformedPositions(
+        innerGeometry,
+        innerSource,
+        [],
+        0,
+        dentProfile,
+      )
+      writeDeformedPositions(
+        labelGeometry,
+        labelSource,
+        [],
+        0,
+        dentProfile,
+      )
+      if (accentGeometry && accentSource) {
+        writeDeformedPositions(
+          accentGeometry,
+          accentSource,
+          [],
+          0,
+          dentProfile,
+        )
+      }
+      bodyNeedsRestoreRef.current = false
+      geometryDirtyRef.current = true
+    }
+
+    const fadeState = fadeStateRef.current
     stepFragmentFade(fadeState, delta, reducedMotion)
     if (fadeState.fadeStartedCount > 0) {
       setPhysicsDebrisClusters((current) =>
@@ -1193,7 +1309,6 @@ export const ButterSquishy = memo(function ButterSquishy({
         }),
       )
     }
-    let retiredClusterCount = 0
     for (
       let fragmentIndex = 0;
       fragmentIndex < waxTopology.plateCount;
@@ -1201,9 +1316,8 @@ export const ButterSquishy = memo(function ButterSquishy({
     ) {
       const alpha = fadeState.alpha[fragmentIndex]
       if (
-        Math.abs(
-          alpha - lastFragmentAlphaRef.current[fragmentIndex],
-        ) > 0.001
+        Math.abs(alpha - lastAlphaRef.current[fragmentIndex]) >
+        0.001
       ) {
         const fragment = waxTopology.fragments[fragmentIndex]
         writeFragmentFadeColorAlpha(
@@ -1212,7 +1326,7 @@ export const ButterSquishy = memo(function ButterSquishy({
           fragment.vertexRange.count,
           alpha,
         )
-        lastFragmentAlphaRef.current[fragmentIndex] = alpha
+        lastAlphaRef.current[fragmentIndex] = alpha
       }
     }
     for (
@@ -1221,35 +1335,22 @@ export const ButterSquishy = memo(function ButterSquishy({
       retiredIndex += 1
     ) {
       const fragmentIndex = fadeState.retiredIndices[retiredIndex]
-      const positionOffset = fragmentIndex * 3
-      fragmentPosesRef.current.positions[positionOffset + 1] = -100
+      const offset = fragmentIndex * 3
+      fragmentPosesRef.current.positions[offset + 1] = -100
       geometryDirtyRef.current = true
     }
+    let retiredClusterCount = 0
     for (const binding of clusterBindingsRef.current.values()) {
-      let clusterRetired = true
-      for (const fragmentIndex of binding.fragmentIndices) {
-        if (!isFragmentRetired(fadeState, fragmentIndex)) {
-          clusterRetired = false
-          break
-        }
-      }
-      if (clusterRetired) {
+      if (
+        binding.fragmentIndices.every((fragmentIndex) =>
+          isFragmentRetired(fadeState, fragmentIndex),
+        )
+      ) {
         retiredClusterCount += 1
       }
     }
     if (retiredClusterCount > 0) {
       setPhysicsDebrisClusters((current) =>
-        current.filter((cluster) => {
-          const binding = clusterBindingsRef.current.get(cluster.id)
-          return (
-            binding?.fragmentIndices.some(
-              (fragmentIndex) =>
-                !isFragmentRetired(fadeState, fragmentIndex),
-            ) ?? false
-          )
-        }),
-      )
-      setDebrisClusters((current) =>
         current.filter((cluster) => {
           const binding = clusterBindingsRef.current.get(cluster.id)
           if (!binding) {
@@ -1267,17 +1368,6 @@ export const ButterSquishy = memo(function ButterSquishy({
       )
     }
 
-    if (impacts.length > 0) {
-      writeDeformedPositions(innerGeometry, innerSource, impacts, 0)
-      writeDeformedPositions(labelGeometry, labelSource, impacts, 0)
-      bodyNeedsRestoreRef.current = true
-    } else if (bodyNeedsRestoreRef.current) {
-      writeDeformedPositions(innerGeometry, innerSource, [], 0)
-      writeDeformedPositions(labelGeometry, labelSource, [], 0)
-      bodyNeedsRestoreRef.current = false
-      geometryDirtyRef.current = true
-    }
-
     if (geometryDirtyRef.current) {
       writeWaxGeometry({
         runtime: waxRuntime,
@@ -1287,6 +1377,7 @@ export const ButterSquishy = memo(function ButterSquishy({
         impacts,
         peelAmounts,
         fragmentPoses: fragmentPosesRef.current,
+        dentProfile,
       })
       geometryDirtyRef.current = false
     }
@@ -1296,23 +1387,21 @@ export const ButterSquishy = memo(function ButterSquishy({
       ? Math.max(0, newestImpact.amount)
       : 0
     if (compressionRef.current) {
-      if (debrisClusters.length > 0) {
-        // Detached geometry shares this render group with the butter. Keep
-        // its parent transform stable once rigid bodies exist so sleeping
-        // tabletop pieces cannot drift away from their fixed colliders.
+      if (hasDetachedRef.current) {
         compressionRef.current.scale.setScalar(1)
       } else {
         const normal = newestImpact?.localNormal ?? DEFAULT_NORMAL
+        const amount = definition.deformation.compression
         compressionRef.current.scale.set(
           1 -
-            0.025 * Math.abs(normal[0]) * compression +
-            0.006 * (1 - Math.abs(normal[0])) * compression,
+            amount * Math.abs(normal[0]) * compression +
+            amount * 0.2 * (1 - Math.abs(normal[0])) * compression,
           1 -
-            0.025 * Math.abs(normal[1]) * compression +
-            0.006 * (1 - Math.abs(normal[1])) * compression,
+            amount * Math.abs(normal[1]) * compression +
+            amount * 0.2 * (1 - Math.abs(normal[1])) * compression,
           1 -
-            0.025 * Math.abs(normal[2]) * compression +
-            0.006 * (1 - Math.abs(normal[2])) * compression,
+            amount * Math.abs(normal[2]) * compression +
+            amount * 0.2 * (1 - Math.abs(normal[2])) * compression,
         )
       }
     }
@@ -1320,22 +1409,20 @@ export const ButterSquishy = memo(function ButterSquishy({
     let idlePulse = 0
     if (
       !reducedMotion &&
-      debrisClusters.length === 0 &&
-      now - lastInteractionRef.current > 6000
+      !hasDetachedRef.current &&
+      now - lastInteractionRef.current > 5500
     ) {
       const pulseTime =
-        ((now - lastInteractionRef.current - 6000) / 1000) % 5
-      if (pulseTime < 1.4) {
+        ((now - lastInteractionRef.current - 5500) / 1000) % 5.6
+      if (pulseTime < 1.2) {
         idlePulse =
-          Math.sin((pulseTime / 1.4) * Math.PI) ** 2 * 0.025
+          Math.sin((pulseTime / 1.2) * Math.PI) ** 2 * 0.018
       }
     }
-
     if (presentationRef.current) {
       const scale = introRef.current.value * (1 + idlePulse)
       presentationRef.current.scale.setScalar(scale)
     }
-
   })
 
   const handleWaxPointerDown = useCallback(
@@ -1343,41 +1430,31 @@ export const ButterSquishy = memo(function ButterSquishy({
       handlePointerDown(event, 'wax'),
     [handlePointerDown],
   )
-  const handleButterPointerDown = useCallback(
+  const handleBodyPointerDown = useCallback(
     (event: ThreeEvent<PointerEvent>) =>
       handlePointerDown(event, 'butter'),
     [handlePointerDown],
   )
-  const handleWaxPointerMove = useCallback(
-    (event: ThreeEvent<PointerEvent>) => handlePointerMove(event),
-    [handlePointerMove],
-  )
-  const handleButterPointerMove = useCallback(
-    (event: ThreeEvent<PointerEvent>) => handlePointerMove(event),
-    [handlePointerMove],
-  )
 
   return (
-    <>
-      <group
-        ref={presentationRef}
-        position={position}
-        rotation={PRESENTATION_ROTATION}
-      >
+    <group position={position} scale={scale}>
+      <group ref={presentationRef}>
         <group ref={compressionRef}>
           <mesh
             geometry={innerGeometry}
-            castShadow
-            receiveShadow
-            onPointerDown={handleButterPointerDown}
-            onPointerMove={handleButterPointerMove}
-            onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerCancel}
+            onPointerDown={handleBodyPointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
           >
-            <meshStandardMaterial
-              color={bodyColor}
-              metalness={0}
-              roughness={0.7}
+            <meshPhysicalMaterial
+              clearcoat={definition.style.clearcoat}
+              color={definition.style.bodyColor}
+              metalness={definition.style.metalness}
+              roughness={definition.style.roughness}
+              sheen={definition.style.sheen}
+              thickness={0.12}
+              transmission={definition.style.transmission}
             />
           </mesh>
           <mesh
@@ -1386,78 +1463,67 @@ export const ButterSquishy = memo(function ButterSquishy({
             renderOrder={1}
           >
             <meshBasicMaterial
-              map={labelTexture}
-              transparent={false}
+              alphaTest={0.015}
               depthTest
               depthWrite
-              alphaTest={0.015}
-              opacity={1}
+              map={labelTexture}
               polygonOffset
               polygonOffsetFactor={-7}
               toneMapped={false}
+              transparent={false}
             />
           </mesh>
           <mesh
             geometry={waxRuntime.geometry}
-            receiveShadow
             frustumCulled={false}
-            onPointerMove={handleWaxPointerMove}
-            onPointerDown={handleWaxPointerDown}
-            onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerCancel}
-            onPointerOver={handleWaxPointerOver}
-            onPointerOut={handleWaxPointerOut}
+            onPointerDown={handleWaxPointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerOut={handlePointerOut}
+            onPointerOver={handlePointerOver}
+            onPointerUp={handlePointerUp}
           >
             <meshPhysicalMaterial
               alphaHash
-              attach="material-0"
-              {...WAX_OUTER_MATERIAL}
-              attenuationColor={waxPalette.attenuation}
-              color={waxPalette.outer}
-              vertexColors
-            />
-            <meshStandardMaterial
-              alphaHash
-              attach="material-1"
-              color={waxPalette.inner}
-              metalness={0}
-              roughness={0.82}
-              side={THREE.FrontSide}
-              vertexColors
-            />
-            <meshStandardMaterial
-              alphaHash
-              attach="material-2"
-              color={waxPalette.edge}
-              metalness={0}
-              polygonOffset
-              polygonOffsetFactor={4}
-              polygonOffsetUnits={4}
-              roughness={0.88}
-              side={THREE.FrontSide}
+              {...SOAP_WAX_PHYSICAL_PROPERTIES}
+              attenuationColor={waxPalette.attenuationColor}
+              color={waxPalette.surfaceColor}
               vertexColors
             />
           </mesh>
           <mesh
             geometry={labelGeometry}
-            position={[0, 0, 0.058]}
+            position={[0, 0, SOAP_OUTER_OFFSET + 0.006]}
             raycast={NO_RAYCAST}
             renderOrder={3}
           >
             <meshBasicMaterial
-              map={labelTexture}
-              transparent
+              alphaTest={0.015}
               depthTest
               depthWrite={false}
-              alphaTest={0.015}
-              opacity={0.3}
+              map={labelTexture}
+              opacity={0.52}
               polygonOffset
               polygonOffsetFactor={-5}
               toneMapped={false}
+              transparent
             />
           </mesh>
+          {accentGeometry ? (
+            <points
+              geometry={accentGeometry}
+              raycast={NO_RAYCAST}
+              renderOrder={2}
+            >
+              <pointsMaterial
+                size={definition.id === 'sugar' ? 0.03 : 0.046}
+                sizeAttenuation
+                vertexColors
+              />
+            </points>
+          ) : null}
         </group>
       </group>
-    </>
+    </group>
   )
 })

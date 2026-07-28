@@ -1,8 +1,8 @@
 # Squishy
 
-Squishy is a customer-facing Codefair project: a tactile, procedural
-wax-covered butter stick whose continuous shell dents, cracks, peels, and
-breaks apart under pointer and touch pressure.
+Squishy is a customer-facing Codefair project: a tactile collection of
+procedural wax-covered squishies whose continuous shells dent, crack, peel,
+and break apart under pointer and touch pressure.
 
 ## Stack
 
@@ -35,10 +35,11 @@ npm run build
 
 ## Architecture
 
-The butter body begins as a densely subdivided box projected onto a smooth,
-rounded-cuboid surface. That watertight source is deterministically partitioned
-into 48 irregular connected plates and extruded into one physically thick wax
-coating.
+The butter page presents three horizontal rounded sticks in a centered vertical
+stack: yellow, pink, and blue. Each watertight source uses 4,000 evenly
+distributed triangles, is deterministically partitioned into 32 irregular
+connected plates with its own seed, and is extruded into a physically thick,
+color-tinted wax coating.
 Neighboring plates share a persistent bond graph, so every press accumulates
 damage in the existing shell and extends nearby fissures instead of spawning a
 decorative break artifact.
@@ -50,8 +51,23 @@ pressure into irreversible bond breaks, exposed seams, peeling plates, and
 eventual detachment. A short tap cannot immediately release a loose piece:
 detachment requires continued local peel load. Same-frame neighboring plates
 leave as connected sheets of up to four pieces. Rapier is lazy-loaded only after
-debris exists; its stable generation pool is capped at 24 mobile or 40 desktop
-bodies, and overflow pieces settle deterministically.
+debris exists. All three butters share one physics world and one 24-body pool,
+so flakes interact consistently without multiplying solver or fixed-collider
+work; overflow pieces settle deterministically. Detached pieces fade and retire
+from both rendering and physics so spent flakes do not accumulate.
+
+The `/soaps` experience uses the same damage, dent, raycast, and shell geometry
+contracts for eight lower-density procedural bars. Each soap has a distinct
+bright core, matching pastel-transmissive wax tint, responsive material style,
+SOAP decal, deformation profile, and seeded fracture network. A stronger
+topology-level seam pass redistributes the existing boundary samples into long
+clean segments while retaining the same raycast IDs, real shell thickness, and
+triangle winding. The grid hydrates each fracture runtime progressively and
+routes detached connected flakes through one shared, lazy-loaded Rapier world.
+Eight rounded soap colliders and one invisible floor make every flake fall
+through the grid and settle below the final row before fading. The aggregate
+pool remains capped at 24 bodies, preserving one Canvas and a bounded mobile
+workload while all eight soaps remain independently interactive.
 
 The interaction layer supports mouse, pen, and up to two simultaneous mobile
 touches. Touch motion beyond the scroll threshold cancels the press. Responsive
@@ -63,13 +79,14 @@ Five short crack recordings are decoded once through Web Audio. Playback is
 driven only by actual bond-break events, uses every recording once per shuffled
 cycle, avoids immediate repeats, and caps overlap during sustained fractures.
 
-## First-prototype boundary
+## Experience boundary
 
-This version includes one butter squishy, the persistent thick wax shell,
-progressive damage and crack merging, local dents, compression and rebound,
-peeling and rigid-body debris, butter-label decals, exact surface raycasting,
-idle invitation motion, reduced-motion behavior, randomized crack audio,
-completion feedback, and in-page **Re-coat wax** replay.
+This version includes a three-butter page and an eight-soap page, persistent
+thick color-tinted wax shells, progressive damage and crack merging, local
+dents, compression and rebound, peeling and fading debris, product decals,
+exact surface raycasting, idle invitation motion, reduced-motion behavior,
+randomized crack audio, route-aware previous/next navigation, completion
+feedback, and in-page re-coating.
 
-Impact/debris audio, haptics, additional squishy shapes, saved progress,
-analytics, and Codefair-specific messaging remain intentionally deferred.
+Impact/debris-specific audio, haptics, saved progress, analytics, and
+Codefair-specific messaging remain intentionally deferred.

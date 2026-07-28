@@ -1,11 +1,38 @@
 import * as THREE from 'three'
-import type { WaxSourceSurface } from './types'
+import {
+  WAX_SEAM_PROFILE,
+  type WaxSeamProfile,
+  type WaxSourceSurface,
+} from './types'
 
 const DISTANCE_EPSILON = 1e-10
-const CLEAN_SEAM_TOLERANCE = 0.085
-const CLEAN_SEAM_MAX_DISPLACEMENT = 0.09
-const CLEAN_SEAM_MINIMUM_AREA_RATIO = 0.15
-const CLEAN_SEAM_NORMAL_COSINE = Math.cos(THREE.MathUtils.degToRad(7))
+
+type CleanSeamSettings = Readonly<{
+  tolerance: number
+  maximumDisplacement: number
+  minimumAreaRatio: number
+  normalCosine: number
+  processClosedChains: boolean
+  applyPerChain: boolean
+}>
+
+const STANDARD_SEAM_SETTINGS: CleanSeamSettings = Object.freeze({
+  tolerance: 0.085,
+  maximumDisplacement: 0.09,
+  minimumAreaRatio: 0.15,
+  normalCosine: Math.cos(THREE.MathUtils.degToRad(7)),
+  processClosedChains: false,
+  applyPerChain: false,
+})
+
+const LONG_SEAM_SETTINGS: CleanSeamSettings = Object.freeze({
+  tolerance: 0.24,
+  maximumDisplacement: 0.24,
+  minimumAreaRatio: 0.15,
+  normalCosine: Math.cos(THREE.MathUtils.degToRad(24)),
+  processClosedChains: true,
+  applyPerChain: true,
+})
 
 type BoundaryEdgeRecord = {
   a: number
@@ -103,6 +130,33 @@ function buildBoundaryChains(
   return chains
 }
 
+function splitClosedBoundaryChain(chain: readonly number[]) {
+  const terminal = chain.length - 1
+  if (
+    terminal < 3 ||
+    chain[0] !== chain[terminal]
+  ) {
+    return [chain]
+  }
+
+  const ring = chain.slice(0, terminal)
+  let start = 0
+  for (let index = 1; index < ring.length; index += 1) {
+    if (ring[index] < ring[start]) {
+      start = index
+    }
+  }
+  const ordered = [
+    ...ring.slice(start),
+    ...ring.slice(0, start),
+  ]
+  const opposite = Math.floor(ordered.length / 2)
+  return [
+    ordered.slice(0, opposite + 1),
+    [...ordered.slice(opposite), ordered[0]],
+  ]
+}
+
 function dotSourceNormals(
   sourceNormals: Float32Array,
   vertexA: number,
@@ -160,13 +214,14 @@ function addSimplifiedBoundaryAnchors(
   end: number,
   positions: Float32Array,
   anchors: Set<number>,
+  tolerance: number,
 ) {
   if (end - start < 2) {
     return
   }
 
   let furthestIndex = -1
-  let furthestDistance = CLEAN_SEAM_TOLERANCE
+  let furthestDistance = tolerance
   for (let index = start + 1; index < end; index += 1) {
     const distance = pointToSegmentDistance(
       positions,
@@ -190,6 +245,7 @@ function addSimplifiedBoundaryAnchors(
     furthestIndex,
     positions,
     anchors,
+    tolerance,
   )
   addSimplifiedBoundaryAnchors(
     chain,
@@ -197,6 +253,7 @@ function addSimplifiedBoundaryAnchors(
     end,
     positions,
     anchors,
+    tolerance,
   )
 }
 
@@ -204,6 +261,7 @@ function createLinearizedBoundaryUpdates(
   chain: readonly number[],
   source: WaxSourceSurface,
   junctionVertices: ReadonlySet<number>,
+  settings: CleanSeamSettings,
 ) {
   const forcedAnchors = new Set<number>([0, chain.length - 1])
   let normalSpanStart = 0
@@ -219,7 +277,7 @@ function createLinearizedBoundaryUpdates(
         source.normals,
         chain[normalSpanStart],
         chain[index + 1],
-      ) < CLEAN_SEAM_NORMAL_COSINE
+      ) < settings.normalCosine
     ) {
       forcedAnchors.add(index)
       normalSpanStart = index
@@ -235,6 +293,7 @@ function createLinearizedBoundaryUpdates(
       normalAnchors[index + 1],
       source.positions,
       anchors,
+      settings.tolerance,
     )
   }
 
@@ -297,8 +356,8 @@ function createLinearizedBoundaryUpdates(
         displacementY,
         displacementZ,
       )
-      if (displacement > CLEAN_SEAM_MAX_DISPLACEMENT) {
-        const scale = CLEAN_SEAM_MAX_DISPLACEMENT / displacement
+      if (displacement > settings.maximumDisplacement) {
+        const scale = settings.maximumDisplacement / displacement
         targetX =
           source.positions[vertexOffset] + displacementX * scale
         targetY =
@@ -317,6 +376,7 @@ function applyBoundaryUpdates(
   updates: ReadonlyMap<number, readonly [number, number, number]>,
   incidentTriangles: readonly number[][],
   scale: number,
+  minimumAreaRatio: number,
 ) {
   if (updates.size === 0) {
     return true
@@ -363,7 +423,7 @@ function applyBoundaryUpdates(
       orientation <= DISTANCE_EPSILON ||
       area <
         source.triangleAreas[triangle] *
-          CLEAN_SEAM_MINIMUM_AREA_RATIO
+          minimumAreaRatio
     ) {
       return false
     }
@@ -507,7 +567,12 @@ export function straightenBoundaryPositions(
   source: WaxSourceSurface,
   edgeRecords: readonly BoundaryEdgeRecord[],
   sourceTriangleFragmentIds: Uint16Array,
+  seamProfile: WaxSeamProfile = WAX_SEAM_PROFILE.standard,
 ) {
+  const settings =
+    seamProfile === WAX_SEAM_PROFILE.long
+      ? LONG_SEAM_SETTINGS
+      : STANDARD_SEAM_SETTINGS
   const bondMap = new Map<string, BoundaryAccumulator>()
   const boundaryPairsByVertex = Array.from(
     { length: source.vertexCount },
@@ -573,33 +638,50 @@ export function straightenBoundaryPositions(
     number,
     { x: number; y: number; z: number; count: number }
   >()
+  const boundaryUpdateGroups: Array<
+    ReadonlyMap<number, readonly [number, number, number]>
+  > = []
   for (const accumulator of accumulators) {
-    for (const chain of buildBoundaryChains(accumulator.edges)) {
-      if (
-        chain.length < 3 ||
-        chain[0] === chain[chain.length - 1]
-      ) {
-        continue
-      }
-      const chainUpdates = createLinearizedBoundaryUpdates(
-        chain,
-        source,
-        junctionVertices,
-      )
-      for (const [vertex, target] of chainUpdates) {
-        const sum = updateSums.get(vertex)
-        if (sum) {
-          sum.x += target[0]
-          sum.y += target[1]
-          sum.z += target[2]
-          sum.count += 1
-        } else {
-          updateSums.set(vertex, {
-            x: target[0],
-            y: target[1],
-            z: target[2],
-            count: 1,
-          })
+    for (const rawChain of buildBoundaryChains(accumulator.edges)) {
+      const chains =
+        settings.processClosedChains
+          ? splitClosedBoundaryChain(rawChain)
+          : [rawChain]
+      for (const chain of chains) {
+        if (
+          chain.length < 3 ||
+          chain[0] === chain[chain.length - 1]
+        ) {
+          continue
+        }
+        const chainUpdates = createLinearizedBoundaryUpdates(
+          chain,
+          source,
+          junctionVertices,
+          settings,
+        )
+        if (
+          settings.applyPerChain &&
+          chainUpdates.size > 0
+        ) {
+          boundaryUpdateGroups.push(chainUpdates)
+          continue
+        }
+        for (const [vertex, target] of chainUpdates) {
+          const sum = updateSums.get(vertex)
+          if (sum) {
+            sum.x += target[0]
+            sum.y += target[1]
+            sum.z += target[2]
+            sum.count += 1
+          } else {
+            updateSums.set(vertex, {
+              x: target[0],
+              y: target[1],
+              z: target[2],
+              count: 1,
+            })
+          }
         }
       }
     }
@@ -622,25 +704,41 @@ export function straightenBoundaryPositions(
       boundaryVertices.add(vertex)
     }
   }
-  const expandedUpdates = expandBoundaryUpdates(
-    source,
-    boundaryUpdates,
-    boundaryVertices,
-    sourceNeighbors,
-  )
   let applied = false
-  for (const scale of [1, 0.8, 0.6, 0.4]) {
-    if (
-      applyBoundaryUpdates(
-        source,
-        expandedUpdates,
-        incidentTriangles,
-        scale,
-      )
-    ) {
-      applied = true
-      break
+  const applySafely = (
+    updates: ReadonlyMap<
+      number,
+      readonly [number, number, number]
+    >,
+  ) => {
+    const expandedUpdates = expandBoundaryUpdates(
+      source,
+      updates,
+      boundaryVertices,
+      sourceNeighbors,
+    )
+    for (const scale of [1, 0.8, 0.6, 0.4]) {
+      if (
+        applyBoundaryUpdates(
+          source,
+          expandedUpdates,
+          incidentTriangles,
+          scale,
+          settings.minimumAreaRatio,
+        )
+      ) {
+        return true
+      }
     }
+    return false
+  }
+
+  if (settings.applyPerChain) {
+    for (const updates of boundaryUpdateGroups) {
+      applied = applySafely(updates) || applied
+    }
+  } else {
+    applied = applySafely(boundaryUpdates)
   }
   if (applied) {
     refreshTriangleMetrics(source)

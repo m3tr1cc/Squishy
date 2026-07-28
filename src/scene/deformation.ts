@@ -11,6 +11,20 @@ export type DeformationSource = {
   normals: Float32Array
 }
 
+export type DentProfile = Readonly<{
+  radius: number
+  depth: number
+  maximumDepth: number
+  minimumDepth?: number
+}>
+
+export const DEFAULT_DENT_PROFILE: DentProfile = {
+  radius: DENT_RADIUS,
+  depth: DENT_DEPTH,
+  maximumDepth: MAX_DENT_DEPTH,
+  minimumDepth: -0.012,
+}
+
 export function captureDeformationSource(geometry: THREE.BufferGeometry): DeformationSource {
   const positions = geometry.getAttribute('position')
   const normals = geometry.getAttribute('normal')
@@ -38,6 +52,7 @@ export function sampleDentDepthValues(
   normalY: number,
   normalZ: number,
   impacts: readonly DentImpact[],
+  profile: DentProfile = DEFAULT_DENT_PROFILE,
 ) {
   let dent = 0
 
@@ -47,7 +62,7 @@ export function sampleDentDepthValues(
     const deltaZ = z - impact.localPoint[2]
     const distance = Math.hypot(deltaX, deltaY, deltaZ)
 
-    if (distance >= DENT_RADIUS) {
+    if (distance >= profile.radius) {
       continue
     }
 
@@ -63,20 +78,24 @@ export function sampleDentDepthValues(
     }
 
     dent +=
-      DENT_DEPTH *
+      profile.depth *
       impact.amount *
-      smoothDentWeight(distance) *
+      smoothDentWeight(distance, profile.radius) *
       alignment *
       alignment
   }
 
-  return Math.min(MAX_DENT_DEPTH, Math.max(-0.012, dent))
+  return Math.min(
+    profile.maximumDepth,
+    Math.max(profile.minimumDepth ?? -0.012, dent),
+  )
 }
 
 export function sampleDentDepth(
   position: readonly [number, number, number],
   normal: readonly [number, number, number],
   impacts: readonly DentImpact[],
+  profile: DentProfile = DEFAULT_DENT_PROFILE,
 ) {
   return sampleDentDepthValues(
     position[0],
@@ -86,6 +105,7 @@ export function sampleDentDepth(
     normal[1],
     normal[2],
     impacts,
+    profile,
   )
 }
 
@@ -94,6 +114,7 @@ export function writeDeformedPositions(
   source: DeformationSource,
   impacts: readonly DentImpact[],
   surfaceOffset: number,
+  profile: DentProfile = DEFAULT_DENT_PROFILE,
 ) {
   const attribute = geometry.getAttribute('position') as THREE.BufferAttribute
   const target = attribute.array as Float32Array
@@ -114,6 +135,7 @@ export function writeDeformedPositions(
       normalY,
       normalZ,
       impacts,
+      profile,
     )
     const normalDistance = surfaceOffset - dent
     target[offset] = x + normalX * normalDistance

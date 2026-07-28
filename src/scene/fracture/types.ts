@@ -18,6 +18,14 @@ export const WAX_FRACTURE_ROLE = {
 export type WaxFractureRole =
   (typeof WAX_FRACTURE_ROLE)[keyof typeof WAX_FRACTURE_ROLE]
 
+export const WAX_SEAM_PROFILE = {
+  standard: 'standard',
+  long: 'long',
+} as const
+
+export type WaxSeamProfile =
+  (typeof WAX_SEAM_PROFILE)[keyof typeof WAX_SEAM_PROFILE]
+
 export type TriangleRange = {
   start: number
   count: number
@@ -104,4 +112,5 @@ export type CreateWaxTopologyOptions = {
   seed?: number
   innerClearance?: number
   outerOffset?: number
+  seamProfile?: WaxSeamProfile
 }

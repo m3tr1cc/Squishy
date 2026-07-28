@@ -3,6 +3,7 @@ import { createRoundedCuboidGeometry } from '../createRoundedCuboidGeometry'
 import { straightenBoundaryPositions } from './cleanSeams'
 import {
   WAX_FRACTURE_ROLE,
+  WAX_SEAM_PROFILE,
   WAX_SURFACE_KIND,
   type CreateWaxTopologyOptions,
   type WaxBond,
@@ -1549,6 +1550,7 @@ export function createWaxTopology({
   seed = DEFAULT_WAX_TOPOLOGY_SEED,
   innerClearance = DEFAULT_WAX_INNER_CLEARANCE,
   outerOffset = DEFAULT_WAX_OUTER_OFFSET,
+  seamProfile = WAX_SEAM_PROFILE.standard,
 }: CreateWaxTopologyOptions = {}): WaxTopology {
   const normalizedSeed = seed >>> 0
   if (!Number.isInteger(plateCount) || plateCount < 1) {
@@ -1564,6 +1566,12 @@ export function createWaxTopology({
     throw new Error(
       'Wax topology offsets must satisfy 0 <= innerClearance < outerOffset.',
     )
+  }
+  if (
+    seamProfile !== WAX_SEAM_PROFILE.standard &&
+    seamProfile !== WAX_SEAM_PROFILE.long
+  ) {
+    throw new Error('Wax topology seamProfile is not supported.')
   }
 
   const ownsSourceGeometry = !sourceGeometry
@@ -1620,6 +1628,7 @@ export function createWaxTopology({
       source,
       graphData.edgeRecords,
       sourceTriangleFragmentIds,
+      seamProfile,
     )
     const assembled = assembleGeometry(
       source,
