@@ -1,14 +1,41 @@
 import { useFrame, useThree } from '@react-three/fiber'
-import { useEffect, useRef, useState } from 'react'
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import * as THREE from 'three'
-import { ButterSquishy } from './ButterSquishy'
+import {
+  ButterSquishy,
+  createButterStaticColliders,
+  type ButterPhysicsDebrisSource,
+} from './ButterSquishy'
+import {
+  BUTTER_DEBRIS_BODY_LIMIT,
+  BUTTER_DEFINITIONS,
+  BUTTER_STACK_GROUND_Y,
+  BUTTER_STACK_HEIGHT,
+  BUTTER_STACK_POSITIONS,
+  mixButterSeed,
+  type ButterId,
+} from './butters'
 import {
   BUTTER_SIZE,
-  GROUND_Y,
   SHELL_OFFSET,
 } from './constants'
+import { createButterLabelTexture } from './createButterLabelTexture'
+import type {
+  DebrisCluster,
+  DebrisTransform,
+} from './fracture/RapierDebris'
 
 export const SCENE_BACKGROUND = '#000000'
+
+const LazyRapierDebris = lazy(() => import('./fracture/RapierDebris'))
 
 type SquishyDiagnostics = {
   frameCount: number
@@ -95,7 +122,7 @@ export function getResponsiveCameraPose(
   const verticalFov = THREE.MathUtils.degToRad(fieldOfViewDegrees)
   const aspect = Math.max(0.25, width / Math.max(1, height))
   const paddedWidth = (BUTTER_SIZE.width + SHELL_OFFSET * 2) * 1.16
-  const paddedHeight = (BUTTER_SIZE.height + SHELL_OFFSET * 2) * 1.32
+  const paddedHeight = BUTTER_STACK_HEIGHT * 1.12
   const fitWidth = paddedWidth / 2 / (Math.tan(verticalFov / 2) * aspect)
   const fitHeight = paddedHeight / 2 / Math.tan(verticalFov / 2)
   const distance =
@@ -145,6 +172,83 @@ export function SquishyScene({
   unlockCrackAudio,
 }: SquishySceneProps) {
   const reducedMotion = useReducedMotion()
+  const labelTexture = useMemo(createButterLabelTexture, [])
+  const [physicsDebrisSources, setPhysicsDebrisSources] = useState<
+    ReadonlyMap<ButterId, ButterPhysicsDebrisSource>
+  >(() => new Map())
+  const handlePhysicsDebrisChange = useCallback(
+    (
+      instanceId: ButterId,
+      source: ButterPhysicsDebrisSource | null,
+    ) => {
+      setPhysicsDebrisSources((current) => {
+        if (source === null) {
+          if (!current.has(instanceId)) {
+            return current
+          }
+          const next = new Map(current)
+          next.delete(instanceId)
+          return next
+        }
+        if (current.get(instanceId) === source) {
+          return current
+        }
+        const next = new Map(current)
+        next.set(instanceId, source)
+        return next
+      })
+    },
+    [],
+  )
+  const physicsDebrisRuntime = useMemo(() => {
+    const clusters: DebrisCluster[] = []
+    const sourceByClusterId = new Map<
+      string,
+      ButterPhysicsDebrisSource
+    >()
+    for (const definition of BUTTER_DEFINITIONS) {
+      const source = physicsDebrisSources.get(definition.id)
+      if (!source) {
+        continue
+      }
+      for (const cluster of source.clusters) {
+        clusters.push(cluster)
+        sourceByClusterId.set(cluster.id, source)
+      }
+    }
+    return {
+      clusters,
+      sourceByClusterId,
+    }
+  }, [physicsDebrisSources])
+  const physicsDebrisRuntimeRef = useRef(physicsDebrisRuntime)
+  physicsDebrisRuntimeRef.current = physicsDebrisRuntime
+  const staticColliders = useMemo(
+    () =>
+      createButterStaticColliders(
+        BUTTER_STACK_POSITIONS,
+        BUTTER_STACK_GROUND_Y,
+      ),
+    [],
+  )
+  const handleDebrisTransform = useCallback(
+    (clusterId: string, transform: DebrisTransform) => {
+      physicsDebrisRuntimeRef.current.sourceByClusterId
+        .get(clusterId)
+        ?.onTransform(clusterId, transform)
+    },
+    [],
+  )
+  const handleDebrisSettled = useCallback(
+    (clusterId: string, transform: DebrisTransform) => {
+      physicsDebrisRuntimeRef.current.sourceByClusterId
+        .get(clusterId)
+        ?.onSettled(clusterId, transform)
+    },
+    [],
+  )
+
+  useEffect(() => () => labelTexture.dispose(), [labelTexture])
 
   return (
     <>
@@ -170,16 +274,36 @@ export function SquishyScene({
         intensity={0.9}
         position={[4, 2, -3]}
       />
-      <ButterSquishy
-        key={resetKey}
-        coatingSeed={coatingSeed}
-        onComplete={onComplete}
-        playCrackSound={playCrackSound}
-        reducedMotion={reducedMotion}
-        unlockCrackAudio={unlockCrackAudio}
-      />
+      {BUTTER_DEFINITIONS.map((definition) => (
+        <ButterSquishy
+          key={`${resetKey}:${definition.id}`}
+          bodyColor={definition.bodyColor}
+          coatingSeed={mixButterSeed(coatingSeed, definition)}
+          instanceId={definition.id}
+          labelTexture={labelTexture}
+          onComplete={onComplete}
+          onPhysicsDebrisChange={handlePhysicsDebrisChange}
+          playCrackSound={playCrackSound}
+          position={definition.position}
+          reducedMotion={reducedMotion}
+          unlockCrackAudio={unlockCrackAudio}
+          waxPalette={definition.wax}
+        />
+      ))}
+      {physicsDebrisRuntime.clusters.length > 0 ? (
+        <Suspense fallback={null}>
+          <LazyRapierDebris
+            generation={coatingSeed}
+            clusters={physicsDebrisRuntime.clusters}
+            maxActiveBodies={BUTTER_DEBRIS_BODY_LIMIT}
+            staticColliders={staticColliders}
+            onTransform={handleDebrisTransform}
+            onSettled={handleDebrisSettled}
+          />
+        </Suspense>
+      ) : null}
       <mesh
-        position={[0, GROUND_Y, 0]}
+        position={[0, BUTTER_STACK_GROUND_Y, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
       >
         <planeGeometry args={[40, 40]} />

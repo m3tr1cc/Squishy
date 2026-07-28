@@ -57,7 +57,7 @@ function LoadingState({ pageId }: { pageId: PageId }) {
     <div className="status-card" role="status">
       {pageId === 'soaps'
         ? 'Preparing eight fresh coatings...'
-        : 'Warming the wax...'}
+        : 'Warming three fresh coatings...'}
     </div>
   )
 }
@@ -85,7 +85,6 @@ export function App() {
   const navigation = usePageNavigation()
   const navigate = navigation.navigate
   const route = navigation.route
-  const currentPageId = route?.id ?? null
   const [session, setSession] = useState<ExperienceSession>(() =>
     createExperienceSession(route?.id ?? 'butter'),
   )
@@ -94,14 +93,7 @@ export function App() {
   const isCoarsePointer =
     typeof window !== 'undefined' &&
     window.matchMedia('(pointer: coarse)').matches
-  const maximumDpr =
-    currentPageId === 'soaps'
-      ? isCoarsePointer
-        ? 1.25
-        : 1.5
-      : isCoarsePointer
-        ? 1.5
-        : 1.75
+  const maximumDpr = isCoarsePointer ? 1.25 : 1.5
   const canvasDpr = resolveCanvasDpr(maximumDpr)
 
   useEffect(() => {
@@ -205,11 +197,11 @@ export function App() {
   const pageDescription =
     route.id === 'soaps'
       ? 'Tap any of the eight soap bars to dent and crack its wax coating.'
-      : 'Click or tap the butter stick to press its wax surface.'
+      : 'Click or tap any of the three butter sticks to press its wax surface.'
   const liveMessage = session.isComplete
     ? route.id === 'soaps'
       ? 'A soap wax layer is fully broken. Re-coat all soaps to play again.'
-      : 'The wax layer is fully broken. Re-coat the butter to play again.'
+      : 'A butter wax layer is fully broken. Re-coat all three to play again.'
     : ''
 
   return (
@@ -274,7 +266,7 @@ export function App() {
           >
             {route.id === 'soaps'
               ? 'Re-coat soaps'
-              : 'Re-coat wax'}
+              : 'Re-coat butters'}
           </button>
         ) : null}
         <div className="visually-hidden" aria-live="polite">

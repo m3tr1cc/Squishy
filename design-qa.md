@@ -272,8 +272,9 @@ final result: implementation passed; physical Android confirmation pending
 - Each bar has a distinct silhouette, spring profile, bright core color,
   material response, coating seed, and SOAP decal. Sprinkles and Sugar add
   restrained procedural surface accents without additional texture downloads.
-- The intact layer remains neutral milky paraffin. Decals are muted on the
-  coating and the saturated core becomes crisp through real fracture openings.
+- The intact layer is pale transmissive paraffin tinted toward each soap core.
+  Decals are muted on the coating and the saturated core becomes crisp through
+  real fracture openings.
 - A press on one bar affects only its own topology. The resulting opening is a
   connected region with long plate boundaries and exposes the correct core;
   there are no press-specific crack meshes or decals.
@@ -295,9 +296,9 @@ final result: implementation passed; physical Android confirmation pending
 ### Mobile performance
 
 - Viewport: 390 x 844 CSS pixels, Canvas DPR capped at 1.25.
-- Full hydrated grid: 56,180 rendered triangles and 47 draw calls.
-- Idle 300-frame sample: 59.21 FPS average and 17.1 ms p95.
-- Post-press 300-frame sample: 59.99 FPS average and 17.1 ms p95.
+- Original neutral-shell baseline: 56,180 rendered triangles and 47 draw calls.
+- Original idle 300-frame sample: 59.21 FPS average and 17.1 ms p95.
+- Original post-press 300-frame sample: 59.99 FPS average and 17.1 ms p95.
 - The eight low-density fracture runtimes hydrate progressively after the
   lightweight grid appears, avoiding one large topology-construction spike.
 - No uncaught browser, Three.js, audio, or Rapier errors were observed.
@@ -305,3 +306,58 @@ final result: implementation passed; physical Android confirmation pending
   `touch-action: pan-y`; a mobile-sized press produced no viewport flash.
 
 final result: passed
+
+## Tinted soap wax, long seams, and butter trio
+
+### Material and topology verification
+
+- Every soap coating now has a distinct cached pastel palette derived from its
+  core hue. Surface lightness remains between `0.76` and `0.80`; the
+  attenuation color is darker and more saturated so the intact shell hints at
+  the bright material beneath it.
+- Soap wax remains an opaque physical material (`opacity: 1`,
+  `transparent: false`) with `0.18` transmission. This avoids alpha sorting
+  halos and keeps the fully hydrated grid at the same 47-draw-call structure;
+  no tint overlay or crack-line mesh was added.
+- The long-seam topology profile uses a `0.24` simplification tolerance,
+  bounded `0.24` source-vertex movement, a 24-degree normal span, the existing
+  15% triangle-area guard, and deterministic closed-boundary handling. Each
+  boundary chain receives the largest safe update independently, so one tight
+  region cannot force every seam back toward its source-grid staircase.
+- Across all eight soap shapes and eight representative coating seeds, visible
+  front-facing non-junction seams retain at most a 22% sharp-turn ratio.
+  Fragment ownership, bond edges, source triangle IDs, raycast IDs, winding,
+  and deterministic seed output remain unchanged.
+- The denser front sampling required for clean soap cuts stays within 3,000
+  source triangles per bar. Complete hydrated body, wax, and two decal passes
+  total 85,668 visible triangles across the eight products, below the enforced
+  90,000-triangle budget.
+
+### Three-butter presentation and physics
+
+- The butter page now contains three straight horizontal bars stacked at
+  `y = 1.62`, `0`, and `-1.62`, with yellow, pink, and blue cores and matching
+  pale wax palettes. Expanded shells retain a `0.16` model-unit gap.
+- Each bar mixes a unique salt into the page coating seed, so its crack layout
+  is stable for one coating and distinct from its siblings.
+- The responsive camera fits the complete expanded stack within 90% normalized
+  viewport bounds at 280 x 560, 390 x 844, and 1440 x 900 while remaining
+  centered and straight-on.
+- Each independently deformable bar uses 4,000 source triangles and 32 wax
+  plates. Three bars total 12,000 source triangles, only 22% above the previous
+  single dense source.
+- All three bars feed one lazy Rapier world containing every butter collider and
+  the shared floor, preventing upper debris from falling through lower sticks
+  without duplicating solvers or fixed colliders. The aggregate pool is capped
+  at the prior mobile ceiling of 24 live debris bodies.
+- One shared butter-label texture serves all three bars. Butter-route DPR is
+  capped at 1.25 for coarse pointers and 1.5 otherwise.
+
+### Automated verification
+
+- `npm run lint`
+- `npm run check`
+- `npm test`: 23 files, 118 tests
+- `npm run build`
+- The production build retains the independently lazy-loaded soap and Rapier
+  chunks and adds no dependency or Supabase migration.

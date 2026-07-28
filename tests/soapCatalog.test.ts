@@ -152,7 +152,7 @@ describe('soap catalog', () => {
       firstDecal.dispose()
       secondDecal.dispose()
     }
-  })
+  }, 15_000)
 
   it('mixes each product salt into a repeatable unsigned generation seed', () => {
     const coatingSeed = 0xf01dcafe

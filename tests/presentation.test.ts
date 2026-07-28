@@ -1,14 +1,25 @@
+import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import {
+  createButterStaticColliders,
   groupConnectedFragments,
   PRESENTATION_ROTATION,
   selectColliderSupportPoints,
   WAX_OUTER_MATERIAL,
 } from '../src/scene/ButterSquishy'
 import {
+  BUTTER_DEFINITIONS,
+  BUTTER_STACK_HEIGHT,
+  BUTTER_STACK_STEP,
+} from '../src/scene/butters'
+import {
   getResponsiveCameraPose,
   SCENE_BACKGROUND,
 } from '../src/scene/SquishyScene'
+import {
+  BUTTER_SIZE,
+  SHELL_OFFSET,
+} from '../src/scene/constants'
 
 describe('straight black presentation', () => {
   it('uses an identity product pose and centered responsive camera', () => {
@@ -28,12 +39,74 @@ describe('straight black presentation', () => {
     }
   })
 
+  it('fits all three horizontal sticks inside portrait and landscape cameras', () => {
+    for (const [width, height] of [
+      [280, 560],
+      [390, 844],
+      [1440, 900],
+    ]) {
+      const pose = getResponsiveCameraPose(width, height)
+      const camera = new THREE.PerspectiveCamera(
+        32,
+        width / height,
+        0.1,
+        100,
+      )
+      camera.position.fromArray(pose.position)
+      camera.lookAt(...pose.target)
+      camera.updateProjectionMatrix()
+      camera.updateMatrixWorld()
+
+      const halfWidth = BUTTER_SIZE.width / 2 + SHELL_OFFSET
+      const halfHeight = BUTTER_SIZE.height / 2 + SHELL_OFFSET
+      for (const definition of BUTTER_DEFINITIONS) {
+        for (const x of [-halfWidth, halfWidth]) {
+          for (const y of [
+            definition.position[1] - halfHeight,
+            definition.position[1] + halfHeight,
+          ]) {
+            const projected = new THREE.Vector3(x, y, 0).project(camera)
+            expect(Math.abs(projected.x)).toBeLessThanOrEqual(0.9)
+            expect(Math.abs(projected.y)).toBeLessThanOrEqual(0.9)
+          }
+        }
+      }
+
+      const topOfMiddle = halfHeight
+      const bottomOfTop = BUTTER_STACK_STEP - halfHeight
+      const top = new THREE.Vector3(0, topOfMiddle, 0).project(camera)
+      const bottom = new THREE.Vector3(0, bottomOfTop, 0).project(camera)
+      expect(Math.abs(bottom.y - top.y)).toBeGreaterThan(0.025)
+    }
+
+    expect(BUTTER_STACK_HEIGHT).toBeGreaterThan(BUTTER_SIZE.height * 3)
+  })
+
   it('uses opaque physical transmission over pure black', () => {
     expect(SCENE_BACKGROUND).toBe('#000000')
     expect(WAX_OUTER_MATERIAL.transparent).toBe(false)
     expect(WAX_OUTER_MATERIAL.opacity).toBe(1)
     expect(WAX_OUTER_MATERIAL.transmission).toBe(0.1)
     expect(WAX_OUTER_MATERIAL.roughness).toBe(0.74)
+  })
+
+  it('aligns the shared debris world with all three sticks and one floor', () => {
+    const colliders = createButterStaticColliders(
+      BUTTER_DEFINITIONS.map(({ position }) => position),
+      -2.4,
+    )
+    const bodies = colliders.filter(
+      (collider) => collider.kind === 'round-cuboid',
+    )
+    const floor = colliders.find(({ id }) => id === 'tabletop')
+
+    expect(bodies).toHaveLength(3)
+    expect(bodies.map(({ position }) => position)).toEqual(
+      BUTTER_DEFINITIONS.map(({ position }) => position),
+    )
+    expect(floor?.position?.[0]).toBe(0)
+    expect(floor?.position?.[1]).toBeCloseTo(-2.45)
+    expect(floor?.position?.[2]).toBe(0)
   })
 })
 

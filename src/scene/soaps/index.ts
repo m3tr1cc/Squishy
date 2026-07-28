@@ -19,6 +19,10 @@ export {
   createSoapLabelAtlasTexture,
   getSoapLabelAtlasEntry,
 } from './soapLabelAtlas'
+export {
+  SOAP_WAX_PHYSICAL_PROPERTIES,
+  getSoapWaxPalette,
+} from './soapWaxPalette'
 export type {
   SoapAtlasUvBounds,
   SoapDecalDefinition,
@@ -31,3 +35,4 @@ export type {
   SoapSurfaceFinish,
   SoapVector3,
 } from './types'
+export type { SoapWaxPalette } from './soapWaxPalette'

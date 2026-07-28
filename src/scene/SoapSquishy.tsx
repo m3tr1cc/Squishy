@@ -34,6 +34,7 @@ import {
   createWaxTopology,
   getWaxTriangleMetadata,
 } from './fracture/topology'
+import { WAX_SEAM_PROFILE } from './fracture/types'
 import {
   createWaxGeometryRuntime,
   writeWaxGeometry,
@@ -43,7 +44,11 @@ import {
   createSurfaceHit,
   isQualifiedTap,
 } from './interaction'
-import type { SoapDefinition } from './soaps'
+import {
+  SOAP_WAX_PHYSICAL_PROPERTIES,
+  getSoapWaxPalette,
+  type SoapDefinition,
+} from './soaps'
 import { INTRO_SPRING, stepSpring } from './spring'
 import type {
   DentImpact,
@@ -276,11 +281,8 @@ export const SoapSquishy = memo(function SoapSquishy({
     () => createAccentGeometry(definition),
     [definition],
   )
-  const waxAttenuationColor = useMemo(
-    () =>
-      new THREE.Color(definition.style.bodyColor)
-        .lerp(new THREE.Color('#d8d4cc'), 0.82)
-        .getStyle(),
+  const waxPalette = useMemo(
+    () => getSoapWaxPalette(definition.style.bodyColor),
     [definition.style.bodyColor],
   )
   const innerSource = useMemo(
@@ -315,6 +317,7 @@ export const SoapSquishy = memo(function SoapSquishy({
         plateCount: SOAP_PLATE_COUNT,
         innerClearance: SOAP_INNER_CLEARANCE,
         outerOffset: SOAP_OUTER_OFFSET,
+        seamProfile: WAX_SEAM_PROFILE.long,
       }),
     [coatingSeed, innerGeometry],
   )
@@ -1153,17 +1156,9 @@ export const SoapSquishy = memo(function SoapSquishy({
           >
             <meshPhysicalMaterial
               alphaHash
-              attenuationColor={waxAttenuationColor}
-              attenuationDistance={0.28}
-              clearcoat={0}
-              color="#eeeae2"
-              ior={1.44}
-              metalness={0}
-              roughness={0.72}
-              sheen={0.02}
-              specularIntensity={0.24}
-              thickness={0.038}
-              transmission={0.12}
+              {...SOAP_WAX_PHYSICAL_PROPERTIES}
+              attenuationColor={waxPalette.attenuationColor}
+              color={waxPalette.surfaceColor}
               vertexColors
             />
           </mesh>

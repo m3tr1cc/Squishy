@@ -102,7 +102,7 @@ export const SOAP_DEFINITIONS = Object.freeze([
     seedSalt: 0x4a7d2e19,
     size: [4.25, 1.5, 0.9],
     cornerRadius: 0.16,
-    segments: [20, 9, 7],
+    segments: [36, 15, 4],
     deformation: {
       behavior: 'brittle',
       dentRadius: 0.42,
@@ -128,7 +128,7 @@ export const SOAP_DEFINITIONS = Object.freeze([
     seedSalt: 0x91c5b30f,
     size: [3.85, 1.9, 1],
     cornerRadius: 0.12,
-    segments: [18, 10, 7],
+    segments: [36, 15, 4],
     deformation: {
       behavior: 'chalky',
       dentRadius: 0.48,
@@ -154,7 +154,7 @@ export const SOAP_DEFINITIONS = Object.freeze([
     seedSalt: 0x26e8d4a3,
     size: [4.15, 1.65, 1.08],
     cornerRadius: 0.28,
-    segments: [19, 9, 7],
+    segments: [36, 15, 4],
     deformation: {
       behavior: 'supple',
       dentRadius: 0.58,
@@ -180,7 +180,7 @@ export const SOAP_DEFINITIONS = Object.freeze([
     seedSalt: 0xd47a106d,
     size: [3.75, 1.7, 0.92],
     cornerRadius: 0.2,
-    segments: [18, 9, 7],
+    segments: [36, 15, 4],
     deformation: {
       behavior: 'snappy',
       dentRadius: 0.46,
@@ -206,7 +206,7 @@ export const SOAP_DEFINITIONS = Object.freeze([
     seedSalt: 0x6f32c9b5,
     size: [4, 1.8, 1.12],
     cornerRadius: 0.34,
-    segments: [19, 10, 7],
+    segments: [36, 15, 4],
     deformation: {
       behavior: 'wobbly',
       dentRadius: 0.62,
@@ -232,7 +232,7 @@ export const SOAP_DEFINITIONS = Object.freeze([
     seedSalt: 0xb1e75943,
     size: [4.3, 1.55, 1],
     cornerRadius: 0.25,
-    segments: [20, 9, 7],
+    segments: [36, 15, 4],
     deformation: {
       behavior: 'crunchy',
       dentRadius: 0.5,
@@ -263,7 +263,7 @@ export const SOAP_DEFINITIONS = Object.freeze([
     seedSalt: 0x38adf271,
     size: [3.9, 1.85, 1.1],
     cornerRadius: 0.36,
-    segments: [19, 10, 7],
+    segments: [36, 15, 4],
     deformation: {
       behavior: 'gooey',
       dentRadius: 0.68,
@@ -289,7 +289,7 @@ export const SOAP_DEFINITIONS = Object.freeze([
     seedSalt: 0xe5068c9f,
     size: [4.1, 1.6, 0.96],
     cornerRadius: 0.18,
-    segments: [19, 9, 7],
+    segments: [36, 15, 4],
     deformation: {
       behavior: 'granular',
       dentRadius: 0.45,

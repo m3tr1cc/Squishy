@@ -7,7 +7,9 @@ import {
 import * as THREE from 'three'
 import {
   SOAP_DEFINITIONS,
+  SOAP_WAX_PHYSICAL_PROPERTIES,
   createSoapLabelAtlasTexture,
+  getSoapWaxPalette,
   mixSoapSeed,
   type SoapId,
 } from './soaps'
@@ -136,6 +138,9 @@ function SoapPreview({
   position: readonly [number, number, number]
 }) {
   const size = definition.geometry.size
+  const waxPalette = getSoapWaxPalette(
+    definition.style.bodyColor,
+  )
   return (
     <group position={position} scale={SOAP_PRESENTATION_SCALE}>
       <mesh>
@@ -143,13 +148,9 @@ function SoapPreview({
           args={[size[0], size[1], size[2], 3, 3, 3]}
         />
         <meshPhysicalMaterial
-          attenuationColor="#d8d4cc"
-          attenuationDistance={0.28}
-          color="#eeeae2"
-          ior={1.44}
-          roughness={0.72}
-          thickness={0.038}
-          transmission={0.12}
+          {...SOAP_WAX_PHYSICAL_PROPERTIES}
+          attenuationColor={waxPalette.attenuationColor}
+          color={waxPalette.surfaceColor}
         />
       </mesh>
     </group>

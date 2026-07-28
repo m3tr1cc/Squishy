@@ -1,8 +1,7 @@
 import type { ThreeEvent } from '@react-three/fiber'
 import { useFrame, useThree } from '@react-three/fiber'
 import {
-  lazy,
-  Suspense,
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -13,12 +12,17 @@ import * as THREE from 'three'
 import {
   BUTTER_SIZE,
   CORNER_RADIUS,
-  GROUND_Y,
   MAX_ACTIVE_IMPACTS,
 } from './constants'
 import { createButterLabelGeometry } from './createButterLabelGeometry'
-import { createButterLabelTexture } from './createButterLabelTexture'
 import { createRoundedCuboidGeometry } from './createRoundedCuboidGeometry'
+import {
+  BUTTER_SOURCE_SEGMENTS,
+  BUTTER_STACK_PLATE_COUNT,
+  type ButterId,
+  type ButterVector3,
+  type ButterWaxPalette,
+} from './butters'
 import {
   captureDeformationSource,
   writeDeformedPositions,
@@ -56,6 +60,7 @@ import {
   createWaxTopology,
   getWaxTriangleMetadata,
 } from './fracture/topology'
+import { WAX_SEAM_PROFILE } from './fracture/types'
 import {
   bindPointerCancellation,
   createSurfaceHit,
@@ -73,16 +78,29 @@ import type {
   SurfaceLayer,
 } from './types'
 
-const LazyRapierDebris = lazy(() => import('./fracture/RapierDebris'))
-
 type ButterSquishyProps = {
+  bodyColor: string
   coatingSeed: number
+  instanceId: ButterId
+  labelTexture: THREE.Texture
+  position: ButterVector3
   reducedMotion: boolean
+  waxPalette: ButterWaxPalette
   onComplete: () => void
+  onPhysicsDebrisChange: (
+    instanceId: ButterId,
+    source: ButterPhysicsDebrisSource | null,
+  ) => void
   playCrackSound: (brokenBondCount: number) => void
   unlockCrackAudio: () => void
   onImpact?: (impact: SquishyImpact) => void
 }
+
+export type ButterPhysicsDebrisSource = Readonly<{
+  clusters: readonly DebrisCluster[]
+  onTransform: (clusterId: string, transform: DebrisTransform) => void
+  onSettled: (clusterId: string, transform: DebrisTransform) => void
+}>
 
 type MutableFracturePress = {
   fragmentIndex?: number
@@ -146,6 +164,46 @@ const REDUCED_PRESS_SPRING = {
 } as const
 
 let impactSequence = 0
+
+export function createButterStaticColliders(
+  bodyPositions: readonly ButterVector3[],
+  groundY: number,
+): readonly DebrisStaticCollider[] {
+  const quaternion = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(...PRESENTATION_ROTATION),
+  )
+  return [
+    ...bodyPositions.map(
+      (bodyPosition, index): DebrisStaticCollider => ({
+        id: `butter-body-${index}`,
+        kind: 'round-cuboid',
+        halfExtents: [
+          BUTTER_SIZE.width / 2 - CORNER_RADIUS - 0.06,
+          BUTTER_SIZE.height / 2 - CORNER_RADIUS - 0.06,
+          BUTTER_SIZE.depth / 2 - CORNER_RADIUS - 0.06,
+        ],
+        borderRadius: CORNER_RADIUS - 0.06,
+        position: bodyPosition,
+        quaternion: [
+          quaternion.x,
+          quaternion.y,
+          quaternion.z,
+          quaternion.w,
+        ],
+        friction: 0.88,
+        restitution: 0.015,
+      }),
+    ),
+    {
+      id: 'tabletop',
+      kind: 'cuboid',
+      halfExtents: [20, 0.05, 20],
+      position: [0, groundY - 0.05, 0],
+      friction: 0.94,
+      restitution: 0.01,
+    },
+  ]
+}
 
 function hashUint32(value: number) {
   let hash = value >>> 0
@@ -341,19 +399,32 @@ export function groupConnectedFragments(
   return clusters
 }
 
-export function ButterSquishy({
+export const ButterSquishy = memo(function ButterSquishy({
+  bodyColor,
   coatingSeed,
+  instanceId,
+  labelTexture,
+  position,
   reducedMotion,
+  waxPalette,
   onComplete,
+  onPhysicsDebrisChange,
   playCrackSound,
   unlockCrackAudio,
   onImpact,
 }: ButterSquishyProps) {
   const presentationRef = useRef<THREE.Group>(null)
   const compressionRef = useRef<THREE.Group>(null)
-  const innerGeometry = useMemo(() => createRoundedCuboidGeometry(), [])
+  const innerGeometry = useMemo(
+    () =>
+      createRoundedCuboidGeometry({
+        widthSegments: BUTTER_SOURCE_SEGMENTS.width,
+        heightSegments: BUTTER_SOURCE_SEGMENTS.height,
+        depthSegments: BUTTER_SOURCE_SEGMENTS.depth,
+      }),
+    [],
+  )
   const labelGeometry = useMemo(() => createButterLabelGeometry(), [])
-  const labelTexture = useMemo(createButterLabelTexture, [])
   const innerSource = useMemo(
     () => captureDeformationSource(innerGeometry),
     [innerGeometry],
@@ -367,6 +438,8 @@ export function ButterSquishy({
       createWaxTopology({
         sourceGeometry: innerGeometry,
         seed: coatingSeed,
+        plateCount: BUTTER_STACK_PLATE_COUNT,
+        seamProfile: WAX_SEAM_PROFILE.long,
       }),
     [coatingSeed, innerGeometry],
   )
@@ -452,40 +525,6 @@ export function ButterSquishy({
     useState<DebrisCluster[]>([])
   const canvasElement = useThree((state) => state.gl.domElement)
 
-  const staticColliders = useMemo<readonly DebrisStaticCollider[]>(() => {
-    const quaternion = new THREE.Quaternion().setFromEuler(
-      new THREE.Euler(...PRESENTATION_ROTATION),
-    )
-    return [
-      {
-        id: 'butter-body',
-        kind: 'round-cuboid',
-        halfExtents: [
-          BUTTER_SIZE.width / 2 - CORNER_RADIUS - 0.06,
-          BUTTER_SIZE.height / 2 - CORNER_RADIUS - 0.06,
-          BUTTER_SIZE.depth / 2 - CORNER_RADIUS - 0.06,
-        ],
-        borderRadius: CORNER_RADIUS - 0.06,
-        quaternion: [
-          quaternion.x,
-          quaternion.y,
-          quaternion.z,
-          quaternion.w,
-        ],
-        friction: 0.88,
-        restitution: 0.015,
-      },
-      {
-        id: 'tabletop',
-        kind: 'cuboid',
-        halfExtents: [20, 0.05, 20],
-        position: [0, GROUND_Y - 0.05, 0],
-        friction: 0.94,
-        restitution: 0.01,
-      },
-    ]
-  }, [])
-
   useEffect(() => {
     writeDeformedPositions(innerGeometry, innerSource, [], 0)
     writeDeformedPositions(labelGeometry, labelSource, [], 0)
@@ -506,7 +545,6 @@ export function ButterSquishy({
       innerGeometry.dispose()
       labelGeometry.dispose()
       waxRuntime.geometry.dispose()
-      labelTexture.dispose()
       canvasElement.classList.remove('wax-pointer-hover')
     }
   }, [
@@ -515,7 +553,6 @@ export function ButterSquishy({
     innerSource,
     labelGeometry,
     labelSource,
-    labelTexture,
     canvasElement,
     waxRuntime,
     waxTopology,
@@ -586,7 +623,7 @@ export function ButterSquishy({
 
       impactSequence += 1
       return createSurfaceHit({
-        id: `press-${Math.round(performance.now())}-${impactSequence}`,
+        id: `${instanceId}-press-${Math.round(performance.now())}-${impactSequence}`,
         timestampMs: performance.now(),
         pointerType: normalizePointerType(
           event.nativeEvent.pointerType,
@@ -601,7 +638,7 @@ export function ButterSquishy({
         face: event.face,
       })
     },
-    [waxTopology],
+    [instanceId, waxTopology],
   )
 
   const releaseActivePress = useCallback(
@@ -980,7 +1017,7 @@ export function ButterSquishy({
         })
       }
 
-      const clusterId = `wax-${orderedFragmentIndices.join('-')}`
+      const clusterId = `${instanceId}-wax-${orderedFragmentIndices.join('-')}`
       clusterBindingsRef.current.set(clusterId, {
         fragmentIndices: orderedFragmentIndices,
         localOffsets,
@@ -1022,7 +1059,7 @@ export function ButterSquishy({
         ccd: false,
       }
     },
-    [waxRuntime, waxTopology.fragments],
+    [instanceId, waxRuntime, waxTopology.fragments],
   )
 
   const handleDebrisTransform = useCallback(
@@ -1115,6 +1152,27 @@ export function ButterSquishy({
       )
     },
     [fractureModel, handleDebrisTransform],
+  )
+
+  useEffect(() => {
+    onPhysicsDebrisChange(instanceId, {
+      clusters: physicsDebrisClusters,
+      onTransform: handleDebrisTransform,
+      onSettled: handleDebrisSettled,
+    })
+  }, [
+    handleDebrisSettled,
+    handleDebrisTransform,
+    instanceId,
+    onPhysicsDebrisChange,
+    physicsDebrisClusters,
+  ])
+
+  useEffect(
+    () => () => {
+      onPhysicsDebrisChange(instanceId, null)
+    },
+    [instanceId, onPhysicsDebrisChange],
   )
 
   useFrame((_, delta) => {
@@ -1470,6 +1528,7 @@ export function ButterSquishy({
     <>
       <group
         ref={presentationRef}
+        position={position}
         rotation={PRESENTATION_ROTATION}
       >
         <group ref={compressionRef}>
@@ -1483,7 +1542,7 @@ export function ButterSquishy({
             onPointerCancel={handlePointerCancel}
           >
             <meshStandardMaterial
-              color="#f2c94c"
+              color={bodyColor}
               metalness={0}
               roughness={0.7}
             />
@@ -1520,12 +1579,14 @@ export function ButterSquishy({
               alphaHash
               attach="material-0"
               {...WAX_OUTER_MATERIAL}
+              attenuationColor={waxPalette.attenuation}
+              color={waxPalette.outer}
               vertexColors
             />
             <meshStandardMaterial
               alphaHash
               attach="material-1"
-              color="#d2ccc2"
+              color={waxPalette.inner}
               metalness={0}
               roughness={0.82}
               side={THREE.FrontSide}
@@ -1534,7 +1595,7 @@ export function ButterSquishy({
             <meshStandardMaterial
               alphaHash
               attach="material-2"
-              color="#b8b0a4"
+              color={waxPalette.edge}
               metalness={0}
               polygonOffset
               polygonOffsetFactor={4}
@@ -1564,17 +1625,6 @@ export function ButterSquishy({
           </mesh>
         </group>
       </group>
-      {physicsDebrisClusters.length > 0 ? (
-        <Suspense fallback={null}>
-          <LazyRapierDebris
-            generation={coatingSeed}
-            clusters={physicsDebrisClusters}
-            staticColliders={staticColliders}
-            onTransform={handleDebrisTransform}
-            onSettled={handleDebrisSettled}
-          />
-        </Suspense>
-      ) : null}
     </>
   )
-}
+})

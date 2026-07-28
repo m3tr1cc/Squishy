@@ -6,7 +6,7 @@ import type {
   SoapVector3,
 } from './types'
 
-export const SOAP_SOURCE_TRIANGLE_BUDGET = 2_400
+export const SOAP_SOURCE_TRIANGLE_BUDGET = 3_000
 export const SOAP_DECAL_TRIANGLE_BUDGET = 512
 
 const DECAL_WIDTH_RATIO = 0.72
