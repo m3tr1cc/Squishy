@@ -353,6 +353,25 @@ final result: passed
 - One shared butter-label texture serves all three bars. Butter-route DPR is
   capped at 1.25 for coarse pointers and 1.5 otherwise.
 
+### Deployed preview QA
+
+- The Vercel preview returned HTTP 200 for both `/` and `/soaps`.
+- At the default desktop viewport, all three butter bars render straight,
+  centered, and fully inside the frame with visibly distinct cream-yellow,
+  pastel-pink, and pastel-blue coatings.
+- At 390 x 844, the butter stack remains centered with generous separation
+  between bars and unobstructed previous/next navigation controls.
+- A coordinate tap on the pink butter produced connected long diagonal seams
+  without a viewport highlight, text selection, or blue-screen flash.
+- At 390 x 844, all eight soaps remain visible in the 2 x 4 grid. Their intact
+  wax layers read as eight distinct pastel tints related to the underlying
+  coral, lavender, cream, pink, cyan, violet, green, and blue cores.
+- Repeated coordinate taps on Hard Wax exposed the bright coral core through
+  long straight-edged pieces. Detached pieces faded; attached peeled pieces
+  remained part of the coherent coating.
+- No uncaught application, Three.js, audio, or Rapier errors appeared. The
+  browser logged only Three.js's upstream `Clock` deprecation warning.
+
 ### Automated verification
 
 - `npm run lint`
