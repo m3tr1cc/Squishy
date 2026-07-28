@@ -1385,7 +1385,7 @@ export const SoapSquishy = memo(function SoapSquishy({
             renderOrder={1}
           >
             <meshBasicMaterial
-              alphaTest={0.015}
+              alphaTest={0.5}
               depthTest
               depthWrite
               map={labelTexture}

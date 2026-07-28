@@ -10,6 +10,7 @@ import {
   SOAP_SHARED_SIZE,
   SOAP_SOURCE_TRIANGLE_BUDGET,
   getSoapDefinition,
+  getSoapShapedPosition,
   mixSoapSeed,
 } from '../src/scene/soaps'
 
@@ -196,7 +197,12 @@ describe('soap procedural geometry', () => {
       const size = bounds.getSize(new THREE.Vector3())
       const center = bounds.getCenter(new THREE.Vector3())
       expect(definition.geometry.size).toEqual(SOAP_SHARED_SIZE)
-      expect(size.x).toBeCloseTo(definition.geometry.size[0], 4)
+      expect(size.x).toBeGreaterThan(
+        definition.geometry.size[0] * 0.99,
+      )
+      expect(size.x).toBeLessThanOrEqual(
+        definition.geometry.size[0],
+      )
       expect(size.y).toBeGreaterThan(
         definition.geometry.size[1] * 0.97,
       )
@@ -234,8 +240,38 @@ describe('soap procedural geometry', () => {
         }
       }
       const waistRatio = centerHalfHeight / lobeHalfHeight
-      expect(waistRatio).toBeGreaterThanOrEqual(0.86)
-      expect(waistRatio).toBeLessThanOrEqual(0.9)
+      expect(waistRatio).toBeGreaterThanOrEqual(0.81)
+      expect(waistRatio).toBeLessThanOrEqual(0.86)
+
+      const contourSamples = [0, 0.2, 0.4, 0.6, 0.8].map(
+        (normalizedX) =>
+          Math.abs(
+            getSoapShapedPosition(
+              normalizedX * halfWidth,
+              definition.geometry.size[1] * 0.5,
+              0,
+              definition.geometry.size,
+            )[1],
+          ),
+      )
+      for (let index = 1; index < contourSamples.length; index += 1) {
+        expect(contourSamples[index]).toBeGreaterThanOrEqual(
+          contourSamples[index - 1] - 1e-4,
+        )
+      }
+      const endMidpointX = getSoapShapedPosition(
+        halfWidth * 0.95,
+        0,
+        0,
+        definition.geometry.size,
+      )[0]
+      const endShoulderX = getSoapShapedPosition(
+        halfWidth * 0.95,
+        definition.geometry.size[1] * 0.5,
+        0,
+        definition.geometry.size,
+      )[0]
+      expect(endShoulderX).toBeLessThan(endMidpointX * 0.91)
       geometry.dispose()
     }
   })
@@ -314,7 +350,7 @@ describe('shared SOAP label atlas', () => {
       expect(maximumV).toBeLessThanOrEqual(1)
       expect(maximumU).toBeGreaterThan(minimumU)
       expect(maximumV).toBeGreaterThan(minimumV)
-      expect(entry.text).toBe('SOAP')
+      expect(entry.text).toBe('Soap')
 
       const definition = getSoapDefinition(entry.id)
       const coreHsl = { h: 0, s: 0, l: 0 }

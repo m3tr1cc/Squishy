@@ -58,10 +58,11 @@ from both rendering and physics so spent flakes do not accumulate.
 
 The `/soaps` experience uses the same damage, dent, raycast, and shell geometry
 contracts for six lower-density procedural soaps. Every pristine bar shares a
-puffy, center-pinched silhouette inspired by molded bath soap, while its bright
-core, glossy translucent wax tint, material response, and seeded fracture
-network remain distinct. Each core carries the same locally hosted Fredoka
-`SOAP` mark in a darker tone of its own color. A topology-level seam pass
+smooth hourglass silhouette with a broad flowing waist, rounded shoulders, and
+softly curved ends, while its bright core, glossy translucent wax tint,
+material response, and seeded fracture network remain distinct. Each core
+carries the same locally hosted Fredoka `Soap` mark in a darker tone of its own
+color, rendered as one clean fill without a stroke. A topology-level seam pass
 redistributes boundary samples into long clean segments while retaining the
 same raycast IDs, real shell thickness, and triangle winding. The 3 x 2
 landscape grid becomes 2 x 3 in portrait, hydrates each fracture runtime

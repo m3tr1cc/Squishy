@@ -14,8 +14,8 @@ const DECAL_HEIGHT_RATIO = 0.5
 const DECAL_SURFACE_OFFSET = 0.004
 const DECAL_WIDTH_SEGMENTS = 16
 const DECAL_HEIGHT_SEGMENTS = 6
-const SOAP_WAIST_DEPTH = 0.13
-const SOAP_WAIST_CURVE = 3.6
+const SOAP_WAIST_DEPTH = 0.165
+const SOAP_END_ROUNDING = 0.115
 const SOAP_PUFF_DEPTH = 0.055
 
 export const SOAP_SHARED_SIZE = Object.freeze([
@@ -23,7 +23,7 @@ export const SOAP_SHARED_SIZE = Object.freeze([
   1.82,
   1.05,
 ] as const)
-export const SOAP_SHARED_CORNER_RADIUS = 0.31
+export const SOAP_SHARED_CORNER_RADIUS = 0.49
 export const SOAP_SHARED_SEGMENTS = Object.freeze([
   36,
   15,
@@ -42,11 +42,25 @@ export function getSoapShapedPosition(
     -1,
     1,
   )
-  const waist = Math.exp(
-    -SOAP_WAIST_CURVE * normalizedX * normalizedX,
-  )
-  const shapedY = y * (1 - SOAP_WAIST_DEPTH * waist)
   const normalizedY = THREE.MathUtils.clamp(
+    y / (height * 0.5),
+    -1,
+    1,
+  )
+  const waist =
+    Math.cos(Math.abs(normalizedX) * Math.PI * 0.5) ** 2
+  const shoulderProgress = THREE.MathUtils.smoothstep(
+    Math.abs(normalizedX),
+    0.42,
+    1,
+  )
+  const endRounding =
+    SOAP_END_ROUNDING *
+    shoulderProgress *
+    Math.abs(normalizedY) ** 1.8
+  const shapedX = x * (1 - endRounding)
+  const shapedY = y * (1 - SOAP_WAIST_DEPTH * waist)
+  const shapedNormalizedY = THREE.MathUtils.clamp(
     shapedY / (height * 0.5),
     -1,
     1,
@@ -54,10 +68,10 @@ export function getSoapShapedPosition(
   const puff =
     SOAP_PUFF_DEPTH *
     Math.max(0, 1 - normalizedX * normalizedX) *
-    Math.max(0, 1 - normalizedY * normalizedY)
+    Math.max(0, 1 - shapedNormalizedY * shapedNormalizedY)
   const shapedZ = z + Math.sign(z || 1) * puff
 
-  return [x, shapedY, shapedZ]
+  return [shapedX, shapedY, shapedZ]
 }
 
 function applySoapShape(

@@ -16,7 +16,7 @@ let soapLabelFontPromise: Promise<void> | null = null
 
 export type SoapLabelAtlasEntry = Readonly<{
   id: SoapId
-  text: 'SOAP'
+  text: 'Soap'
   inkColor: string
   atlasSlot: number
   atlasUvBounds: SoapAtlasUvBounds
@@ -52,7 +52,7 @@ function label(
 ): SoapLabelAtlasEntry {
   return Object.freeze({
     id,
-    text: 'SOAP',
+    text: 'Soap',
     inkColor,
     atlasSlot,
     atlasUvBounds: createAtlasUvBounds(atlasSlot),
@@ -97,7 +97,7 @@ export function loadSoapLabelFont() {
     `url(${fredokaFontUrl})`,
     {
       style: 'normal',
-      weight: '700',
+      weight: '600',
     },
   )
     .load()
@@ -109,8 +109,8 @@ export function loadSoapLabelFont() {
 
 /**
  * Creates one procedural atlas after the bundled Fredoka face is ready. Decal
- * geometry remaps its UVs to one cell, so every active SOAP label shares one
- * texture and one rounded display face.
+ * geometry remaps its UVs to one cell, so every active Soap label shares one
+ * texture and one smooth display face.
  */
 export function createSoapLabelAtlasTexture() {
   if (typeof document === 'undefined') {
@@ -132,7 +132,6 @@ export function createSoapLabelAtlasTexture() {
   context.clearRect(0, 0, canvas.width, canvas.height)
   context.textAlign = 'center'
   context.textBaseline = 'middle'
-  context.lineJoin = 'round'
 
   for (const entry of SOAP_LABEL_ATLAS_ENTRIES) {
     const column = entry.atlasSlot % SOAP_LABEL_ATLAS_COLUMNS
@@ -144,21 +143,9 @@ export function createSoapLabelAtlasTexture() {
 
     context.save()
     context.font =
-      `700 88px "${SOAP_LABEL_FONT_FAMILY}", ` +
-      '"Arial Rounded MT Bold", sans-serif'
-    context.strokeStyle = new THREE.Color(entry.inkColor)
-      .multiplyScalar(0.72)
-      .getStyle()
-    context.lineWidth = 3
-    context.globalAlpha = 0.36
-    context.strokeText(
-      entry.text,
-      centerX,
-      centerY,
-      cellWidth * 0.72,
-    )
+      `600 88px "${SOAP_LABEL_FONT_FAMILY}", ` +
+      '"Arial Rounded MT", sans-serif'
     context.fillStyle = entry.inkColor
-    context.globalAlpha = 1
     context.fillText(
       entry.text,
       centerX,

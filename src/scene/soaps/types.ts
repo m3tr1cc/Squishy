@@ -73,7 +73,7 @@ export type SoapAtlasUvBounds = readonly [
 ]
 
 export type SoapDecalDefinition = Readonly<{
-  text: 'SOAP'
+  text: 'Soap'
   inkColor: string
   atlasSlot: number
   atlasUvBounds: SoapAtlasUvBounds

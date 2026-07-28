@@ -470,3 +470,58 @@ final result: passed
   `npm run build` all pass.
 - The redesign adds no runtime package and no Supabase migration.
 - Final result: passed.
+
+## Smooth hourglass contour and label refinement
+
+### Source and implementation evidence
+
+- Source visual truth:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/4333b263-3cba-4e3c-bb3c-31c0e0956269/1-Photo-1.jpg`
+  at 1536 x 532 pixels.
+- Desktop implementation: `qa/soap-hourglass-desktop.png` at 1440 x 900,
+  CSS viewport 1440 x 900, DPR 1.
+- Mobile implementation: `qa/soap-hourglass-mobile.png` at 390 x 844,
+  CSS viewport 390 x 844, DPR 1.5; the browser capture is normalized to CSS
+  pixels.
+- Mobile cracked state: `qa/soap-hourglass-mobile-cracked.png` at
+  390 x 844, CSS viewport 390 x 844, DPR 1.5 with the same normalization.
+- Focused equal-density label comparison:
+  `qa/soap-hourglass-label-comparison.png`. Both sides are normalized to
+  720 x 300 pixels.
+
+### Findings and comparison history
+
+- [Resolved P1] The prior contour retained box-like shoulders and relatively
+  flat ends. The source mesh now uses a cosine-squared waist across the full
+  width, a larger three-dimensional corner radius, and smooth vertical end
+  tapering. The post-fix desktop and mobile captures show one continuous
+  hourglass outline without the previous rectangular transition.
+- [Resolved P1] The prior all-caps mark used a faint darker stroke. The atlas
+  now draws one title-case `Soap` fill at Fredoka 600 with no `strokeText`
+  pass. Raising the opaque decal alpha cutoff removes the dark translucent
+  fringe without changing its depth behavior under intact wax.
+- [Passed] Fonts and typography: the focused comparison confirms the same
+  simple one-line title-case word, a rounded sans construction, no outline,
+  no wrap, and centered optical placement. Hue-matched ink remains intentional
+  from the preceding approved color direction.
+- [Passed] Spacing and layout rhythm: the six-item 3 x 2 desktop and 2 x 3
+  mobile grids remain centered, evenly spaced, and clear of navigation.
+- [Passed] Colors and visual tokens: glossy tinted coatings and tone-on-tone
+  marks are unchanged.
+- [Passed] Image quality and asset fidelity: the supplied crop is used only as
+  typography reference; the procedural geometry and local OFL font remain
+  crisp at both densities.
+- [Passed] Copy/content: every item now displays exactly `Soap`.
+
+### Interaction and regression QA
+
+- Repeated presses on the upper-left mobile soap still create connected
+  topology-driven cracks and detachable falling wax; no decorative overlay or
+  alternate fracture path was introduced.
+- The continuous source mesh remains finite, closed, manifold, and below the
+  established mobile triangle budget. Automated checks also verify a monotonic
+  waist curve and rounded shoulder taper.
+- `npm run lint`, `npm run check`, `npm test` (24 files, 123 tests), and
+  `npm run build` pass.
+- No Supabase change or migration is required.
+- Final result: passed.
