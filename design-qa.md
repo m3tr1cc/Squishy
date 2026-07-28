@@ -398,3 +398,13 @@ final result: passed
   velocity, floor clearance in both responsive layouts, positive collider
   dimensions, the shared body cap, and enough fade time for a top-row flake to
   reach the floor.
+- Deployed preview QA on
+  `https://squishy-f0ktjq6a1-m3tr1ccs-projects.vercel.app/soaps` used seven
+  coordinate presses on Hard Wax. A detached flake visibly fell below the
+  second soap row to the bottom collision area, then was gone 1.8 seconds
+  later; it did not hover or spin in place.
+- No uncaught application, WebGL, or Rapier errors appeared. The console
+  retained only the existing Three.js Clock and Rapier initialization
+  deprecation warnings.
+- Final verification: `npm run lint`, `npm run check`, `npm test` (24 files,
+  123 tests), and `npm run build`.
