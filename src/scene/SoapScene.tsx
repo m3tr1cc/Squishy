@@ -15,6 +15,7 @@ import {
   SOAP_DEFINITIONS,
   SOAP_WAX_PHYSICAL_PROPERTIES,
   createSoapLabelAtlasTexture,
+  createSoapLabelAtlasTextureAsync,
   getSoapWaxPalette,
   mixSoapSeed,
   type SoapId,
@@ -41,29 +42,29 @@ type SoapSceneProps = Readonly<{
 const LazyRapierDebris = lazy(() => import('./fracture/RapierDebris'))
 
 export const SOAP_PRESENTATION_SCALE = [0.68, 1, 1] as const
-const PORTRAIT_COLUMN_GAP = 3.08
-const PORTRAIT_ROW_GAP = 2.08
-const LANDSCAPE_COLUMN_GAP = 3.08
-const LANDSCAPE_ROW_GAP = 2.18
+const PORTRAIT_COLUMN_GAP = 3.15
+const PORTRAIT_ROW_GAP = 2.22
+const LANDSCAPE_COLUMN_GAP = 3.15
+const LANDSCAPE_ROW_GAP = 2.22
 const SOAP_SOURCE_IDS = SOAP_DEFINITIONS.map(
   (definition) => definition.id,
 )
 
 const SOAP_GRID_POSITIONS = {
-  portrait: Array.from({ length: 8 }, (_, index) => {
+  portrait: Array.from({ length: 6 }, (_, index) => {
     const column = index % 2
     const row = Math.floor(index / 2)
     return Object.freeze([
       (column - 0.5) * PORTRAIT_COLUMN_GAP,
-      (1.5 - row) * PORTRAIT_ROW_GAP,
+      (1 - row) * PORTRAIT_ROW_GAP,
       0,
     ]) as readonly [number, number, number]
   }),
-  landscape: Array.from({ length: 8 }, (_, index) => {
-    const column = index % 4
-    const row = Math.floor(index / 4)
+  landscape: Array.from({ length: 6 }, (_, index) => {
+    const column = index % 3
+    const row = Math.floor(index / 3)
     return Object.freeze([
-      (column - 1.5) * LANDSCAPE_COLUMN_GAP,
+      (column - 1) * LANDSCAPE_COLUMN_GAP,
       (0.5 - row) * LANDSCAPE_ROW_GAP,
       0,
     ]) as readonly [number, number, number]
@@ -96,10 +97,10 @@ export function getResponsiveSoapCameraPose(
   const halfHeight =
     layout === 'landscape'
       ? LANDSCAPE_ROW_GAP * 0.5 + 1.18
-      : PORTRAIT_ROW_GAP * 1.5 + 1.14
+      : PORTRAIT_ROW_GAP + 1.14
   const halfWidth =
     layout === 'landscape'
-      ? LANDSCAPE_COLUMN_GAP * 1.5 + 1.62
+      ? LANDSCAPE_COLUMN_GAP + 1.62
       : PORTRAIT_COLUMN_GAP * 0.5 + 1.62
   const fitWidth =
     halfWidth / (Math.tan(verticalFov / 2) * aspect)
@@ -134,44 +135,40 @@ export function getSoapDebrisFloorY(layout: SoapLayout) {
 export function createSoapStaticColliders(
   layout: SoapLayout,
 ): readonly DebrisStaticCollider[] {
-  const colliders: DebrisStaticCollider[] = SOAP_DEFINITIONS.map(
+  const colliders: DebrisStaticCollider[] = SOAP_DEFINITIONS.flatMap(
     (definition, index) => {
       const [width, height, depth] = definition.geometry.size
       const position = getSoapGridPosition(index, layout)
       const scaledWidth = width * SOAP_PRESENTATION_SCALE[0]
       const scaledHeight = height * SOAP_PRESENTATION_SCALE[1]
       const scaledDepth = depth * SOAP_PRESENTATION_SCALE[2]
-      const scaledRadius =
-        definition.geometry.cornerRadius *
-        Math.min(...SOAP_PRESENTATION_SCALE)
-      const shrink = 0.025
-      const borderRadius = Math.max(
-        0.025,
-        scaledRadius - shrink,
+      const lobeOffset = scaledWidth * 0.22
+      const borderRadius = Math.min(
+        scaledHeight * 0.15,
+        scaledDepth * 0.2,
       )
+      const halfExtents = [
+        Math.max(
+          0.02,
+          scaledWidth * 0.5 - lobeOffset - borderRadius,
+        ),
+        Math.max(0.02, scaledHeight * 0.44 - borderRadius),
+        Math.max(0.02, scaledDepth * 0.47 - borderRadius),
+      ] as const
 
-      return {
-        id: `soap-body-${definition.id}`,
-        kind: 'round-cuboid',
-        halfExtents: [
-          Math.max(
-            0.02,
-            scaledWidth * 0.5 - scaledRadius - shrink,
-          ),
-          Math.max(
-            0.02,
-            scaledHeight * 0.5 - scaledRadius - shrink,
-          ),
-          Math.max(
-            0.02,
-            scaledDepth * 0.5 - scaledRadius - shrink,
-          ),
-        ],
+      return ([-1, 1] as const).map((side) => ({
+        id: `soap-body-${definition.id}-${side < 0 ? 'left' : 'right'}`,
+        kind: 'round-cuboid' as const,
+        halfExtents,
         borderRadius,
-        position,
+        position: [
+          position[0] + side * lobeOffset,
+          position[1],
+          position[2],
+        ] as const,
         friction: 0.88,
         restitution: 0.015,
-      }
+      }))
     },
   )
   const floorY = getSoapDebrisFloorY(layout)
@@ -227,16 +224,18 @@ function SoapPreview({
   definition: (typeof SOAP_DEFINITIONS)[number]
   position: readonly [number, number, number]
 }) {
-  const size = definition.geometry.size
+  const geometry = useMemo(
+    () => definition.geometry.createSourceGeometry(),
+    [definition],
+  )
   const waxPalette = getSoapWaxPalette(
     definition.style.bodyColor,
   )
+  useEffect(() => () => geometry.dispose(), [geometry])
+
   return (
     <group position={position} scale={SOAP_PRESENTATION_SCALE}>
-      <mesh>
-        <boxGeometry
-          args={[size[0], size[1], size[2], 3, 3, 3]}
-        />
+      <mesh geometry={geometry}>
         <meshPhysicalMaterial
           {...SOAP_WAX_PHYSICAL_PROPERTIES}
           attenuationColor={waxPalette.attenuationColor}
@@ -256,12 +255,34 @@ function SoapField({
   reducedMotion,
   unlockCrackAudio,
 }: SoapFieldProps) {
-  const labelTexture = useMemo(createSoapLabelAtlasTexture, [])
+  const [labelTexture, setLabelTexture] =
+    useState<THREE.CanvasTexture | null>(null)
   const [readyCount, setReadyCount] = useState(0)
 
-  useEffect(() => () => labelTexture.dispose(), [labelTexture])
   useEffect(() => {
-    if (readyCount >= SOAP_DEFINITIONS.length) {
+    let active = true
+    void createSoapLabelAtlasTextureAsync()
+      .catch(() => createSoapLabelAtlasTexture())
+      .then((texture) => {
+        if (active) {
+          setLabelTexture(texture)
+        } else {
+          texture.dispose()
+        }
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+  useEffect(
+    () => () => labelTexture?.dispose(),
+    [labelTexture],
+  )
+  useEffect(() => {
+    if (
+      !labelTexture ||
+      readyCount >= SOAP_DEFINITIONS.length
+    ) {
       return
     }
     const timeout = window.setTimeout(
@@ -269,12 +290,12 @@ function SoapField({
       readyCount === 0 ? 80 : 180,
     )
     return () => window.clearTimeout(timeout)
-  }, [readyCount])
+  }, [labelTexture, readyCount])
 
   return (
     <group>
       {SOAP_DEFINITIONS.map((definition, index) =>
-        index < readyCount ? (
+        index < readyCount && labelTexture ? (
           <SoapSquishy
             key={`${definition.id}:${coatingSeed}`}
             coatingSeed={mixSoapSeed(coatingSeed, definition)}

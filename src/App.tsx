@@ -196,7 +196,7 @@ export function App() {
 
   const pageDescription =
     route.id === 'soaps'
-      ? 'Tap any of the eight soap bars to dent and crack its wax coating.'
+      ? 'Tap any of the six soaps to dent and crack its wax coating.'
       : 'Click or tap any of the three butter sticks to press its wax surface.'
   const liveMessage = session.isComplete
     ? route.id === 'soaps'

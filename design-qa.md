@@ -408,3 +408,65 @@ final result: passed
   deprecation warnings.
 - Final verification: `npm run lint`, `npm run check`, `npm test` (24 files,
   123 tests), and `npm run build`.
+
+## Six molded-soap redesign
+
+### Reference and captures
+
+- Visual reference:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/b9e14cec-c4d4-4a90-9a9e-8c0e4a449547/1-Photo-1.jpg`.
+- Desktop final: `qa/soap-redesign-desktop.png` at 1440 x 900.
+- Mobile final: `qa/soap-redesign-mobile.png` at 390 x 844.
+- Mobile cracked state: `qa/soap-redesign-mobile-cracked.png`.
+- Side-by-side reference comparison: `qa/soap-redesign-comparison.png`.
+
+### Fidelity decisions
+
+- Reduced the assortment from eight bars to six and changed the responsive
+  layout to 3 x 2 in landscape and 2 x 3 in portrait.
+- All pristine soaps now use one molded silhouette: rounded lobes taper into a
+  shallow center waist, with a subtle front/back puff. The shared geometry,
+  label surface, previews, raycast surface, and paired-lobe colliders all follow
+  that same profile.
+- Every label says `SOAP` in locally hosted Fredoka 700. Its ink is derived
+  from the product hue: amber on yellow, bright pink on soft pink, violet on
+  lavender, dark blue on light blue, coral on blush, and forest green on lime.
+- The wax is now glossier and more transparent (`0.62` transmission, `0.16`
+  roughness, `0.65` clearcoat). Its pastel tint still identifies the underlying
+  soap before breakage, while labels and Sprinkles/Sugar details remain visible
+  through the intact coating.
+- Fracture topology, clean long seam simplification, deformation, crack audio,
+  connected Rapier debris, falling behavior, and timed fade remain unchanged.
+
+### Comparison iterations
+
+- Initial comparison found the label pass too diffuse through the thicker
+  milky coating. Increasing transmission and lowering roughness made the core
+  color and tone-on-tone mark more legible.
+- Moving the label very near the shell temporarily caused letter fragments to
+  clip through the intact wax. Returning it to a shallow internal offset kept
+  the mark coherent and preserved the intended under-wax softness.
+- Final comparison confirms six complete shapes with no crop, consistent
+  pinched silhouettes, readable hue-matched `SOAP` marks, bright internal
+  designs, and unobstructed navigation at both target viewports.
+
+### Interaction QA
+
+- Six repeated mobile presses on the upper-left soap created connected clean
+  seams and exposed the bright core without selecting the page or producing a
+  blue viewport highlight.
+- Detached wax fell away from the soap and retired after its existing fade
+  timeout. The permanent opening remained physically consistent with the
+  broken coating.
+- The portrait grid retained all six soaps after interaction and kept the
+  previous/next controls clear of the products.
+
+### Verification
+
+- Automated catalog coverage enforces six entries, identical shared geometry,
+  the center waist, six `SOAP` atlas cells, hue-matched label inks, responsive
+  3 x 2 / 2 x 3 placement, two colliders per soap, and bounded triangle counts.
+- `npm run lint`, `npm run check`, `npm test` (24 files, 123 tests), and
+  `npm run build` all pass.
+- The redesign adds no runtime package and no Supabase migration.
+- Final result: passed.

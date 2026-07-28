@@ -227,7 +227,7 @@ afterAll(() => {
 })
 
 describe('soap long fracture seams', () => {
-  it('keeps the fully hydrated eight-soap geometry bounded', () => {
+  it('keeps the fully hydrated six-soap geometry bounded', () => {
     let renderedTriangles = 0
     for (const fixture of fixtures) {
       const decal = fixture.definition.decal.createGeometry()
@@ -236,7 +236,7 @@ describe('soap long fracture seams', () => {
       renderedTriangles += (decal.getIndex()!.count / 3) * 2
       decal.dispose()
     }
-    expect(renderedTriangles).toBeLessThanOrEqual(90_000)
+    expect(renderedTriangles).toBeLessThanOrEqual(70_000)
   })
 
   for (const coatingSeed of REPRESENTATIVE_COATING_SEEDS) {
