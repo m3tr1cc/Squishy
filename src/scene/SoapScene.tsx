@@ -2,6 +2,7 @@ import { useThree } from '@react-three/fiber'
 import {
   lazy,
   Suspense,
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -258,6 +259,10 @@ function SoapField({
   const [labelTexture, setLabelTexture] =
     useState<THREE.CanvasTexture | null>(null)
   const [readyCount, setReadyCount] = useState(0)
+  const handleSoapComplete = useCallback(
+    (id: string) => onComplete(id as SoapId),
+    [onComplete],
+  )
 
   useEffect(() => {
     let active = true
@@ -302,7 +307,7 @@ function SoapField({
             definition={definition}
             introDelay={index * 0.045}
             labelTexture={labelTexture}
-            onComplete={onComplete}
+            onComplete={handleSoapComplete}
             onPhysicsDebrisChange={onPhysicsDebrisChange}
             playCrackSound={playCrackSound}
             position={getSoapGridPosition(index, layout)}
@@ -333,6 +338,15 @@ export function SoapScene({
   const layout = resolveSoapLayout(size.width, size.height)
   const physicsDebris =
     usePhysicsDebrisSources<SoapId>(SOAP_SOURCE_IDS)
+  const handlePhysicsDebrisChange = useCallback(
+    (
+      id: string,
+      source: Parameters<
+        typeof physicsDebris.registerSource
+      >[1],
+    ) => physicsDebris.registerSource(id as SoapId, source),
+    [physicsDebris.registerSource],
+  )
   const staticColliders = useMemo(
     () => createSoapStaticColliders(layout),
     [layout],
@@ -362,7 +376,7 @@ export function SoapScene({
         coatingSeed={coatingSeed}
         layout={layout}
         onComplete={onComplete}
-        onPhysicsDebrisChange={physicsDebris.registerSource}
+        onPhysicsDebrisChange={handlePhysicsDebrisChange}
         playCrackSound={playCrackSound}
         reducedMotion={reducedMotion}
         unlockCrackAudio={unlockCrackAudio}

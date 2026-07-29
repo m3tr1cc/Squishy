@@ -25,6 +25,12 @@ const LazySoapScene = lazy(() =>
   })),
 )
 
+const LazyChocolateScene = lazy(() =>
+  import('./scene/ChocolateScene').then((module) => ({
+    default: module.ChocolateScene,
+  })),
+)
+
 function createCoatingSeed() {
   const seed = new Uint32Array(1)
   crypto.getRandomValues(seed)
@@ -53,11 +59,15 @@ function hasWebGl2Support() {
 }
 
 function LoadingState({ pageId }: { pageId: PageId }) {
+  const message =
+    pageId === 'soaps'
+      ? 'Preparing six fresh coatings...'
+      : pageId === 'chocolate'
+        ? 'Tempering chocolate slime...'
+        : 'Warming three fresh coatings...'
   return (
     <div className="status-card" role="status">
-      {pageId === 'soaps'
-        ? 'Preparing eight fresh coatings...'
-        : 'Warming three fresh coatings...'}
+      {message}
     </div>
   )
 }
@@ -123,6 +133,7 @@ export function App() {
       isComplete: true,
     }))
   }, [])
+  const handleChocolateComplete = handleButterComplete
 
   const handleSoapComplete = useCallback((soapId: SoapId) => {
     setSession((current) => ({
@@ -146,7 +157,10 @@ export function App() {
         <main className="app-shell app-shell--fallback">
           <div className="not-found-card" role="alert">
             <h1>That squishy is not here.</h1>
-            <p>The butter and soap experiences are ready to crack.</p>
+            <p>
+              The butter, soap, and chocolate experiences are ready to
+              crack.
+            </p>
             <a href="/">Return to the butter</a>
           </div>
         </main>
@@ -197,11 +211,15 @@ export function App() {
   const pageDescription =
     route.id === 'soaps'
       ? 'Tap any of the six soaps to dent and crack its wax coating.'
-      : 'Click or tap any of the three butter sticks to press its wax surface.'
+      : route.id === 'chocolate'
+        ? 'Click or tap the chocolate squares to crack the shell and spread the slime filling.'
+        : 'Click or tap any of the three butter sticks to press its wax surface.'
   const liveMessage = session.isComplete
     ? route.id === 'soaps'
       ? 'A soap wax layer is fully broken. Re-coat all soaps to play again.'
-      : 'A butter wax layer is fully broken. Re-coat all three to play again.'
+      : route.id === 'chocolate'
+        ? 'The chocolate shell is fully broken. Re-form it to play again.'
+        : 'A butter wax layer is fully broken. Re-coat all three to play again.'
     : ''
 
   return (
@@ -246,11 +264,20 @@ export function App() {
                 resetKey={session.resetKey}
                 unlockCrackAudio={crackAudio.unlock}
               />
-            ) : (
+            ) : route.id === 'soaps' ? (
               <Suspense fallback={null}>
                 <LazySoapScene
                   coatingSeed={session.seed}
                   onComplete={handleSoapComplete}
+                  playCrackSound={crackAudio.play}
+                  unlockCrackAudio={crackAudio.unlock}
+                />
+              </Suspense>
+            ) : (
+              <Suspense fallback={null}>
+                <LazyChocolateScene
+                  coatingSeed={session.seed}
+                  onComplete={handleChocolateComplete}
                   playCrackSound={crackAudio.play}
                   unlockCrackAudio={crackAudio.unlock}
                 />
@@ -266,7 +293,9 @@ export function App() {
           >
             {route.id === 'soaps'
               ? 'Re-coat soaps'
-              : 'Re-coat butters'}
+              : route.id === 'chocolate'
+                ? 'Re-form chocolate'
+                : 'Re-coat butters'}
           </button>
         ) : null}
         <div className="visually-hidden" aria-live="polite">

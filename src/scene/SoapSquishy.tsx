@@ -12,7 +12,9 @@ import * as THREE from 'three'
 import {
   captureDeformationSource,
   writeDeformedPositions,
+  writeDisplacedPositions,
   type DentProfile,
+  type SurfaceDisplacementSampler,
 } from './deformation'
 import {
   createFractureModel,
@@ -20,6 +22,7 @@ import {
   FRAGMENT_STATE,
   markFragmentsSettled,
   stepFracture,
+  type FractureOptions,
   type FracturePress,
 } from './fracture/damage'
 import {
@@ -33,6 +36,7 @@ import {
   markFragmentSleepingForFade,
   shouldSimulateFragment,
   stepFragmentFade,
+  type FragmentFadePolicyOptions,
 } from './fracture/fragmentFade'
 import {
   attachFragmentFadeColorAttribute,
@@ -42,10 +46,15 @@ import {
   createWaxTopology,
   getWaxTriangleMetadata,
 } from './fracture/topology'
-import { WAX_SEAM_PROFILE } from './fracture/types'
+import {
+  WAX_SEAM_PROFILE,
+  type WaxBond,
+  type WaxSeamProfile,
+} from './fracture/types'
 import type {
   DebrisCluster,
   DebrisTransform,
+  DebrisVector3,
 } from './fracture/RapierDebris'
 import type { PhysicsDebrisSource } from './fracture/usePhysicsDebrisSources'
 import {
@@ -73,21 +82,58 @@ import type {
   SurfaceLayer,
 } from './types'
 
+export type FracturableDefinition = Omit<
+  SoapDefinition,
+  'id' | 'decal'
+> & {
+  id: string
+  decal?: SoapDefinition['decal']
+}
+
+export type FracturableSquishyConfig = Readonly<{
+  plateCount: number
+  innerClearance: number
+  outerOffset: number
+  seamProfile: WaxSeamProfile
+  maximumActiveImpacts: number
+  maximumClusterSize: number
+  releasedImpactTarget: number
+  fadePolicy: FragmentFadePolicyOptions
+  fractureOptions: FractureOptions
+  waxPalette: Readonly<{
+    surfaceColor: string
+    attenuationColor: string
+  }>
+  waxMaterial: Readonly<THREE.MeshPhysicalMaterialParameters>
+  createShellGeometry?: () => THREE.BufferGeometry
+  displacementSampler?: SurfaceDisplacementSampler
+  bondToughnessScale?: (bond: WaxBond) => number
+  createDebrisLaunch?: (
+    seed: number,
+    normal: DebrisVector3,
+  ) => Readonly<{
+    linearVelocity: DebrisVector3
+    angularVelocity: DebrisVector3
+    gravityScale: number
+  }>
+}>
+
 type SoapSquishyProps = Readonly<{
-  definition: SoapDefinition
+  definition: FracturableDefinition
   coatingSeed: number
-  labelTexture: THREE.Texture
+  labelTexture?: THREE.Texture | null
   position: readonly [number, number, number]
   scale?: readonly [number, number, number]
   reducedMotion: boolean
-  onComplete: (soapId: SoapDefinition['id']) => void
+  onComplete: (id: string) => void
   onPhysicsDebrisChange: (
-    soapId: SoapDefinition['id'],
+    id: string,
     source: SoapPhysicsDebrisSource | null,
   ) => void
   playCrackSound: (brokenBondCount: number) => void
   unlockCrackAudio: () => void
   introDelay?: number
+  runtimeConfig?: FracturableSquishyConfig
 }>
 
 export type SoapPhysicsDebrisSource = PhysicsDebrisSource
@@ -148,7 +194,7 @@ function hashUint32(value: number) {
   return hash >>> 0
 }
 
-function createAccentGeometry(definition: SoapDefinition) {
+function createAccentGeometry(definition: FracturableDefinition) {
   if (
     definition.id !== 'sprinkles' &&
     definition.id !== 'sugar'
@@ -215,6 +261,7 @@ export const SoapSquishy = memo(function SoapSquishy({
   playCrackSound,
   unlockCrackAudio,
   introDelay = 0,
+  runtimeConfig,
 }: SoapSquishyProps) {
   const presentationRef = useRef<THREE.Group>(null)
   const compressionRef = useRef<THREE.Group>(null)
@@ -222,8 +269,12 @@ export const SoapSquishy = memo(function SoapSquishy({
     () => definition.geometry.createSourceGeometry(),
     [definition],
   )
+  const shellSourceGeometry = useMemo(
+    () => runtimeConfig?.createShellGeometry?.() ?? innerGeometry,
+    [innerGeometry, runtimeConfig],
+  )
   const labelGeometry = useMemo(
-    () => definition.decal.createGeometry(),
+    () => definition.decal?.createGeometry() ?? null,
     [definition],
   )
   const accentGeometry = useMemo(
@@ -231,15 +282,20 @@ export const SoapSquishy = memo(function SoapSquishy({
     [definition],
   )
   const waxPalette = useMemo(
-    () => getSoapWaxPalette(definition.style.bodyColor),
-    [definition.style.bodyColor],
+    () =>
+      runtimeConfig?.waxPalette ??
+      getSoapWaxPalette(definition.style.bodyColor),
+    [definition.style.bodyColor, runtimeConfig],
   )
   const innerSource = useMemo(
     () => captureDeformationSource(innerGeometry),
     [innerGeometry],
   )
   const labelSource = useMemo(
-    () => captureDeformationSource(labelGeometry),
+    () =>
+      labelGeometry
+        ? captureDeformationSource(labelGeometry)
+        : null,
     [labelGeometry],
   )
   const accentSource = useMemo(
@@ -261,14 +317,17 @@ export const SoapSquishy = memo(function SoapSquishy({
   const waxTopology = useMemo(
     () =>
       createWaxTopology({
-        sourceGeometry: innerGeometry,
+        sourceGeometry: shellSourceGeometry,
         seed: coatingSeed,
-        plateCount: SOAP_PLATE_COUNT,
-        innerClearance: SOAP_INNER_CLEARANCE,
-        outerOffset: SOAP_OUTER_OFFSET,
-        seamProfile: WAX_SEAM_PROFILE.long,
+        plateCount: runtimeConfig?.plateCount ?? SOAP_PLATE_COUNT,
+        innerClearance:
+          runtimeConfig?.innerClearance ?? SOAP_INNER_CLEARANCE,
+        outerOffset:
+          runtimeConfig?.outerOffset ?? SOAP_OUTER_OFFSET,
+        seamProfile:
+          runtimeConfig?.seamProfile ?? WAX_SEAM_PROFILE.long,
       }),
-    [coatingSeed, innerGeometry],
+    [coatingSeed, runtimeConfig, shellSourceGeometry],
   )
   const waxRuntime = useMemo(
     () => createWaxGeometryRuntime(waxTopology),
@@ -292,34 +351,36 @@ export const SoapSquishy = memo(function SoapSquishy({
             fragmentA: bond.fragmentA,
             fragmentB: bond.fragmentB,
             length: bond.length,
-            toughness: bond.toughness,
+            toughness:
+              bond.toughness *
+              (runtimeConfig?.bondToughnessScale?.(bond) ?? 1),
             role: bond.fractureRole,
           })),
         },
-        {
-          propagationRadius:
-            definition.deformation.dentRadius * 1.55,
-          damagePerSecond: 4.8,
-          holdRampSeconds: 0.22,
-          holdStrength: 0.84,
-          crackContinuation: 0.34,
-          globalCompressionFatigue: 0.012,
-          tipStressTransfer: 0.58,
-          tipStressDecay: 0.82,
-          maxTipBranches: 2,
-          peelBrokenRatio: 0.62,
-          detachBrokenRatio: 0.88,
-          minimumPeelSeconds: 0.16,
-          settleCandidateSeconds: 0.16,
-        },
+        runtimeConfig?.fractureOptions ?? {
+            propagationRadius:
+              definition.deformation.dentRadius * 1.55,
+            damagePerSecond: 4.8,
+            holdRampSeconds: 0.22,
+            holdStrength: 0.84,
+            crackContinuation: 0.34,
+            globalCompressionFatigue: 0.012,
+            tipStressTransfer: 0.58,
+            tipStressDecay: 0.82,
+            maxTipBranches: 2,
+            peelBrokenRatio: 0.62,
+            detachBrokenRatio: 0.88,
+            minimumPeelSeconds: 0.16,
+            settleCandidateSeconds: 0.16,
+          },
       ),
-    [definition.deformation.dentRadius, waxTopology],
+    [definition.deformation.dentRadius, runtimeConfig, waxTopology],
   )
   const fractureStateRef = useRef(createFractureState(fractureModel))
   const fadeStateRef = useRef(
     createFragmentFadeState(
       waxTopology.plateCount,
-      SOAP_DEBRIS_FADE_POLICY,
+      runtimeConfig?.fadePolicy ?? SOAP_DEBRIS_FADE_POLICY,
     ),
   )
   const impactsRef = useRef<DentImpact[]>([])
@@ -358,30 +419,39 @@ export const SoapSquishy = memo(function SoapSquishy({
     performance.now() + introDelay * 1000,
   )
   const canvasElement = useThree((state) => state.gl.domElement)
+  const writeBodyGeometry = useCallback(
+    (
+      geometry: THREE.BufferGeometry,
+      source: ReturnType<typeof captureDeformationSource>,
+      impacts: readonly DentImpact[],
+    ) => {
+      if (runtimeConfig?.displacementSampler) {
+        writeDisplacedPositions(
+          geometry,
+          source,
+          impacts,
+          runtimeConfig.displacementSampler,
+        )
+      } else {
+        writeDeformedPositions(
+          geometry,
+          source,
+          impacts,
+          0,
+          dentProfile,
+        )
+      }
+    },
+    [dentProfile, runtimeConfig],
+  )
 
   useEffect(() => {
-    writeDeformedPositions(
-      innerGeometry,
-      innerSource,
-      [],
-      0,
-      dentProfile,
-    )
-    writeDeformedPositions(
-      labelGeometry,
-      labelSource,
-      [],
-      0,
-      dentProfile,
-    )
+    writeBodyGeometry(innerGeometry, innerSource, [])
+    if (labelGeometry && labelSource) {
+      writeBodyGeometry(labelGeometry, labelSource, [])
+    }
     if (accentGeometry && accentSource) {
-      writeDeformedPositions(
-        accentGeometry,
-        accentSource,
-        [],
-        0,
-        dentProfile,
-      )
+      writeBodyGeometry(accentGeometry, accentSource, [])
     }
     writeWaxGeometry({
       runtime: waxRuntime,
@@ -391,6 +461,7 @@ export const SoapSquishy = memo(function SoapSquishy({
       impacts: [],
       peelAmounts: peelAmountsRef.current,
       dentProfile,
+      displacementSampler: runtimeConfig?.displacementSampler,
     })
     waxRuntime.geometry.boundingSphere = new THREE.Sphere(
       new THREE.Vector3(),
@@ -399,7 +470,10 @@ export const SoapSquishy = memo(function SoapSquishy({
 
     return () => {
       innerGeometry.dispose()
-      labelGeometry.dispose()
+      if (shellSourceGeometry !== innerGeometry) {
+        shellSourceGeometry.dispose()
+      }
+      labelGeometry?.dispose()
       accentGeometry?.dispose()
       waxRuntime.geometry.dispose()
       canvasElement.classList.remove('wax-pointer-hover')
@@ -414,13 +488,20 @@ export const SoapSquishy = memo(function SoapSquishy({
     innerSource,
     labelGeometry,
     labelSource,
+    runtimeConfig,
+    shellSourceGeometry,
     waxRuntime,
     waxTopology,
+    writeBodyGeometry,
   ])
 
   const addDent = useCallback((hit: SurfaceHit) => {
     const impacts = impactsRef.current
-    if (impacts.length >= MAX_ACTIVE_SOAP_IMPACTS) {
+    if (
+      impacts.length >=
+      (runtimeConfig?.maximumActiveImpacts ??
+        MAX_ACTIVE_SOAP_IMPACTS)
+    ) {
       const removable = impacts.findIndex(
         (impact) => !activeDentsRef.current.has(impact),
       )
@@ -441,7 +522,7 @@ export const SoapSquishy = memo(function SoapSquishy({
     geometryDirtyRef.current = true
     bodyNeedsRestoreRef.current = true
     return dent
-  }, [])
+  }, [runtimeConfig])
 
   const hitFromEvent = useCallback(
     (
@@ -854,11 +935,10 @@ export const SoapSquishy = memo(function SoapSquishy({
         fragmentPosesRef.current.quaternions[quaternionOffset + 2] = 0
         fragmentPosesRef.current.quaternions[quaternionOffset + 3] = 1
       }
-      const launch = createSoapDebrisLaunch(clusterSeed, [
-        normal.x,
-        normal.y,
-        normal.z,
-      ])
+      const launch = (
+        runtimeConfig?.createDebrisLaunch ??
+        createSoapDebrisLaunch
+      )(clusterSeed, [normal.x, normal.y, normal.z])
       return {
         id: clusterId,
         colliders,
@@ -877,6 +957,7 @@ export const SoapSquishy = memo(function SoapSquishy({
     [
       coatingSeed,
       definition.id,
+      runtimeConfig,
       waxRuntime,
       waxTopology.fragments,
     ],
@@ -1064,7 +1145,7 @@ export const SoapSquishy = memo(function SoapSquishy({
       springScratch.velocity = impact.velocity
       stepSpring(
         springScratch,
-        0,
+        runtimeConfig?.releasedImpactTarget ?? 0,
         delta,
         definition.deformation.spring,
       )
@@ -1074,6 +1155,7 @@ export const SoapSquishy = memo(function SoapSquishy({
     for (let index = impacts.length - 1; index >= 0; index -= 1) {
       const impact = impacts[index]
       if (
+        (runtimeConfig?.releasedImpactTarget ?? 0) === 0 &&
         !activeDents.has(impact) &&
         Math.abs(impact.amount) < 0.001 &&
         Math.abs(impact.velocity) < 0.001
@@ -1113,7 +1195,8 @@ export const SoapSquishy = memo(function SoapSquishy({
       const connectedGroups = groupConnectedFragments(
         detachedFragments,
         waxTopology.fragments,
-        SOAP_DEBRIS_MAX_CLUSTER_SIZE,
+        runtimeConfig?.maximumClusterSize ??
+          SOAP_DEBRIS_MAX_CLUSTER_SIZE,
         coatingSeed,
       )
       for (const group of connectedGroups) {
@@ -1164,53 +1247,25 @@ export const SoapSquishy = memo(function SoapSquishy({
     }
 
     if (impacts.length > 0) {
-      writeDeformedPositions(
-        innerGeometry,
-        innerSource,
-        impacts,
-        0,
-        dentProfile,
-      )
-      writeDeformedPositions(
-        labelGeometry,
-        labelSource,
-        impacts,
-        0,
-        dentProfile,
-      )
+      writeBodyGeometry(innerGeometry, innerSource, impacts)
+      if (labelGeometry && labelSource) {
+        writeBodyGeometry(labelGeometry, labelSource, impacts)
+      }
       if (accentGeometry && accentSource) {
-        writeDeformedPositions(
+        writeBodyGeometry(
           accentGeometry,
           accentSource,
           impacts,
-          0,
-          dentProfile,
         )
       }
       bodyNeedsRestoreRef.current = true
     } else if (bodyNeedsRestoreRef.current) {
-      writeDeformedPositions(
-        innerGeometry,
-        innerSource,
-        [],
-        0,
-        dentProfile,
-      )
-      writeDeformedPositions(
-        labelGeometry,
-        labelSource,
-        [],
-        0,
-        dentProfile,
-      )
+      writeBodyGeometry(innerGeometry, innerSource, [])
+      if (labelGeometry && labelSource) {
+        writeBodyGeometry(labelGeometry, labelSource, [])
+      }
       if (accentGeometry && accentSource) {
-        writeDeformedPositions(
-          accentGeometry,
-          accentSource,
-          [],
-          0,
-          dentProfile,
-        )
+        writeBodyGeometry(accentGeometry, accentSource, [])
       }
       bodyNeedsRestoreRef.current = false
       geometryDirtyRef.current = true
@@ -1299,6 +1354,7 @@ export const SoapSquishy = memo(function SoapSquishy({
         peelAmounts,
         fragmentPoses: fragmentPosesRef.current,
         dentProfile,
+        displacementSampler: runtimeConfig?.displacementSampler,
       })
       geometryDirtyRef.current = false
     }
@@ -1378,23 +1434,30 @@ export const SoapSquishy = memo(function SoapSquishy({
               transmission={definition.style.transmission}
             />
           </mesh>
-          <mesh
-            geometry={labelGeometry}
-            position={[0, 0, SOAP_OUTER_OFFSET * 0.4]}
-            raycast={NO_RAYCAST}
-            renderOrder={1}
-          >
-            <meshBasicMaterial
-              alphaTest={0.5}
-              depthTest
-              depthWrite
-              map={labelTexture}
-              polygonOffset
-              polygonOffsetFactor={-7}
-              toneMapped={false}
-              transparent={false}
-            />
-          </mesh>
+          {labelGeometry && labelTexture ? (
+            <mesh
+              geometry={labelGeometry}
+              position={[
+                0,
+                0,
+                (runtimeConfig?.outerOffset ??
+                  SOAP_OUTER_OFFSET) * 0.4,
+              ]}
+              raycast={NO_RAYCAST}
+              renderOrder={1}
+            >
+              <meshBasicMaterial
+                alphaTest={0.5}
+                depthTest
+                depthWrite
+                map={labelTexture}
+                polygonOffset
+                polygonOffsetFactor={-7}
+                toneMapped={false}
+                transparent={false}
+              />
+            </mesh>
+          ) : null}
           <mesh
             geometry={waxRuntime.geometry}
             frustumCulled={false}
@@ -1407,7 +1470,8 @@ export const SoapSquishy = memo(function SoapSquishy({
           >
             <meshPhysicalMaterial
               alphaHash
-              {...SOAP_WAX_PHYSICAL_PROPERTIES}
+              {...(runtimeConfig?.waxMaterial ??
+                SOAP_WAX_PHYSICAL_PROPERTIES)}
               attenuationColor={waxPalette.attenuationColor}
               color={waxPalette.surfaceColor}
               vertexColors

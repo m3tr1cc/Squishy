@@ -3,6 +3,8 @@ import {
   DEFAULT_DENT_PROFILE,
   sampleDentDepthValues,
   type DentProfile,
+  type MutableSurfaceDisplacement,
+  type SurfaceDisplacementSampler,
 } from '../deformation'
 import type { DentImpact } from '../types'
 import type { FractureModel, FractureState } from './damage'
@@ -47,6 +49,11 @@ const positionScratch = new THREE.Vector3()
 const pivotScratch = new THREE.Vector3()
 const normalScratch = new THREE.Vector3()
 const quaternionScratch = new THREE.Quaternion()
+const displacementScratch: MutableSurfaceDisplacement = {
+  x: 0,
+  y: 0,
+  z: 0,
+}
 
 function choosePeelAxis(
   normalX: number,
@@ -399,6 +406,7 @@ export function writeWaxGeometry({
   peelAmounts,
   fragmentPoses = runtime.poseScratch,
   dentProfile = DEFAULT_DENT_PROFILE,
+  displacementSampler,
 }: {
   runtime: WaxGeometryRuntime
   topology: WaxTopology
@@ -408,6 +416,7 @@ export function writeWaxGeometry({
   peelAmounts: Float32Array
   fragmentPoses?: WaxFragmentPoses
   dentProfile?: DentProfile
+  displacementSampler?: SurfaceDisplacementSampler
 }) {
   const positionAttribute = runtime.geometry.getAttribute(
     'position',
@@ -477,16 +486,34 @@ export function writeWaxGeometry({
       normalY = normalScratch.y
       normalZ = normalScratch.z
     } else {
-      const dent = sampleDentDepthValues(
-        sourceX,
-        sourceY,
-        sourceZ,
-        surfaceNormalX,
-        surfaceNormalY,
-        surfaceNormalZ,
-        impacts,
-        dentProfile,
-      )
+      const dent = displacementSampler
+        ? 0
+        : sampleDentDepthValues(
+            sourceX,
+            sourceY,
+            sourceZ,
+            surfaceNormalX,
+            surfaceNormalY,
+            surfaceNormalZ,
+            impacts,
+            dentProfile,
+          )
+      if (displacementSampler) {
+        displacementSampler(
+          sourceX,
+          sourceY,
+          sourceZ,
+          surfaceNormalX,
+          surfaceNormalY,
+          surfaceNormalZ,
+          impacts,
+          displacementScratch,
+        )
+      } else {
+        displacementScratch.x = 0
+        displacementScratch.y = 0
+        displacementScratch.z = 0
+      }
       const pivotX = runtime.pivots[fragmentOffset]
       const pivotY = runtime.pivots[fragmentOffset + 1]
       const pivotZ = runtime.pivots[fragmentOffset + 2]
@@ -535,16 +562,19 @@ export function writeWaxGeometry({
 
       x =
         sourceX +
+        displacementScratch.x +
         surfaceNormalX * shellOffset +
         seamX -
         surfaceNormalX * dent
       y =
         sourceY +
+        displacementScratch.y +
         surfaceNormalY * shellOffset +
         seamY -
         surfaceNormalY * dent
       z =
         sourceZ +
+        displacementScratch.z +
         surfaceNormalZ * shellOffset +
         seamZ -
         surfaceNormalZ * dent

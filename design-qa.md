@@ -613,3 +613,88 @@ final result: passed
   mobile budget.
 - No Supabase change or migration is required.
 - Final result: passed.
+
+## Chocolate slime experience
+
+### Source and implementation evidence
+
+- Source visual truth:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/9efcbaf9-f32c-42c6-90a7-6800ff0be2af/1-Photo-1.jpg`,
+  `2-Photo-2.jpg`, and `3-Photo-3.jpg`, each at 1280 x 591 pixels.
+- Desktop intact implementation:
+  `qa/chocolate-desktop-fresh.png` at 1440 x 900, CSS viewport
+  1440 x 900, DPR 1.
+- Desktop cracked implementation:
+  `qa/chocolate-desktop-cracked-fresh.png` at 1440 x 900 with the
+  same viewport and density.
+- Repeated-press implementation:
+  `qa/chocolate-desktop-multi-crack.png` at 1440 x 900 after four
+  additional presses and a 2.2 second debris-settle interval.
+- Mobile intact and cracked implementation:
+  `qa/chocolate-mobile.png` and `qa/chocolate-mobile-cracked.png` at
+  390 x 844, CSS viewport 390 x 844, requested DPR 1.5.
+- Equal-size full-view comparisons:
+  `qa/chocolate-reference-comparison.png` and
+  `qa/chocolate-cracked-comparison.png`, each at 1440 x 450. Source
+  and implementation were independently aspect-fit into equal 720 x 450
+  black frames before comparison, avoiding density or crop bias.
+
+### Findings and comparison history
+
+- [Passed] The intact comparison shows one continuous glossy dark-chocolate
+  bar with the requested 5 x 3 raised-cell grid, recessed gutters, soft outer
+  corners, and restrained specular highlights. The procedural bar is more
+  pillowy than the molded reference, which is an intentional tactile
+  interpretation rather than a hierarchy or geometry mismatch.
+- [Passed] The cracked comparison confirms that breakage belongs to the
+  chocolate surface itself. Smaller connected fragments peel away to reveal
+  the contrasting pale-green filling; there is no press-specific decal,
+  replacement mesh, or flat color overlay.
+- [Passed] The filling depresses at contact, spreads tangentially around the
+  press, rebounds slowly, and retains an 18% accumulated deformation residue
+  until `Re-form chocolate` resets the experience. Attached chocolate follows
+  the same displacement field before detached fragments transition to Rapier.
+- [Passed] Fonts and typography: the source provides no product label to
+  reproduce. The existing hidden heading, navigation status, and accessible
+  button copy use the established application type stack without introducing
+  a new visible typography system.
+- [Passed] Spacing and layout rhythm: both 1440 x 900 and 390 x 844 keep the
+  wide bar centered, fully visible, and clear of the top-right navigation.
+  Straight-on camera framing preserves equal cell widths and horizontal rows.
+- [Passed] Colors and visual tokens: near-black presentation, glossy
+  `#3a160f` chocolate, darker broken edges, and `#a9ef75` slime preserve the
+  reference's dark-shell/light-filling contrast while implementing the
+  requested green filling.
+- [Passed] Image quality and asset fidelity: the reference was used as visual
+  truth only; the final bar is a closed procedural surface with smooth normals
+  and no raster stretching, placeholder imagery, sorting halo, or visible
+  background seam.
+- [Passed] Copy/content: the third route is titled `Chocolate slime`, the
+  hidden instruction describes cracking and spreading, and completion exposes
+  the specific `Re-form chocolate` action.
+- No P0, P1, or P2 difference was found in the first normalized comparison, so
+  no visual correction iteration was required. Focused crops were unnecessary:
+  the geometry, specular surface, crack opening, and filling contrast are all
+  clearly readable in the equal-height full-view comparisons.
+
+### Interaction, responsive, and performance QA
+
+- A 300 ms desktop hold produced a local connected opening; four additional
+  presses extended the fracture across neighboring cells while detached
+  fragments fell and retired without a WebGL or Rapier error.
+- A 260 ms mobile press at 390 x 844 produced the same local chocolate crack
+  and exposed green filling without layout movement, blue tap highlighting,
+  or navigation activation.
+- Fresh desktop and mobile browser sessions reported zero uncaught page
+  errors. Console inspection found only the existing Rapier initialization
+  deprecation warning after debris first loaded.
+- The mobile 300-frame diagnostic sample averaged 60.0 FPS with a 17.1 ms
+  p95 frame time, 3 draw calls, and 61,504 rendered triangles.
+- Deterministic tests cover the 15-cell closed mesh, 12,000-source-triangle
+  budget, 72 connected chocolate plates, gutter toughness bias, bounded slime
+  displacement, 18% residue, camera framing, debris colliders, and three-page
+  non-wrapping navigation.
+- `npm run lint`, `npm run check`, `npm test` (28 files, 133 tests), and
+  `npm run build` pass.
+- No Supabase change or migration is required.
+- final result: passed

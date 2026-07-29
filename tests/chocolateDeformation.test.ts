@@ -1,0 +1,70 @@
+import { describe, expect, it } from 'vitest'
+import {
+  CHOCOLATE_SLIME_DEFORMATION,
+  createSlimeDisplacementSampler,
+} from '../src/scene/chocolate'
+import type { MutableSurfaceDisplacement } from '../src/scene/deformation'
+import type { DentImpact } from '../src/scene/types'
+
+const sampler = createSlimeDisplacementSampler()
+const impact: DentImpact = {
+  id: 'press',
+  localPoint: [0, 0, 0.32],
+  localNormal: [0, 0, 1],
+  amount: 1,
+  velocity: 0,
+}
+
+function sample(
+  x: number,
+  y: number,
+  z: number,
+  normal: readonly [number, number, number] = [0, 0, 1],
+  amount = 1,
+) {
+  const output: MutableSurfaceDisplacement = { x: 0, y: 0, z: 0 }
+  sampler(
+    x,
+    y,
+    z,
+    normal[0],
+    normal[1],
+    normal[2],
+    [{ ...impact, amount }],
+    output,
+  )
+  return output
+}
+
+describe('chocolate slime displacement', () => {
+  it('presses inward at contact and spreads outward around it', () => {
+    const center = sample(0, 0, 0.32)
+    const shoulder = sample(0.64, 0, 0.32)
+
+    expect(center.z).toBeCloseTo(
+      -CHOCOLATE_SLIME_DEFORMATION.depth,
+      3,
+    )
+    expect(shoulder.x).toBeGreaterThan(0.01)
+    expect(shoulder.z).toBeLessThan(0)
+    expect(
+      Math.hypot(shoulder.x, shoulder.y, shoulder.z),
+    ).toBeLessThanOrEqual(
+      CHOCOLATE_SLIME_DEFORMATION.maximumDisplacement,
+    )
+  })
+
+  it('does not transfer a front press onto the opposite face', () => {
+    expect(sample(0, 0, -0.32, [0, 0, -1])).toEqual({
+      x: 0,
+      y: 0,
+      z: 0,
+    })
+  })
+
+  it('retains the configured 18 percent deformation residue', () => {
+    const full = sample(0, 0, 0.32, [0, 0, 1], 1)
+    const residual = sample(0, 0, 0.32, [0, 0, 1], 0.18)
+    expect(residual.z / full.z).toBeCloseTo(0.18, 4)
+  })
+})
