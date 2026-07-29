@@ -11,6 +11,10 @@ export type SlimeDeformationProfile = Readonly<{
   tangentSpread: number
   normalBulge: number
   gravitySag: number
+  volumeSpreadRadius: number
+  volumeFlow: number
+  volumeSag: number
+  surfaceDepthRadius: number
   maximumDisplacement: number
 }>
 
@@ -21,7 +25,11 @@ export const CHOCOLATE_SLIME_DEFORMATION = Object.freeze({
   tangentSpread: 0.34,
   normalBulge: 0.14,
   gravitySag: 0.12,
-  maximumDisplacement: 0.48,
+  volumeSpreadRadius: 3.6,
+  volumeFlow: 0.5,
+  volumeSag: 0.24,
+  surfaceDepthRadius: 0.58,
+  maximumDisplacement: 0.78,
 } satisfies SlimeDeformationProfile)
 
 export function createSlimeDisplacementSampler(
@@ -46,13 +54,47 @@ export function createSlimeDisplacementSampler(
       const deltaY = y - impact.localPoint[1]
       const deltaZ = z - impact.localPoint[2]
       const distance = Math.hypot(deltaX, deltaY, deltaZ)
-      if (distance >= profile.spreadRadius) {
+      if (
+        distance >=
+        Math.max(profile.spreadRadius, profile.volumeSpreadRadius)
+      ) {
         continue
       }
 
       const impactNormalX = impact.localNormal[0]
       const impactNormalY = impact.localNormal[1]
       const impactNormalZ = impact.localNormal[2]
+      const normalDistance =
+        deltaX * impactNormalX +
+        deltaY * impactNormalY +
+        deltaZ * impactNormalZ
+      const tangentX = deltaX - impactNormalX * normalDistance
+      const tangentY = deltaY - impactNormalY * normalDistance
+      const tangentZ = deltaZ - impactNormalZ * normalDistance
+      const tangentLength = Math.hypot(tangentX, tangentY, tangentZ)
+      const impactAmount = Math.max(0, impact.amount)
+      const depthCoupling = smoothDentWeight(
+        Math.abs(normalDistance),
+        profile.surfaceDepthRadius,
+      )
+      const volumeFalloff =
+        smoothDentWeight(
+          tangentLength,
+          profile.volumeSpreadRadius,
+        ) * depthCoupling
+
+      if (volumeFalloff > 0) {
+        const flow =
+          profile.volumeFlow * impactAmount * volumeFalloff
+        if (tangentLength > 1e-5) {
+          displacementX += (tangentX / tangentLength) * flow
+          displacementY += (tangentY / tangentLength) * flow
+          displacementZ += (tangentZ / tangentLength) * flow
+        }
+        displacementY -=
+          profile.volumeSag * impactAmount * volumeFalloff
+      }
+
       const alignment = Math.max(
         0,
         normalX * impactNormalX +
@@ -63,7 +105,7 @@ export function createSlimeDisplacementSampler(
         continue
       }
 
-      const amount = Math.max(0, impact.amount) * alignment * alignment
+      const amount = impactAmount * alignment * alignment
       const core = smoothDentWeight(distance, profile.pressRadius)
       const spreadFalloff = smoothDentWeight(
         distance,
@@ -87,14 +129,6 @@ export function createSlimeDisplacementSampler(
         spreadFalloff *
         (0.35 + annulus * 0.65)
 
-      const normalDistance =
-        deltaX * impactNormalX +
-        deltaY * impactNormalY +
-        deltaZ * impactNormalZ
-      const tangentX = deltaX - impactNormalX * normalDistance
-      const tangentY = deltaY - impactNormalY * normalDistance
-      const tangentZ = deltaZ - impactNormalZ * normalDistance
-      const tangentLength = Math.hypot(tangentX, tangentY, tangentZ)
       if (tangentLength > 1e-5) {
         const tangentDisplacement =
           annulus * profile.tangentSpread * amount

@@ -781,3 +781,85 @@ remaining 5 x 3 grid are all readable at the normalized comparison size.
 - No dependency or Supabase migration was added.
 
 final result: passed
+
+## Unbounded slime silhouette refinement
+
+### Source and implementation evidence
+
+- Source visual truth:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/1acf110d-81e4-44d4-909f-0daac7289106/1-Photo-1.jpg`
+  at 1280 x 591 pixels. The broken reference shows the filling and carried
+  chocolate forming a silhouette that no longer follows the pristine bar.
+- Intact companion reference:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/1acf110d-81e4-44d4-909f-0daac7289106/2-Photo-2.jpg`
+  at 1280 x 591 pixels.
+- Desktop expanded implementation:
+  `qa/chocolate-slime-unbounded-after-more.png` at 1440 x 900,
+  CSS viewport 1440 x 900, DPR 1.
+- Mobile expanded implementation:
+  `qa/chocolate-slime-unbounded-mobile-after.png` at 390 x 844,
+  CSS viewport 390 x 844, DPR 1.
+- Source/implementation comparison:
+  `qa/chocolate-slime-unbounded-comparison.png` at 1440 x 450.
+- Pristine/expanded implementation comparison:
+  `qa/chocolate-slime-unbounded-before-after.png` at 1440 x 450.
+- State: six nearby lower-region presses followed by 3.5 seconds of settling
+  on desktop; three center presses followed by the same settling interval on
+  mobile. Each comparison slot is 720 x 450 with proportional aspect-fit and
+  no crop or stretch.
+
+A full-view reference comparison and a same-camera before/after comparison were
+both required. The reference comparison establishes the intended displaced
+material character; the before/after comparison proves that the final silhouette
+extends below the pristine bar instead of merely changing shading inside its
+original rectangle.
+
+### Findings and comparison history
+
+- [Resolved P1] The prior volume spread was multiplied by the local vertex
+  normal alignment. Front vertices moved, but the rounded sidewall and perimeter
+  vertices were effectively pinned to the source rectangle. The revised flow
+  separates front-face indentation from thickness-aware volume transport.
+- [Resolved P1] A 3.6-unit projected flow radius now carries front and near-side
+  vertices radially away from the impact and adds gravity-biased sag. A
+  0.58-unit depth coupling keeps the motion within the front volume and prevents
+  deformation from appearing on the opposite face.
+- [Resolved P1] Maximum accumulated displacement increases from 0.48 to 0.78
+  model units. The desktop post-fix capture shows the filling and bonded
+  chocolate extending below the intact right-hand baseline, while the mobile
+  capture retains the altered silhouette without clipping.
+- [Resolved P2] The old geometry bounds and camera fit were sized around the
+  pristine bar. Chocolate now uses conservative dynamic raycast bounds, and the
+  responsive camera reserves 4.05 x 2.42 half-extents for post-break expansion.
+  Expanded material remains touchable and visible at both target viewports.
+- [Passed] Attached and peeling chocolate still samples the same deformation
+  field as the filling. Only fully detached fragments transition to Rapier,
+  gravity, and the existing timed fade.
+- [Passed] Fonts and typography: no visible typography was added or changed.
+  The hidden route heading, instructions, and navigation labels remain intact.
+- [Passed] Spacing and layout rhythm: the pristine bar remains centered and
+  straight-on; the slightly wider safety framing is applied consistently on
+  desktop and portrait mobile.
+- [Passed] Colors and visual tokens: glossy dark chocolate, pale-green slime,
+  black background, and neutral navigation retain the approved palette.
+- [Passed] Image quality and asset fidelity: expansion is performed on the
+  existing procedural closed meshes. No clip mask, raster overlay, duplicate
+  filling, or fake overflow graphic was introduced.
+- [Passed] Copy/content: interaction instructions, crack audio, completion, and
+  `Re-form chocolate` are unchanged.
+
+### Interaction and regression QA
+
+- Desktop lower-edge presses created a permanent lobe beyond the pristine bar
+  boundary while bonded shell pieces followed it.
+- Mobile center presses retained the wider volume field, stayed inside the
+  responsive frame, and produced no blue tap highlight or navigation collision.
+- Browser inspection found no Vite overlay, WebGL loss, or application-owned
+  console error. Chrome extension message-channel noise and the existing
+  upstream `THREE.Clock` deprecation warning were excluded.
+- Automated coverage verifies sidewall displacement beyond the original filling
+  bounds, conservative dynamic bounds, expanded-shell coupling, opposite-face
+  isolation, displacement limits, and desktop/mobile camera fit.
+- The change adds no dependency and requires no Supabase migration.
+
+final result: passed

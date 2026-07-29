@@ -172,11 +172,48 @@ describe('chocolate fracture topology', () => {
       topology,
       fractureModel: model,
       fractureState: state,
-      impacts: [impact],
+      impacts: [],
       peelAmounts,
       displacementSampler: sampler,
     })
     const positions = runtime.geometry.getAttribute('position')
+    let restingMinimumY = Number.POSITIVE_INFINITY
+    for (let vertex = 0; vertex < positions.count; vertex += 1) {
+      if (
+        runtime.surfaceKinds[vertex] !== WAX_SURFACE_KIND.outer
+      ) {
+        continue
+      }
+      restingMinimumY = Math.min(
+        restingMinimumY,
+        positions.getY(vertex),
+      )
+    }
+
+    writeWaxGeometry({
+      runtime,
+      topology,
+      fractureModel: model,
+      fractureState: state,
+      impacts: [impact],
+      peelAmounts,
+      displacementSampler: sampler,
+    })
+    let displacedMinimumY = Number.POSITIVE_INFINITY
+    for (let vertex = 0; vertex < positions.count; vertex += 1) {
+      if (
+        runtime.surfaceKinds[vertex] !== WAX_SURFACE_KIND.outer
+      ) {
+        continue
+      }
+      displacedMinimumY = Math.min(
+        displacedMinimumY,
+        positions.getY(vertex),
+      )
+    }
+    expect(displacedMinimumY).toBeLessThan(
+      restingMinimumY - 0.05,
+    )
     expect(positions.getX(selectedVertex)).toBeCloseTo(
       impact.localPoint[0] +
         impact.localNormal[0] *

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import * as THREE from 'three'
 import {
   createChocolateStaticColliders,
   getResponsiveChocolateCameraPose,
@@ -15,6 +16,24 @@ describe('chocolate presentation', () => {
       expect(pose.position[2]).toBeGreaterThan(0)
       expect(pose.target[0]).toBe(0)
       expect(pose.target[2]).toBe(0)
+
+      const camera = new THREE.PerspectiveCamera(
+        32,
+        width / height,
+        0.1,
+        100,
+      )
+      camera.position.fromArray(pose.position)
+      camera.lookAt(...pose.target)
+      camera.updateProjectionMatrix()
+      camera.updateMatrixWorld()
+      for (const x of [-3.85, 3.85]) {
+        for (const y of [-2.35, 2.35]) {
+          const projected = new THREE.Vector3(x, y, 0).project(camera)
+          expect(Math.abs(projected.x)).toBeLessThan(0.96)
+          expect(Math.abs(projected.y)).toBeLessThan(0.96)
+        }
+      }
     }
   })
 

@@ -34,8 +34,8 @@ export function getResponsiveChocolateCameraPose(
 ) {
   const aspect = Math.max(0.25, width / Math.max(1, height))
   const verticalFov = THREE.MathUtils.degToRad(fieldOfViewDegrees)
-  const halfHeight = 2.18
-  const halfWidth = 3.58
+  const halfHeight = 2.42
+  const halfWidth = 4.05
   const fitWidth =
     halfWidth / (Math.tan(verticalFov / 2) * aspect)
   const fitHeight = halfHeight / Math.tan(verticalFov / 2)

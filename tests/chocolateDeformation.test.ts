@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   CHOCOLATE_RUNTIME_CONFIG,
   CHOCOLATE_SLIME_DEFORMATION,
+  createChocolateSlimeGeometry,
   createSlimeDisplacementSampler,
 } from '../src/scene/chocolate'
 import {
+  captureDeformationSource,
   makeImpactPermanent,
   type MutableSurfaceDisplacement,
+  writeDisplacedPositions,
 } from '../src/scene/deformation'
 import type { DentImpact } from '../src/scene/types'
 
@@ -72,6 +75,23 @@ describe('chocolate slime displacement', () => {
     expect(ridge.x).toBeGreaterThan(0)
     expect(ridge.y).toBeLessThan(0)
     expect(ridge.z).toBeGreaterThan(0)
+  })
+
+  it('carries sidewall vertices beyond the original body bounds', () => {
+    const sidewall = sample(0, -1.79, 0.28, [0, -1, 0])
+    expect(sidewall.y).toBeLessThan(-0.2)
+
+    const geometry = createChocolateSlimeGeometry()
+    geometry.computeBoundingBox()
+    const originalMinimumY = geometry.boundingBox!.min.y
+    const source = captureDeformationSource(geometry)
+    writeDisplacedPositions(geometry, source, [impact], sampler)
+    geometry.computeBoundingBox()
+
+    expect(geometry.boundingBox!.min.y).toBeLessThan(
+      originalMinimumY - 0.2,
+    )
+    geometry.dispose()
   })
 
   it('locks a released chocolate press into permanent deformation', () => {

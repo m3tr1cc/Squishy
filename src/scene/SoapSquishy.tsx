@@ -99,6 +99,7 @@ export type FracturableSquishyConfig = Readonly<{
   maximumActiveImpacts: number
   maximumClusterSize: number
   releasedImpactTarget: number
+  dynamicBoundsRadius?: number
   preserveReleasedImpacts?: boolean
   minimumPermanentImpact?: number
   fadePolicy: FragmentFadePolicyOptions
@@ -466,10 +467,29 @@ export const SoapSquishy = memo(function SoapSquishy({
       dentProfile,
       displacementSampler: runtimeConfig?.displacementSampler,
     })
-    waxRuntime.geometry.boundingSphere = new THREE.Sphere(
-      new THREE.Vector3(),
-      8,
+    const dynamicBoundsRadius = runtimeConfig?.dynamicBoundsRadius ?? 8
+    const dynamicBounds = new THREE.Box3(
+      new THREE.Vector3(
+        -dynamicBoundsRadius,
+        -dynamicBoundsRadius,
+        -dynamicBoundsRadius,
+      ),
+      new THREE.Vector3(
+        dynamicBoundsRadius,
+        dynamicBoundsRadius,
+        dynamicBoundsRadius,
+      ),
     )
+    const dynamicBoundingSphere = new THREE.Sphere(
+      new THREE.Vector3(),
+      dynamicBoundsRadius,
+    )
+    waxRuntime.geometry.boundingBox = dynamicBounds
+    waxRuntime.geometry.boundingSphere = dynamicBoundingSphere
+    if (runtimeConfig?.dynamicBoundsRadius) {
+      innerGeometry.boundingBox = dynamicBounds.clone()
+      innerGeometry.boundingSphere = dynamicBoundingSphere.clone()
+    }
 
     return () => {
       innerGeometry.dispose()

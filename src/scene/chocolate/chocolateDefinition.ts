@@ -104,6 +104,7 @@ export const CHOCOLATE_RUNTIME_CONFIG = Object.freeze({
   maximumActiveImpacts: 12,
   maximumClusterSize: 3,
   releasedImpactTarget: 0,
+  dynamicBoundsRadius: 5,
   preserveReleasedImpacts: true,
   minimumPermanentImpact: 0.58,
   fadePolicy: Object.freeze({
