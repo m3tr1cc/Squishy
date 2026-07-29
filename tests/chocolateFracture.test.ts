@@ -212,7 +212,7 @@ describe('chocolate fracture topology', () => {
       )
     }
     expect(displacedMinimumY).toBeLessThan(
-      restingMinimumY - 0.02,
+      restingMinimumY - 0.001,
     )
     expect(positions.getX(selectedVertex)).toBeCloseTo(
       impact.localPoint[0] +

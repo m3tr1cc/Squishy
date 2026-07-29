@@ -933,3 +933,70 @@ mesh displacement and retained silhouette directly comparable.
 - No dependency or Supabase migration was added.
 
 final result: passed
+
+## Quarter-strength chocolate deformation tuning
+
+### Source and implementation evidence
+
+- Source visual truth:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/1acf110d-81e4-44d4-909f-0daac7289106/1-Photo-1.jpg`
+  at 1280 x 591 pixels.
+- Quarter-strength desktop state:
+  `qa/chocolate-slime-quarter-strength-desktop.png` at 1440 x 900,
+  CSS viewport 1440 x 900, DPR 1.
+- Quarter-strength mobile state:
+  `qa/chocolate-slime-quarter-strength-mobile.png` at 390 x 844,
+  CSS viewport 390 x 844, DPR 1.
+- Source/current comparison:
+  `qa/chocolate-slime-quarter-strength-reference-comparison.png` at
+  1440 x 450.
+- Previous half-strength/current quarter-strength comparison:
+  `qa/chocolate-slime-half-vs-quarter-strength.png` at 1440 x 450.
+- State: six nearby desktop presses and three center mobile presses, each
+  followed by a 3.5-second settling interval. Comparison slots are equal
+  720 x 450 aspect-fit frames without crop or stretch.
+
+The previous and current captures use different deterministic coating seeds,
+so exact crack edges are intentionally not compared one-for-one. The same
+camera, press count, interaction region, and settle interval make the overall
+retained displacement directly comparable.
+
+### Findings and comparison history
+
+- [Resolved P1] The merged half-strength profile still displaced neighboring
+  chocolate rows more than desired after repeated presses. The current capture
+  keeps the deformation shallow and local while preserving an exposed slime
+  opening and permanent post-release shape.
+- [Resolved P1] Every displacement amplitude is reduced by exactly 75% from
+  the merged profile: indentation depth `0.21 -> 0.0525`, tangent spread
+  `0.17 -> 0.0425`, ridge height `0.07 -> 0.0175`, local sag
+  `0.06 -> 0.015`, volume flow `0.25 -> 0.0625`, volume sag
+  `0.12 -> 0.03`, and accumulated displacement cap `0.39 -> 0.0975`.
+- [Passed] Influence radii are unchanged, so slime movement still reaches the
+  rounded perimeter and is not clipped to the pristine rectangular footprint.
+- [Passed] Attached and peeling chocolate continues sampling the same filling
+  field. Detached shards retain their existing Rapier gravity and fade.
+- [Passed] Fonts and typography: no visible typography changed.
+- [Passed] Spacing and layout rhythm: camera, product framing, navigation, and
+  responsive safe areas remain unchanged.
+- [Passed] Colors and visual tokens: glossy chocolate, green filling, seamless
+  black background, and neutral controls remain unchanged.
+- [Passed] Image quality and asset fidelity: the result remains procedural
+  closed geometry without a clipping mask, duplicate filling, or raster effect.
+- [Passed] Copy/content: instructions, crack audio, completion, and
+  `Re-form chocolate` behavior remain unchanged.
+
+### Interaction and regression QA
+
+- Six desktop presses produced a contained permanent opening without folding
+  adjacent chocolate rows into the contact region.
+- Three mobile presses retained the bar silhouette, exposed the filling, and
+  caused no viewport highlight, clipping, or navigation collision.
+- Browser inspection found one canvas, the expected route title and copy, and
+  no Vite error overlay after repeated desktop and mobile interaction.
+- Automated coverage verifies perimeter overflow, opposite-face isolation,
+  attached-shell coupling, displacement limits, and responsive camera fit at
+  the reduced amplitudes.
+- No dependency or Supabase migration was added.
+
+final result: passed

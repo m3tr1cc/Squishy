@@ -79,7 +79,7 @@ describe('chocolate slime displacement', () => {
 
   it('carries sidewall vertices beyond the original body bounds', () => {
     const sidewall = sample(0, -1.79, 0.28, [0, -1, 0])
-    expect(sidewall.y).toBeLessThan(-0.1)
+    expect(sidewall.y).toBeLessThan(-0.04)
 
     const geometry = createChocolateSlimeGeometry()
     geometry.computeBoundingBox()
@@ -89,7 +89,7 @@ describe('chocolate slime displacement', () => {
     geometry.computeBoundingBox()
 
     expect(geometry.boundingBox!.min.y).toBeLessThan(
-      originalMinimumY - 0.1,
+      originalMinimumY - 0.015,
     )
     geometry.dispose()
   })
