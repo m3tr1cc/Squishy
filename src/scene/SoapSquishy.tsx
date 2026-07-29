@@ -11,6 +11,7 @@ import {
 import * as THREE from 'three'
 import {
   captureDeformationSource,
+  makeImpactPermanent,
   writeDeformedPositions,
   writeDisplacedPositions,
   type DentProfile,
@@ -98,6 +99,8 @@ export type FracturableSquishyConfig = Readonly<{
   maximumActiveImpacts: number
   maximumClusterSize: number
   releasedImpactTarget: number
+  preserveReleasedImpacts?: boolean
+  minimumPermanentImpact?: number
   fadePolicy: FragmentFadePolicyOptions
   fractureOptions: FractureOptions
   waxPalette: Readonly<{
@@ -619,10 +622,21 @@ export const SoapSquishy = memo(function SoapSquishy({
         }
       }
 
+      const shouldPreserveImpact =
+        runtimeConfig?.preserveReleasedImpacts === true &&
+        ((allowTapPulse && qualified) ||
+          durationSeconds >= TOUCH_DAMAGE_DELAY_SECONDS)
+      if (shouldPreserveImpact) {
+        makeImpactPermanent(
+          active.dent,
+          runtimeConfig.minimumPermanentImpact ?? 0,
+        )
+      }
+
       geometryDirtyRef.current = true
       bodyNeedsRestoreRef.current = true
     },
-    [],
+    [runtimeConfig],
   )
 
   useEffect(() => {
@@ -1137,7 +1151,7 @@ export const SoapSquishy = memo(function SoapSquishy({
     }
 
     for (const impact of impacts) {
-      if (activeDents.has(impact)) {
+      if (activeDents.has(impact) || impact.permanent) {
         continue
       }
       const springScratch = springScratchRef.current
@@ -1157,6 +1171,7 @@ export const SoapSquishy = memo(function SoapSquishy({
       if (
         (runtimeConfig?.releasedImpactTarget ?? 0) === 0 &&
         !activeDents.has(impact) &&
+        !impact.permanent &&
         Math.abs(impact.amount) < 0.001 &&
         Math.abs(impact.velocity) < 0.001
       ) {

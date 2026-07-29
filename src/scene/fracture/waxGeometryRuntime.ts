@@ -29,6 +29,7 @@ export type WaxGeometryRuntime = {
   readonly fragmentIds: Uint16Array
   readonly surfaceKinds: Uint8Array
   readonly pivots: Float32Array
+  readonly pivotDisplacements: Float32Array
   readonly peelAxes: Float32Array
   readonly seamInfluenceStarts: Uint32Array
   readonly seamInfluenceBondIds: BondIndexArray
@@ -388,6 +389,7 @@ export function createWaxGeometryRuntime(
     fragmentIds: fragmentIdValues,
     surfaceKinds: new Uint8Array(surfaceKinds.array),
     pivots,
+    pivotDisplacements: new Float32Array(topology.plateCount * 3),
     peelAxes,
     ...seamInfluences,
     poseScratch: {
@@ -428,6 +430,35 @@ export function writeWaxGeometry({
   const normals = normalAttribute.array as Float32Array
   const sourcePositions = topology.source.positions
   const sourceNormals = topology.source.normals
+  const pivotDisplacements = runtime.pivotDisplacements
+
+  if (displacementSampler) {
+    for (
+      let fragmentId = 0;
+      fragmentId < topology.fragments.length;
+      fragmentId += 1
+    ) {
+      const fragment = topology.fragments[fragmentId]
+      const fragmentOffset = fragmentId * 3
+      displacementSampler(
+        runtime.pivots[fragmentOffset],
+        runtime.pivots[fragmentOffset + 1],
+        runtime.pivots[fragmentOffset + 2],
+        fragment.averageNormal[0],
+        fragment.averageNormal[1],
+        fragment.averageNormal[2],
+        impacts,
+        displacementScratch,
+      )
+      pivotDisplacements[fragmentOffset] = displacementScratch.x
+      pivotDisplacements[fragmentOffset + 1] =
+        displacementScratch.y
+      pivotDisplacements[fragmentOffset + 2] =
+        displacementScratch.z
+    }
+  } else {
+    pivotDisplacements.fill(0)
+  }
 
   for (let vertex = 0; vertex < runtime.fragmentIds.length; vertex += 1) {
     const outputOffset = vertex * 3
@@ -587,9 +618,15 @@ export function writeWaxGeometry({
           angle,
         )
         pivotScratch.set(
-          pivotX - surfaceNormalX * dent,
-          pivotY - surfaceNormalY * dent,
-          pivotZ - surfaceNormalZ * dent,
+          pivotX +
+            pivotDisplacements[fragmentOffset] -
+            surfaceNormalX * dent,
+          pivotY +
+            pivotDisplacements[fragmentOffset + 1] -
+            surfaceNormalY * dent,
+          pivotZ +
+            pivotDisplacements[fragmentOffset + 2] -
+            surfaceNormalZ * dent,
         )
         positionScratch
           .set(x, y, z)

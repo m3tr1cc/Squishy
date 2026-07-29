@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CHOCOLATE_RUNTIME_CONFIG,
   CHOCOLATE_SLIME_DEFORMATION,
   createSlimeDisplacementSampler,
 } from '../src/scene/chocolate'
-import type { MutableSurfaceDisplacement } from '../src/scene/deformation'
+import {
+  makeImpactPermanent,
+  type MutableSurfaceDisplacement,
+} from '../src/scene/deformation'
 import type { DentImpact } from '../src/scene/types'
 
 const sampler = createSlimeDisplacementSampler()
@@ -46,6 +50,7 @@ describe('chocolate slime displacement', () => {
       3,
     )
     expect(shoulder.x).toBeGreaterThan(0.01)
+    expect(shoulder.y).toBeLessThan(0)
     expect(shoulder.z).toBeLessThan(0)
     expect(
       Math.hypot(shoulder.x, shoulder.y, shoulder.z),
@@ -62,9 +67,43 @@ describe('chocolate slime displacement', () => {
     })
   })
 
-  it('retains the configured 18 percent deformation residue', () => {
-    const full = sample(0, 0, 0.32, [0, 0, 1], 1)
-    const residual = sample(0, 0, 0.32, [0, 0, 1], 0.18)
-    expect(residual.z / full.z).toBeCloseTo(0.18, 4)
+  it('creates an outward volume ridge beyond the pressed pocket', () => {
+    const ridge = sample(1.12, 0, 0.32)
+    expect(ridge.x).toBeGreaterThan(0)
+    expect(ridge.y).toBeLessThan(0)
+    expect(ridge.z).toBeGreaterThan(0)
+  })
+
+  it('locks a released chocolate press into permanent deformation', () => {
+    const plasticImpact: DentImpact = {
+      ...impact,
+      amount: 0.12,
+      velocity: 2.4,
+    }
+    makeImpactPermanent(
+      plasticImpact,
+      CHOCOLATE_RUNTIME_CONFIG.minimumPermanentImpact!,
+    )
+
+    expect(plasticImpact.permanent).toBe(true)
+    expect(plasticImpact.amount).toBe(
+      CHOCOLATE_RUNTIME_CONFIG.minimumPermanentImpact,
+    )
+    expect(plasticImpact.velocity).toBe(0)
+    const first = sample(
+      0,
+      0,
+      0.32,
+      [0, 0, 1],
+      plasticImpact.amount,
+    )
+    const later = sample(
+      0,
+      0,
+      0.32,
+      [0, 0, 1],
+      plasticImpact.amount,
+    )
+    expect(later).toEqual(first)
   })
 })

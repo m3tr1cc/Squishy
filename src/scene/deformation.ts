@@ -164,6 +164,18 @@ export function writeDeformedPositions(
   geometry.computeVertexNormals()
 }
 
+export function makeImpactPermanent(
+  impact: DentImpact,
+  minimumAmount: number,
+) {
+  impact.amount = Math.max(
+    impact.amount,
+    THREE.MathUtils.clamp(minimumAmount, 0, 1),
+  )
+  impact.velocity = 0
+  impact.permanent = true
+}
+
 const displacementScratch: MutableSurfaceDisplacement = {
   x: 0,
   y: 0,

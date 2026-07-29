@@ -698,3 +698,86 @@ final result: passed
   `npm run build` pass.
 - No Supabase change or migration is required.
 - final result: passed
+
+## Permanent slime displacement refinement
+
+### Source and implementation evidence
+
+- Source visual truth:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/1acf110d-81e4-44d4-909f-0daac7289106/1-Photo-1.jpg`
+  at 1280 x 591 pixels. The supplied image shows the substantially displaced,
+  broken chocolate state used as the interaction target.
+- Intact companion reference:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/1acf110d-81e4-44d4-909f-0daac7289106/2-Photo-2.jpg`
+  at 1280 x 591 pixels.
+- Desktop implementation at three seconds after release:
+  `qa/chocolate-slime-permanent-desktop-3s.png`.
+- Desktop implementation at seven seconds after release:
+  `qa/chocolate-slime-permanent-desktop-7s.png`.
+- Mobile interaction state:
+  `qa/chocolate-slime-permanent-mobile-7s.png`.
+- Equal-slot combined comparison:
+  `qa/chocolate-slime-permanent-comparison.png` at
+  1440 x 450 pixels.
+- Desktop CSS viewport and capture: 1440 x 900 at DPR 1.
+- Mobile CSS viewport and capture: 390 x 844 at DPR 1.
+- State: three nearby presses followed by a seven-second release interval.
+  Source and implementation were aspect-fit into separate 720 x 450 black
+  frames so neither state was stretched or cropped.
+
+The full-view comparison was sufficient for this iteration because the
+requested evidence is the overall post-break silhouette, filling displacement,
+and shell coupling. The opening, attached chocolate pieces, green filling, and
+remaining 5 x 3 grid are all readable at the normalized comparison size.
+
+### Findings and comparison history
+
+- [Resolved P1] The previous chocolate implementation drove released impacts
+  back toward an 18% residue, which made the filling feel springy and rigid.
+  Chocolate presses now become plastic deformations on release: their
+  displacement amount is retained, velocity is cleared, and the impact remains
+  in the filling field until `Re-form chocolate` resets the experience.
+- [Resolved P1] The previous deformation was primarily an inward dent. The
+  revised field creates a deeper pocket, a wider tangential spread, a raised
+  volume-preserving outer ridge, and gravity-biased sag. The maximum bounded
+  displacement increases from 0.30 to 0.48 model units.
+- [Resolved P1] Peeling chocolate used a rest-space pivot, which could make a
+  still-connected shard appear to float over the moving filling. Each plate
+  pivot now samples the same persistent slime field as its vertices. Attached
+  seams remain coincident, peeling pieces travel with the filling, and only
+  detached pieces transition to Rapier gravity.
+- [Passed] The three-second and seven-second mobile captures are pixel
+  identical, confirming that the visible post-release shape does not rebound.
+  Desktop captures retain the same displaced opening; small pixel changes are
+  limited to the continuously rendered glossy scene.
+- [Passed] The normalized comparison now reads as a displaced, slime-filled
+  chocolate bar: the green filling spreads beyond the pressed pocket and
+  chocolate pieces remain carried around the opening instead of immediately
+  falling independently.
+- [Passed] Fonts and typography: no visible product typography changed. Hidden
+  route heading, instructions, and navigation copy remain unchanged.
+- [Passed] Spacing and layout rhythm: the existing straight-on 5 x 3 framing
+  remains centered at both target viewports, with navigation unobstructed.
+- [Passed] Colors and visual tokens: glossy dark chocolate, pale-green slime,
+  and the seamless black environment are unchanged.
+- [Passed] Image quality and asset fidelity: both filling and shell remain
+  procedural WebGL geometry. No deformation decal, replacement mesh, or
+  rasterized damage layer was introduced.
+- [Passed] Copy/content: `Chocolate slime`, its interaction instruction, crack
+  sounds, and `Re-form chocolate` behavior remain intact.
+
+### Interaction and regression QA
+
+- Desktop and mobile pointer presses produced connected shell fractures and
+  retained the resulting slime shape after release.
+- Still-attached and peeling chocolate visibly follow the persistent filling
+  field; detached fragments retain the existing gravity and fade lifecycle.
+- Browser inspection found no Vite overlay, WebGL loss, or application-owned
+  console error. Chrome-extension warnings and the existing upstream
+  `THREE.Clock` deprecation warning were excluded from application findings.
+- Focused automated coverage verifies permanent release state, volume ridge and
+  sag, bounded displacement, exact attached-shell coupling, and displaced peel
+  pivots.
+- No dependency or Supabase migration was added.
+
+final result: passed

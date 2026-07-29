@@ -27,4 +27,5 @@ export type DentImpact = {
   localNormal: VectorTuple
   amount: number
   velocity: number
+  permanent?: boolean
 }

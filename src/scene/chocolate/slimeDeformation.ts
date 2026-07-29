@@ -9,15 +9,19 @@ export type SlimeDeformationProfile = Readonly<{
   spreadRadius: number
   depth: number
   tangentSpread: number
+  normalBulge: number
+  gravitySag: number
   maximumDisplacement: number
 }>
 
 export const CHOCOLATE_SLIME_DEFORMATION = Object.freeze({
-  pressRadius: 0.85,
-  spreadRadius: 1.22,
-  depth: 0.26,
-  tangentSpread: 0.18,
-  maximumDisplacement: 0.3,
+  pressRadius: 0.95,
+  spreadRadius: 1.65,
+  depth: 0.42,
+  tangentSpread: 0.34,
+  normalBulge: 0.14,
+  gravitySag: 0.12,
+  maximumDisplacement: 0.48,
 } satisfies SlimeDeformationProfile)
 
 export function createSlimeDisplacementSampler(
@@ -66,9 +70,22 @@ export function createSlimeDisplacementSampler(
         profile.spreadRadius,
       )
       const inward = profile.depth * amount * core
+      const annulus = Math.max(
+        0,
+        spreadFalloff - core,
+      )
+      const outward = profile.normalBulge * amount * annulus
       displacementX -= normalX * inward
       displacementY -= normalY * inward
       displacementZ -= normalZ * inward
+      displacementX += normalX * outward
+      displacementY += normalY * outward
+      displacementZ += normalZ * outward
+      displacementY -=
+        profile.gravitySag *
+        amount *
+        spreadFalloff *
+        (0.35 + annulus * 0.65)
 
       const normalDistance =
         deltaX * impactNormalX +
@@ -79,13 +96,14 @@ export function createSlimeDisplacementSampler(
       const tangentZ = deltaZ - impactNormalZ * normalDistance
       const tangentLength = Math.hypot(tangentX, tangentY, tangentZ)
       if (tangentLength > 1e-5) {
-        const annulus =
-          Math.max(0, spreadFalloff - core * 0.45) *
-          profile.tangentSpread *
-          amount
-        displacementX += (tangentX / tangentLength) * annulus
-        displacementY += (tangentY / tangentLength) * annulus
-        displacementZ += (tangentZ / tangentLength) * annulus
+        const tangentDisplacement =
+          annulus * profile.tangentSpread * amount
+        displacementX +=
+          (tangentX / tangentLength) * tangentDisplacement
+        displacementY +=
+          (tangentY / tangentLength) * tangentDisplacement
+        displacementZ +=
+          (tangentZ / tangentLength) * tangentDisplacement
       }
     }
 
