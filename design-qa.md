@@ -863,3 +863,73 @@ original rectangle.
 - The change adds no dependency and requires no Supabase migration.
 
 final result: passed
+
+## Half-strength chocolate deformation tuning
+
+### Source and implementation evidence
+
+- Source visual truth:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/1acf110d-81e4-44d4-909f-0daac7289106/1-Photo-1.jpg`
+  at 1280 x 591 pixels.
+- Half-strength desktop state:
+  `qa/chocolate-slime-half-strength-desktop.png` at 1440 x 900,
+  CSS viewport 1440 x 900, DPR 1.
+- Half-strength mobile state:
+  `qa/chocolate-slime-half-strength-mobile.png` at 390 x 844,
+  CSS viewport 390 x 844, DPR 1.
+- Source/half-strength comparison:
+  `qa/chocolate-slime-half-strength-reference-comparison.png` at
+  1440 x 450.
+- Previous full-strength/current half-strength comparison:
+  `qa/chocolate-slime-full-vs-half-strength.png` at 1440 x 450.
+- State: six nearby lower-region desktop presses and three center mobile
+  presses, each followed by a 3.5-second settling interval. Comparison slots
+  are equal 720 x 450 aspect-fit frames without crop or stretch.
+
+The full-strength and half-strength screenshots use different random coating
+seeds, so individual crack edges are intentionally not compared one-for-one.
+The same camera, press count, press region, and settle time make the overall
+mesh displacement and retained silhouette directly comparable.
+
+### Findings and comparison history
+
+- [Resolved P1] The unbounded-flow pass allowed the lower-left quarter of the
+  bar to collapse into one large hanging lobe after six presses. The focused
+  comparison shows the tuned version retaining recognizable rows and gutters
+  outside the genuinely fractured contact area.
+- [Resolved P1] Every displacement amplitude is exactly halved while its
+  influence radius is unchanged: indentation depth `0.42 -> 0.21`, tangent
+  spread `0.34 -> 0.17`, ridge height `0.14 -> 0.07`, local sag
+  `0.12 -> 0.06`, volume flow `0.50 -> 0.25`, volume sag `0.24 -> 0.12`,
+  and accumulated displacement cap `0.78 -> 0.39`.
+- [Passed] The lower silhouette still crosses the pristine chocolate baseline,
+  preserving the requested unconstrained slime behavior. The reduction affects
+  magnitude, not reach, permanence, or thickness coupling.
+- [Passed] Attached and peeling chocolate still follows the filling field.
+  Detached shards retain the existing Rapier gravity and fade lifecycle.
+- [Passed] Fonts and typography: unchanged; no new visible text or typography
+  treatment was introduced.
+- [Passed] Spacing and layout rhythm: camera, product position, navigation,
+  and desktop/mobile safe areas are unchanged from the approved unbounded pass.
+- [Passed] Colors and visual tokens: glossy chocolate, green filling, black
+  background, and neutral navigation remain unchanged.
+- [Passed] Image quality and asset fidelity: the result remains procedural
+  geometry with no clip mask, duplicate mesh, raster overlay, or fake overflow.
+- [Passed] Copy/content: interaction instructions, audio, completion, and
+  `Re-form chocolate` remain unchanged.
+
+### Interaction and regression QA
+
+- Six desktop presses produced a localized permanent deformation without
+  folding the entire bar into the contact region.
+- Three mobile presses preserved the grid silhouette, exposed the filling,
+  and caused no viewport highlight, clipping, or navigation collision.
+- Browser inspection found no Vite overlay, WebGL loss, or application-owned
+  console error. The existing Rapier initialization and `THREE.Clock`
+  deprecation warnings remain dependency-owned and non-blocking.
+- Automated coverage continues to verify sidewall overflow beyond the original
+  filling bound, back-face isolation, attached-shell coupling, bounded
+  displacement, and responsive camera fit at the reduced amplitudes.
+- No dependency or Supabase migration was added.
+
+final result: passed

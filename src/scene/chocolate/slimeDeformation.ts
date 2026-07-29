@@ -21,15 +21,15 @@ export type SlimeDeformationProfile = Readonly<{
 export const CHOCOLATE_SLIME_DEFORMATION = Object.freeze({
   pressRadius: 0.95,
   spreadRadius: 1.65,
-  depth: 0.42,
-  tangentSpread: 0.34,
-  normalBulge: 0.14,
-  gravitySag: 0.12,
+  depth: 0.21,
+  tangentSpread: 0.17,
+  normalBulge: 0.07,
+  gravitySag: 0.06,
   volumeSpreadRadius: 3.6,
-  volumeFlow: 0.5,
-  volumeSag: 0.24,
+  volumeFlow: 0.25,
+  volumeSag: 0.12,
   surfaceDepthRadius: 0.58,
-  maximumDisplacement: 0.78,
+  maximumDisplacement: 0.39,
 } satisfies SlimeDeformationProfile)
 
 export function createSlimeDisplacementSampler(
