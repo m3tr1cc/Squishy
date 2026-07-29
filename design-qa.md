@@ -613,3 +613,323 @@ final result: passed
   mobile budget.
 - No Supabase change or migration is required.
 - Final result: passed.
+
+## Chocolate slime experience
+
+### Source and implementation evidence
+
+- Source visual truth:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/9efcbaf9-f32c-42c6-90a7-6800ff0be2af/1-Photo-1.jpg`,
+  `2-Photo-2.jpg`, and `3-Photo-3.jpg`, each at 1280 x 591 pixels.
+- Desktop intact implementation:
+  `qa/chocolate-desktop-fresh.png` at 1440 x 900, CSS viewport
+  1440 x 900, DPR 1.
+- Desktop cracked implementation:
+  `qa/chocolate-desktop-cracked-fresh.png` at 1440 x 900 with the
+  same viewport and density.
+- Repeated-press implementation:
+  `qa/chocolate-desktop-multi-crack.png` at 1440 x 900 after four
+  additional presses and a 2.2 second debris-settle interval.
+- Mobile intact and cracked implementation:
+  `qa/chocolate-mobile.png` and `qa/chocolate-mobile-cracked.png` at
+  390 x 844, CSS viewport 390 x 844, requested DPR 1.5.
+- Equal-size full-view comparisons:
+  `qa/chocolate-reference-comparison.png` and
+  `qa/chocolate-cracked-comparison.png`, each at 1440 x 450. Source
+  and implementation were independently aspect-fit into equal 720 x 450
+  black frames before comparison, avoiding density or crop bias.
+
+### Findings and comparison history
+
+- [Passed] The intact comparison shows one continuous glossy dark-chocolate
+  bar with the requested 5 x 3 raised-cell grid, recessed gutters, soft outer
+  corners, and restrained specular highlights. The procedural bar is more
+  pillowy than the molded reference, which is an intentional tactile
+  interpretation rather than a hierarchy or geometry mismatch.
+- [Passed] The cracked comparison confirms that breakage belongs to the
+  chocolate surface itself. Smaller connected fragments peel away to reveal
+  the contrasting pale-green filling; there is no press-specific decal,
+  replacement mesh, or flat color overlay.
+- [Passed] The filling depresses at contact, spreads tangentially around the
+  press, rebounds slowly, and retains an 18% accumulated deformation residue
+  until `Re-form chocolate` resets the experience. Attached chocolate follows
+  the same displacement field before detached fragments transition to Rapier.
+- [Passed] Fonts and typography: the source provides no product label to
+  reproduce. The existing hidden heading, navigation status, and accessible
+  button copy use the established application type stack without introducing
+  a new visible typography system.
+- [Passed] Spacing and layout rhythm: both 1440 x 900 and 390 x 844 keep the
+  wide bar centered, fully visible, and clear of the top-right navigation.
+  Straight-on camera framing preserves equal cell widths and horizontal rows.
+- [Passed] Colors and visual tokens: near-black presentation, glossy
+  `#3a160f` chocolate, darker broken edges, and `#a9ef75` slime preserve the
+  reference's dark-shell/light-filling contrast while implementing the
+  requested green filling.
+- [Passed] Image quality and asset fidelity: the reference was used as visual
+  truth only; the final bar is a closed procedural surface with smooth normals
+  and no raster stretching, placeholder imagery, sorting halo, or visible
+  background seam.
+- [Passed] Copy/content: the third route is titled `Chocolate slime`, the
+  hidden instruction describes cracking and spreading, and completion exposes
+  the specific `Re-form chocolate` action.
+- No P0, P1, or P2 difference was found in the first normalized comparison, so
+  no visual correction iteration was required. Focused crops were unnecessary:
+  the geometry, specular surface, crack opening, and filling contrast are all
+  clearly readable in the equal-height full-view comparisons.
+
+### Interaction, responsive, and performance QA
+
+- A 300 ms desktop hold produced a local connected opening; four additional
+  presses extended the fracture across neighboring cells while detached
+  fragments fell and retired without a WebGL or Rapier error.
+- A 260 ms mobile press at 390 x 844 produced the same local chocolate crack
+  and exposed green filling without layout movement, blue tap highlighting,
+  or navigation activation.
+- Fresh desktop and mobile browser sessions reported zero uncaught page
+  errors. Console inspection found only the existing Rapier initialization
+  deprecation warning after debris first loaded.
+- The mobile 300-frame diagnostic sample averaged 60.0 FPS with a 17.1 ms
+  p95 frame time, 3 draw calls, and 61,504 rendered triangles.
+- Deterministic tests cover the 15-cell closed mesh, 12,000-source-triangle
+  budget, 72 connected chocolate plates, gutter toughness bias, bounded slime
+  displacement, 18% residue, camera framing, debris colliders, and three-page
+  non-wrapping navigation.
+- `npm run lint`, `npm run check`, `npm test` (28 files, 133 tests), and
+  `npm run build` pass.
+- No Supabase change or migration is required.
+- final result: passed
+
+## Permanent slime displacement refinement
+
+### Source and implementation evidence
+
+- Source visual truth:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/1acf110d-81e4-44d4-909f-0daac7289106/1-Photo-1.jpg`
+  at 1280 x 591 pixels. The supplied image shows the substantially displaced,
+  broken chocolate state used as the interaction target.
+- Intact companion reference:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/1acf110d-81e4-44d4-909f-0daac7289106/2-Photo-2.jpg`
+  at 1280 x 591 pixels.
+- Desktop implementation at three seconds after release:
+  `qa/chocolate-slime-permanent-desktop-3s.png`.
+- Desktop implementation at seven seconds after release:
+  `qa/chocolate-slime-permanent-desktop-7s.png`.
+- Mobile interaction state:
+  `qa/chocolate-slime-permanent-mobile-7s.png`.
+- Equal-slot combined comparison:
+  `qa/chocolate-slime-permanent-comparison.png` at
+  1440 x 450 pixels.
+- Desktop CSS viewport and capture: 1440 x 900 at DPR 1.
+- Mobile CSS viewport and capture: 390 x 844 at DPR 1.
+- State: three nearby presses followed by a seven-second release interval.
+  Source and implementation were aspect-fit into separate 720 x 450 black
+  frames so neither state was stretched or cropped.
+
+The full-view comparison was sufficient for this iteration because the
+requested evidence is the overall post-break silhouette, filling displacement,
+and shell coupling. The opening, attached chocolate pieces, green filling, and
+remaining 5 x 3 grid are all readable at the normalized comparison size.
+
+### Findings and comparison history
+
+- [Resolved P1] The previous chocolate implementation drove released impacts
+  back toward an 18% residue, which made the filling feel springy and rigid.
+  Chocolate presses now become plastic deformations on release: their
+  displacement amount is retained, velocity is cleared, and the impact remains
+  in the filling field until `Re-form chocolate` resets the experience.
+- [Resolved P1] The previous deformation was primarily an inward dent. The
+  revised field creates a deeper pocket, a wider tangential spread, a raised
+  volume-preserving outer ridge, and gravity-biased sag. The maximum bounded
+  displacement increases from 0.30 to 0.48 model units.
+- [Resolved P1] Peeling chocolate used a rest-space pivot, which could make a
+  still-connected shard appear to float over the moving filling. Each plate
+  pivot now samples the same persistent slime field as its vertices. Attached
+  seams remain coincident, peeling pieces travel with the filling, and only
+  detached pieces transition to Rapier gravity.
+- [Passed] The three-second and seven-second mobile captures are pixel
+  identical, confirming that the visible post-release shape does not rebound.
+  Desktop captures retain the same displaced opening; small pixel changes are
+  limited to the continuously rendered glossy scene.
+- [Passed] The normalized comparison now reads as a displaced, slime-filled
+  chocolate bar: the green filling spreads beyond the pressed pocket and
+  chocolate pieces remain carried around the opening instead of immediately
+  falling independently.
+- [Passed] Fonts and typography: no visible product typography changed. Hidden
+  route heading, instructions, and navigation copy remain unchanged.
+- [Passed] Spacing and layout rhythm: the existing straight-on 5 x 3 framing
+  remains centered at both target viewports, with navigation unobstructed.
+- [Passed] Colors and visual tokens: glossy dark chocolate, pale-green slime,
+  and the seamless black environment are unchanged.
+- [Passed] Image quality and asset fidelity: both filling and shell remain
+  procedural WebGL geometry. No deformation decal, replacement mesh, or
+  rasterized damage layer was introduced.
+- [Passed] Copy/content: `Chocolate slime`, its interaction instruction, crack
+  sounds, and `Re-form chocolate` behavior remain intact.
+
+### Interaction and regression QA
+
+- Desktop and mobile pointer presses produced connected shell fractures and
+  retained the resulting slime shape after release.
+- Still-attached and peeling chocolate visibly follow the persistent filling
+  field; detached fragments retain the existing gravity and fade lifecycle.
+- Browser inspection found no Vite overlay, WebGL loss, or application-owned
+  console error. Chrome-extension warnings and the existing upstream
+  `THREE.Clock` deprecation warning were excluded from application findings.
+- Focused automated coverage verifies permanent release state, volume ridge and
+  sag, bounded displacement, exact attached-shell coupling, and displaced peel
+  pivots.
+- No dependency or Supabase migration was added.
+
+final result: passed
+
+## Unbounded slime silhouette refinement
+
+### Source and implementation evidence
+
+- Source visual truth:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/1acf110d-81e4-44d4-909f-0daac7289106/1-Photo-1.jpg`
+  at 1280 x 591 pixels. The broken reference shows the filling and carried
+  chocolate forming a silhouette that no longer follows the pristine bar.
+- Intact companion reference:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/1acf110d-81e4-44d4-909f-0daac7289106/2-Photo-2.jpg`
+  at 1280 x 591 pixels.
+- Desktop expanded implementation:
+  `qa/chocolate-slime-unbounded-after-more.png` at 1440 x 900,
+  CSS viewport 1440 x 900, DPR 1.
+- Mobile expanded implementation:
+  `qa/chocolate-slime-unbounded-mobile-after.png` at 390 x 844,
+  CSS viewport 390 x 844, DPR 1.
+- Source/implementation comparison:
+  `qa/chocolate-slime-unbounded-comparison.png` at 1440 x 450.
+- Pristine/expanded implementation comparison:
+  `qa/chocolate-slime-unbounded-before-after.png` at 1440 x 450.
+- State: six nearby lower-region presses followed by 3.5 seconds of settling
+  on desktop; three center presses followed by the same settling interval on
+  mobile. Each comparison slot is 720 x 450 with proportional aspect-fit and
+  no crop or stretch.
+
+A full-view reference comparison and a same-camera before/after comparison were
+both required. The reference comparison establishes the intended displaced
+material character; the before/after comparison proves that the final silhouette
+extends below the pristine bar instead of merely changing shading inside its
+original rectangle.
+
+### Findings and comparison history
+
+- [Resolved P1] The prior volume spread was multiplied by the local vertex
+  normal alignment. Front vertices moved, but the rounded sidewall and perimeter
+  vertices were effectively pinned to the source rectangle. The revised flow
+  separates front-face indentation from thickness-aware volume transport.
+- [Resolved P1] A 3.6-unit projected flow radius now carries front and near-side
+  vertices radially away from the impact and adds gravity-biased sag. A
+  0.58-unit depth coupling keeps the motion within the front volume and prevents
+  deformation from appearing on the opposite face.
+- [Resolved P1] Maximum accumulated displacement increases from 0.48 to 0.78
+  model units. The desktop post-fix capture shows the filling and bonded
+  chocolate extending below the intact right-hand baseline, while the mobile
+  capture retains the altered silhouette without clipping.
+- [Resolved P2] The old geometry bounds and camera fit were sized around the
+  pristine bar. Chocolate now uses conservative dynamic raycast bounds, and the
+  responsive camera reserves 4.05 x 2.42 half-extents for post-break expansion.
+  Expanded material remains touchable and visible at both target viewports.
+- [Passed] Attached and peeling chocolate still samples the same deformation
+  field as the filling. Only fully detached fragments transition to Rapier,
+  gravity, and the existing timed fade.
+- [Passed] Fonts and typography: no visible typography was added or changed.
+  The hidden route heading, instructions, and navigation labels remain intact.
+- [Passed] Spacing and layout rhythm: the pristine bar remains centered and
+  straight-on; the slightly wider safety framing is applied consistently on
+  desktop and portrait mobile.
+- [Passed] Colors and visual tokens: glossy dark chocolate, pale-green slime,
+  black background, and neutral navigation retain the approved palette.
+- [Passed] Image quality and asset fidelity: expansion is performed on the
+  existing procedural closed meshes. No clip mask, raster overlay, duplicate
+  filling, or fake overflow graphic was introduced.
+- [Passed] Copy/content: interaction instructions, crack audio, completion, and
+  `Re-form chocolate` are unchanged.
+
+### Interaction and regression QA
+
+- Desktop lower-edge presses created a permanent lobe beyond the pristine bar
+  boundary while bonded shell pieces followed it.
+- Mobile center presses retained the wider volume field, stayed inside the
+  responsive frame, and produced no blue tap highlight or navigation collision.
+- Browser inspection found no Vite overlay, WebGL loss, or application-owned
+  console error. Chrome extension message-channel noise and the existing
+  upstream `THREE.Clock` deprecation warning were excluded.
+- Automated coverage verifies sidewall displacement beyond the original filling
+  bounds, conservative dynamic bounds, expanded-shell coupling, opposite-face
+  isolation, displacement limits, and desktop/mobile camera fit.
+- The change adds no dependency and requires no Supabase migration.
+
+final result: passed
+
+## Half-strength chocolate deformation tuning
+
+### Source and implementation evidence
+
+- Source visual truth:
+  `.codex-remote-attachments/019f9ef9-371e-7273-962c-a044e8110cb3/1acf110d-81e4-44d4-909f-0daac7289106/1-Photo-1.jpg`
+  at 1280 x 591 pixels.
+- Half-strength desktop state:
+  `qa/chocolate-slime-half-strength-desktop.png` at 1440 x 900,
+  CSS viewport 1440 x 900, DPR 1.
+- Half-strength mobile state:
+  `qa/chocolate-slime-half-strength-mobile.png` at 390 x 844,
+  CSS viewport 390 x 844, DPR 1.
+- Source/half-strength comparison:
+  `qa/chocolate-slime-half-strength-reference-comparison.png` at
+  1440 x 450.
+- Previous full-strength/current half-strength comparison:
+  `qa/chocolate-slime-full-vs-half-strength.png` at 1440 x 450.
+- State: six nearby lower-region desktop presses and three center mobile
+  presses, each followed by a 3.5-second settling interval. Comparison slots
+  are equal 720 x 450 aspect-fit frames without crop or stretch.
+
+The full-strength and half-strength screenshots use different random coating
+seeds, so individual crack edges are intentionally not compared one-for-one.
+The same camera, press count, press region, and settle time make the overall
+mesh displacement and retained silhouette directly comparable.
+
+### Findings and comparison history
+
+- [Resolved P1] The unbounded-flow pass allowed the lower-left quarter of the
+  bar to collapse into one large hanging lobe after six presses. The focused
+  comparison shows the tuned version retaining recognizable rows and gutters
+  outside the genuinely fractured contact area.
+- [Resolved P1] Every displacement amplitude is exactly halved while its
+  influence radius is unchanged: indentation depth `0.42 -> 0.21`, tangent
+  spread `0.34 -> 0.17`, ridge height `0.14 -> 0.07`, local sag
+  `0.12 -> 0.06`, volume flow `0.50 -> 0.25`, volume sag `0.24 -> 0.12`,
+  and accumulated displacement cap `0.78 -> 0.39`.
+- [Passed] The lower silhouette still crosses the pristine chocolate baseline,
+  preserving the requested unconstrained slime behavior. The reduction affects
+  magnitude, not reach, permanence, or thickness coupling.
+- [Passed] Attached and peeling chocolate still follows the filling field.
+  Detached shards retain the existing Rapier gravity and fade lifecycle.
+- [Passed] Fonts and typography: unchanged; no new visible text or typography
+  treatment was introduced.
+- [Passed] Spacing and layout rhythm: camera, product position, navigation,
+  and desktop/mobile safe areas are unchanged from the approved unbounded pass.
+- [Passed] Colors and visual tokens: glossy chocolate, green filling, black
+  background, and neutral navigation remain unchanged.
+- [Passed] Image quality and asset fidelity: the result remains procedural
+  geometry with no clip mask, duplicate mesh, raster overlay, or fake overflow.
+- [Passed] Copy/content: interaction instructions, audio, completion, and
+  `Re-form chocolate` remain unchanged.
+
+### Interaction and regression QA
+
+- Six desktop presses produced a localized permanent deformation without
+  folding the entire bar into the contact region.
+- Three mobile presses preserved the grid silhouette, exposed the filling,
+  and caused no viewport highlight, clipping, or navigation collision.
+- Browser inspection found no Vite overlay, WebGL loss, or application-owned
+  console error. The existing Rapier initialization and `THREE.Clock`
+  deprecation warnings remain dependency-owned and non-blocking.
+- Automated coverage continues to verify sidewall overflow beyond the original
+  filling bound, back-face isolation, attached-shell coupling, bounded
+  displacement, and responsive camera fit at the reduced amplitudes.
+- No dependency or Supabase migration was added.
+
+final result: passed

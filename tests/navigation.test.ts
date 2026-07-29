@@ -21,10 +21,13 @@ describe('page routes', () => {
     expect(normalizePagePathname('/soaps///?preview=1')).toBe('/soaps')
   })
 
-  it('resolves both pages and exposes a first-page unknown fallback', () => {
+  it('resolves all pages and exposes a first-page unknown fallback', () => {
     expect(getPageRouteByPathname('/')).toMatchObject({ id: 'butter' })
     expect(getPageRouteByPathname('/soaps/')).toMatchObject({
       id: 'soaps',
+    })
+    expect(getPageRouteByPathname('/chocolate')).toMatchObject({
+      id: 'chocolate',
     })
 
     const unknown = resolvePageRoute('/missing')
@@ -43,6 +46,10 @@ describe('page routes', () => {
     })
     expect(getPageNeighbors('soaps')).toEqual({
       previous: getPageRouteById('butter'),
+      next: getPageRouteById('chocolate'),
+    })
+    expect(getPageNeighbors('chocolate')).toEqual({
+      previous: getPageRouteById('soaps'),
       next: null,
     })
     expect(getPageNeighbors(null)).toEqual({

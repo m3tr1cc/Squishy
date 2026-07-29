@@ -18,6 +18,23 @@ export type DentProfile = Readonly<{
   minimumDepth?: number
 }>
 
+export type MutableSurfaceDisplacement = {
+  x: number
+  y: number
+  z: number
+}
+
+export type SurfaceDisplacementSampler = (
+  x: number,
+  y: number,
+  z: number,
+  normalX: number,
+  normalY: number,
+  normalZ: number,
+  impacts: readonly DentImpact[],
+  output: MutableSurfaceDisplacement,
+) => void
+
 export const DEFAULT_DENT_PROFILE: DentProfile = {
   radius: DENT_RADIUS,
   depth: DENT_DEPTH,
@@ -141,6 +158,57 @@ export function writeDeformedPositions(
     target[offset] = x + normalX * normalDistance
     target[offset + 1] = y + normalY * normalDistance
     target[offset + 2] = z + normalZ * normalDistance
+  }
+
+  attribute.needsUpdate = true
+  geometry.computeVertexNormals()
+}
+
+export function makeImpactPermanent(
+  impact: DentImpact,
+  minimumAmount: number,
+) {
+  impact.amount = Math.max(
+    impact.amount,
+    THREE.MathUtils.clamp(minimumAmount, 0, 1),
+  )
+  impact.velocity = 0
+  impact.permanent = true
+}
+
+const displacementScratch: MutableSurfaceDisplacement = {
+  x: 0,
+  y: 0,
+  z: 0,
+}
+
+export function writeDisplacedPositions(
+  geometry: THREE.BufferGeometry,
+  source: DeformationSource,
+  impacts: readonly DentImpact[],
+  sampler: SurfaceDisplacementSampler,
+) {
+  const attribute = geometry.getAttribute('position') as THREE.BufferAttribute
+  const target = attribute.array as Float32Array
+  const { positions, normals } = source
+
+  for (let offset = 0; offset < positions.length; offset += 3) {
+    const x = positions[offset]
+    const y = positions[offset + 1]
+    const z = positions[offset + 2]
+    sampler(
+      x,
+      y,
+      z,
+      normals[offset],
+      normals[offset + 1],
+      normals[offset + 2],
+      impacts,
+      displacementScratch,
+    )
+    target[offset] = x + displacementScratch.x
+    target[offset + 1] = y + displacementScratch.y
+    target[offset + 2] = z + displacementScratch.z
   }
 
   attribute.needsUpdate = true
