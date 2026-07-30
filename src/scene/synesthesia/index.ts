@@ -1,0 +1,20 @@
+export { SynesthesiaBackground } from './SynesthesiaBackground'
+export {
+  createSquishyVisualSignals,
+  createSquishyVisualSignalMixer,
+  createSquishyVisualSignalSources,
+  createSynesthesiaAnimationState,
+  createSynesthesiaTheme,
+  createSynesthesiaThemeFromPalette,
+  mixSquishyVisualSignals,
+  stepSynesthesiaAnimation,
+  SYNESTHESIA_BURST_HALF_LIFE_SECONDS,
+  SYNESTHESIA_MOTIF_LIFETIME_SECONDS,
+  SYNESTHESIA_MOTIF_SLOT_COUNT,
+  writeSquishyVisualSignals,
+  type SquishyVisualSignals,
+  type SquishyVisualSignalMixer,
+  type SynesthesiaAnimationState,
+  type SynesthesiaPaletteEntry,
+  type SynesthesiaTheme,
+} from './synesthesiaAnimation'

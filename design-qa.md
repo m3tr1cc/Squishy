@@ -186,6 +186,143 @@ with angle changes retained only where real shard boundaries meet.
 
 final result: passed
 
+## Cross-page synesthesia propagation and two-second response
+
+### Source and implementation evidence
+
+- The original active-state visual comparison remains
+  `qa/chocolate-synesthesia-active-comparison.png`, with the local
+  Ratatouille frame reference on the left and the procedural chocolate
+  implementation on the right.
+- Fresh in-app browser captures were inspected for butter, soap, and
+  chocolate at 1440 x 900 and 390 x 844, DPR 1.
+- Butter selected one of its three body colors as the lead and used its
+  paired complement. Soap selected one of its six body colors and its
+  paired complement. The selection stayed stable within each session.
+- Active physical-fracture captures were inspected for all three pages.
+  Butter reported one active motif, soap five, and chocolate six after
+  real bond-break events; a press without a chocolate bond break raised
+  flow speed without introducing a motif.
+
+### Findings and comparison history
+
+- [Resolved P1] The original black butter ground plane covered the lower
+  half of the new procedural field. The non-physical visual plane was
+  removed; the existing static debris collider remains unchanged, and
+  the synesthesia field now fills the complete frame.
+- [Passed] The same blurred patch field, dark pockets, contours, ribbons,
+  and seeded motifs are shared by all pages without duplicating shader or
+  fracture code.
+- [Passed] Butter and soap palettes use explicit lead/complement pairs
+  sourced from their real body-color catalogs. Session-seeded selection
+  provides random variety without changing colors during animation.
+- [Passed] Fonts, copy, navigation placement, completion controls, object
+  geometry, lighting, and interaction targets remain unchanged.
+- [Passed] Every effect remains behind products and debris. No motif or
+  field layer blocks pointer or touch interaction.
+
+### Timing, responsive, and regression QA
+
+- Motif lifetime is now 2 seconds and burst energy uses a 0.35-second
+  half-life. Fresh diagnostics showed zero active motifs and near-ambient
+  flow after a 2.3-second post-fracture wait on soap and chocolate.
+- Butter, soap, and chocolate retained `clientWidth == scrollWidth` and
+  `clientHeight == scrollHeight` at 390 x 844, with no viewport cropping,
+  overflow, navigation collision, or aspect distortion.
+- The fixed signal mixer preserved active presses from any of the three
+  butter or six soap instances, averaged cumulative page damage, and
+  advanced bursts only when a source's real crack sequence changed.
+- Fresh browser inspection found no Vite overlay or application-owned
+  console error. Reduced-motion timing and static motif suppression remain
+  covered by deterministic unit tests.
+- No dependency or Supabase migration was added.
+
+final result: passed
+
+## Chocolate synesthesia background
+
+### Source and implementation evidence
+
+- Source visual truth:
+  `Ratatouille Tastes Food/frame_000571.png` and
+  `Ratatouille Tastes Food/frame_000590.png`, each 1280 x 720 pixels.
+  These film frames are local, untracked inspiration for the blurred field,
+  large ribbons, spirals, and contour-line motion; they are not shipped.
+- Desktop idle implementation:
+  `qa/chocolate-synesthesia-desktop-idle.png` at 1440 x 900 pixels,
+  CSS viewport 1440 x 900.
+- Desktop active implementation:
+  `qa/chocolate-synesthesia-desktop-multi-crack.png` at 1440 x 900 pixels,
+  captured immediately after real chocolate bond breaks.
+- Mobile implementation:
+  `qa/chocolate-synesthesia-mobile-idle.png` and
+  `qa/chocolate-synesthesia-mobile-crack.png` at 390 x 844 pixels,
+  CSS viewport 390 x 844.
+- Full-view comparisons:
+  `qa/chocolate-synesthesia-idle-comparison.png` and
+  `qa/chocolate-synesthesia-active-comparison.png`, normalized to a
+  common 720-pixel height without crop or stretch.
+- Focused-region comparison was not needed: the change is a full-frame
+  procedural background, while the chocolate geometry, controls, copy, and
+  typography remain unchanged and are legible in the full-view captures.
+
+The comparison evaluates visual grammar rather than literal composition: the
+reference contains a character and food, while Squishy intentionally keeps
+all synesthesia shapes behind the interactive chocolate bar.
+
+### Findings and comparison history
+
+- [Resolved P1] The first browser pass advanced the animation state without
+  displaying crack motifs because the mounted shader material had cloned its
+  uniform object. The renderer now writes scalar and fixed `Vector4` motif
+  uniforms directly into the mounted material on every frame.
+- [Resolved P1] The first active pass produced too many repeating contour
+  lines. The final shader uses a one-arm spiral, lower-frequency contours,
+  edge-anchored motif slots, broader ribbons, and a short darkening pulse so
+  the crack state reads as a composed burst rather than visual noise.
+- [Resolved P2] An opaque screen quad participated in Three.js's transmission
+  prepass and added two draw calls. The final depth-tested transparent quad
+  remains visually behind the chocolate while adding exactly one draw call.
+- [Resolved P2] A temporary development-only render-list diagnostic could
+  read a cleared list during hot reload. That probe was removed; fresh final
+  desktop and mobile sessions report zero application-owned console errors.
+- [Passed] Fonts and typography: no visible text style or font changed.
+- [Passed] Spacing and layout rhythm: the canvas, camera, product framing,
+  navigation placement, and safe areas remain unchanged. The 390 x 844 page
+  has no horizontal or vertical overflow.
+- [Passed] Colors and visual tokens: the field uses filling-led `#a9ef75`,
+  complementary `#ef5b62`, and deep chocolate-neutral `#160a08`. The intact
+  bar retains a clear silhouette in both calm and active states.
+- [Passed] Image quality and asset fidelity: the animation is procedural
+  WebGL, aspect-correct, and free of copied frames, raster overlays,
+  handcrafted SVGs, post-processing, or visible scaling artifacts.
+- [Passed] Copy, content, icons, and controls: the route title, instruction,
+  crack audio, navigation arrows, completion state, and `Re-form chocolate`
+  action are unchanged.
+- [Passed] Accessibility: reduced-motion tests freeze flow time, clear active
+  motifs, and retain damage-driven static color state.
+
+### Interaction, responsiveness, and performance
+
+- Desktop and mobile presses were exercised through pristine, first-crack,
+  multi-crack, and post-burst settling states. Only actual bond-break batches
+  advanced the motif sequence; ordinary pressure accelerated the field
+  without creating a fake crack burst.
+- A clean 239-frame mobile sample held the same 16.7 ms median frame time and
+  improved p95 from 17.0 ms to 16.9 ms within sampling noise. The background
+  changed the pristine scene from 3 to 4 draw calls and contributes one
+  full-screen triangle.
+- Direct data-URL iframe construction was blocked by the in-app browser's URL
+  safety policy. The implementation adds no DOM overlay or top-level sizing
+  assumption and stays inside the existing full-frame canvas; the verified
+  390 x 844 no-overflow result and existing iframe architecture are preserved.
+- Automated tests cover palette validation, deterministic bounded motif
+  selection, press-only acceleration, real-break sequencing, monotonic
+  damage escalation, burst decay, reset, and reduced motion.
+- No dependency, persistence, backend, or Supabase migration was added.
+
+final result: passed
+
 ## Fracture audio iteration
 
 ### Implementation
@@ -998,5 +1135,17 @@ retained displacement directly comparable.
   attached-shell coupling, displacement limits, and responsive camera fit at
   the reduced amplitudes.
 - No dependency or Supabase migration was added.
+
+final result: passed
+
+## Latest QA status: cross-page synesthesia background
+
+The complete source/implementation evidence, normalized comparison details,
+fidelity-surface review, responsive checks, interaction results, and
+performance measurements are recorded in the `Chocolate synesthesia
+background` and `Cross-page synesthesia propagation and two-second response`
+sections above. Final desktop and mobile captures for butter, soap, and
+chocolate contain no actionable P0/P1/P2 finding, and fresh browser sessions
+report no application-owned console error.
 
 final result: passed

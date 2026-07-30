@@ -18,6 +18,7 @@ export {
   CHOCOLATE_ID,
   CHOCOLATE_OUTER_OFFSET,
   CHOCOLATE_RUNTIME_CONFIG,
+  CHOCOLATE_SYNESTHESIA_THEME,
   createChocolateDebrisLaunch,
 } from './chocolateDefinition'
 export {

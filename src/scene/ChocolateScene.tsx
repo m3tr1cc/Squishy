@@ -7,15 +7,19 @@ import {
   CHOCOLATE_DEFINITION,
   CHOCOLATE_ID,
   CHOCOLATE_RUNTIME_CONFIG,
+  CHOCOLATE_SYNESTHESIA_THEME,
 } from './chocolate'
 import type { DebrisStaticCollider } from './fracture/RapierDebris'
 import { usePhysicsDebrisSources } from './fracture/usePhysicsDebrisSources'
 import { SoapSquishy } from './SoapSquishy'
 import {
   PerformanceDiagnostics,
-  SCENE_BACKGROUND,
   useReducedMotion,
 } from './SquishyScene'
+import {
+  createSquishyVisualSignalSources,
+  SynesthesiaBackground,
+} from './synesthesia'
 
 type ChocolateSceneProps = Readonly<{
   coatingSeed: number
@@ -103,10 +107,22 @@ export function ChocolateScene({
     createChocolateStaticColliders,
     [],
   )
+  const visualSignals = useMemo(
+    () => createSquishyVisualSignalSources(1),
+    [],
+  )
 
   return (
     <>
-      <color attach="background" args={[SCENE_BACKGROUND]} />
+      <color
+        attach="background"
+        args={[CHOCOLATE_SYNESTHESIA_THEME.shadowColor]}
+      />
+      <SynesthesiaBackground
+        reducedMotion={reducedMotion}
+        signals={visualSignals}
+        theme={CHOCOLATE_SYNESTHESIA_THEME}
+      />
       {import.meta.env.DEV ? <PerformanceDiagnostics /> : null}
       <ResponsiveChocolateCamera />
       <ambientLight color="#fffaf3" intensity={0.34} />
@@ -139,6 +155,7 @@ export function ChocolateScene({
         reducedMotion={reducedMotion}
         runtimeConfig={CHOCOLATE_RUNTIME_CONFIG}
         unlockCrackAudio={unlockCrackAudio}
+        visualSignals={visualSignals[0]}
       />
       {physicsDebris.clusters.length > 0 ? (
         <Suspense fallback={null}>

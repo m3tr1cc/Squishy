@@ -9,6 +9,7 @@ import {
   createSoapLabelAtlasTextureAsync,
   getSoapLabelAtlasEntry,
 } from './soapLabelAtlas'
+import type { SynesthesiaPaletteEntry } from '../synesthesia'
 import type {
   SoapDefinition,
   SoapDeformationDefinition,
@@ -260,6 +261,33 @@ export const SOAP_DEFINITIONS = Object.freeze([
     },
   }),
 ] as const)
+
+export const SOAP_SYNESTHESIA_PALETTE = Object.freeze([
+  Object.freeze({
+    leadingColor: SOAP_DEFINITIONS[0].style.bodyColor,
+    complementaryColor: '#6d54d8',
+  }),
+  Object.freeze({
+    leadingColor: SOAP_DEFINITIONS[1].style.bodyColor,
+    complementaryColor: '#42bfa1',
+  }),
+  Object.freeze({
+    leadingColor: SOAP_DEFINITIONS[2].style.bodyColor,
+    complementaryColor: '#dc9a3f',
+  }),
+  Object.freeze({
+    leadingColor: SOAP_DEFINITIONS[3].style.bodyColor,
+    complementaryColor: '#ee7659',
+  }),
+  Object.freeze({
+    leadingColor: SOAP_DEFINITIONS[4].style.bodyColor,
+    complementaryColor: '#47bfe8',
+  }),
+  Object.freeze({
+    leadingColor: SOAP_DEFINITIONS[5].style.bodyColor,
+    complementaryColor: '#b45bd2',
+  }),
+] satisfies readonly SynesthesiaPaletteEntry[])
 
 export const SOAP_DEFINITION_COUNT = SOAP_DEFINITIONS.length
 

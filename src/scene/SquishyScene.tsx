@@ -18,6 +18,7 @@ import {
   BUTTER_STACK_GROUND_Y,
   BUTTER_STACK_HEIGHT,
   BUTTER_STACK_POSITIONS,
+  BUTTER_SYNESTHESIA_PALETTE,
   mixButterSeed,
 } from './butters'
 import {
@@ -26,6 +27,11 @@ import {
 } from './constants'
 import { createButterLabelTexture } from './createButterLabelTexture'
 import { usePhysicsDebrisSources } from './fracture/usePhysicsDebrisSources'
+import {
+  createSquishyVisualSignalSources,
+  createSynesthesiaThemeFromPalette,
+  SynesthesiaBackground,
+} from './synesthesia'
 
 export const SCENE_BACKGROUND = '#000000'
 
@@ -171,6 +177,26 @@ export function SquishyScene({
   const reducedMotion = useReducedMotion()
   const labelTexture = useMemo(createButterLabelTexture, [])
   const physicsDebris = usePhysicsDebrisSources(BUTTER_SOURCE_IDS)
+  const visualSignals = useMemo(
+    () =>
+      createSquishyVisualSignalSources(
+        BUTTER_DEFINITIONS.length,
+      ),
+    [coatingSeed],
+  )
+  const synesthesiaTheme = useMemo(
+    () =>
+      createSynesthesiaThemeFromPalette(
+        BUTTER_SYNESTHESIA_PALETTE,
+        {
+          shadowColor: '#170f08',
+          seed: coatingSeed ^ 0xb077e2a1,
+          idleSpeed: 0.12,
+          maximumMotifs: 6,
+        },
+      ),
+    [coatingSeed],
+  )
   const staticColliders = useMemo(
     () =>
       createButterStaticColliders(
@@ -183,7 +209,15 @@ export function SquishyScene({
 
   return (
     <>
-      <color attach="background" args={[SCENE_BACKGROUND]} />
+      <color
+        attach="background"
+        args={[synesthesiaTheme.shadowColor]}
+      />
+      <SynesthesiaBackground
+        reducedMotion={reducedMotion}
+        signals={visualSignals}
+        theme={synesthesiaTheme}
+      />
       {import.meta.env.DEV ? <PerformanceDiagnostics /> : null}
       <ResponsiveCamera />
       <ambientLight color="#ffffff" intensity={0.35} />
@@ -205,7 +239,7 @@ export function SquishyScene({
         intensity={0.9}
         position={[4, 2, -3]}
       />
-      {BUTTER_DEFINITIONS.map((definition) => (
+      {BUTTER_DEFINITIONS.map((definition, index) => (
         <ButterSquishy
           key={`${resetKey}:${definition.id}`}
           bodyColor={definition.bodyColor}
@@ -218,6 +252,7 @@ export function SquishyScene({
           position={definition.position}
           reducedMotion={reducedMotion}
           unlockCrackAudio={unlockCrackAudio}
+          visualSignals={visualSignals[index]}
           waxPalette={definition.wax}
         />
       ))}
@@ -233,13 +268,6 @@ export function SquishyScene({
           />
         </Suspense>
       ) : null}
-      <mesh
-        position={[0, BUTTER_STACK_GROUND_Y, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-      >
-        <planeGeometry args={[40, 40]} />
-        <meshBasicMaterial color="#000000" />
-      </mesh>
     </>
   )
 }

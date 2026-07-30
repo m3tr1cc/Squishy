@@ -4,6 +4,7 @@ import type {
   FracturableDefinition,
   FracturableSquishyConfig,
 } from '../SoapSquishy'
+import { createSynesthesiaTheme } from '../synesthesia'
 import {
   CHOCOLATE_CORNER_RADIUS,
   CHOCOLATE_SEGMENTS,
@@ -18,6 +19,15 @@ export const CHOCOLATE_ID = 'chocolate'
 export const CHOCOLATE_OUTER_OFFSET = 0.052
 export const CHOCOLATE_DEBRIS_BODY_LIMIT = 24
 export const CHOCOLATE_DEBRIS_FLOOR_Y = -2.35
+export const CHOCOLATE_SYNESTHESIA_THEME =
+  createSynesthesiaTheme({
+    leadingColor: '#a9ef75',
+    complementaryColor: '#ef5b62',
+    shadowColor: '#160a08',
+    seed: 0x42e3d7a1,
+    idleSpeed: 0.12,
+    maximumMotifs: 6,
+  })
 
 function hashUint32(value: number) {
   let hash = value >>> 0
