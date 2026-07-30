@@ -14,6 +14,7 @@ import {
   SOAP_DEBRIS_BODY_LIMIT,
   SOAP_DEBRIS_FLOOR_CLEARANCE,
   SOAP_DEFINITIONS,
+  SOAP_SYNESTHESIA_PALETTE,
   SOAP_WAX_PHYSICAL_PROPERTIES,
   createSoapLabelAtlasTexture,
   createSoapLabelAtlasTextureAsync,
@@ -27,9 +28,14 @@ import {
 } from './SoapSquishy'
 import {
   PerformanceDiagnostics,
-  SCENE_BACKGROUND,
   useReducedMotion,
 } from './SquishyScene'
+import {
+  createSquishyVisualSignalSources,
+  createSynesthesiaThemeFromPalette,
+  SynesthesiaBackground,
+  type SquishyVisualSignals,
+} from './synesthesia'
 
 type SoapLayout = 'portrait' | 'landscape'
 
@@ -213,6 +219,7 @@ type SoapFieldProps = Pick<
 > & {
   reducedMotion: boolean
   layout: SoapLayout
+  visualSignals: readonly SquishyVisualSignals[]
   onPhysicsDebrisChange: Parameters<
     typeof SoapSquishy
   >[0]['onPhysicsDebrisChange']
@@ -255,6 +262,7 @@ function SoapField({
   playCrackSound,
   reducedMotion,
   unlockCrackAudio,
+  visualSignals,
 }: SoapFieldProps) {
   const [labelTexture, setLabelTexture] =
     useState<THREE.CanvasTexture | null>(null)
@@ -314,6 +322,7 @@ function SoapField({
             reducedMotion={reducedMotion}
             scale={SOAP_PRESENTATION_SCALE}
             unlockCrackAudio={unlockCrackAudio}
+            visualSignals={visualSignals[index]}
           />
         ) : (
           <SoapPreview
@@ -336,6 +345,26 @@ export function SoapScene({
   const reducedMotion = useReducedMotion()
   const size = useThree((state) => state.size)
   const layout = resolveSoapLayout(size.width, size.height)
+  const visualSignals = useMemo(
+    () =>
+      createSquishyVisualSignalSources(
+        SOAP_DEFINITIONS.length,
+      ),
+    [coatingSeed],
+  )
+  const synesthesiaTheme = useMemo(
+    () =>
+      createSynesthesiaThemeFromPalette(
+        SOAP_SYNESTHESIA_PALETTE,
+        {
+          shadowColor: '#0d0b17',
+          seed: coatingSeed ^ 0x50a9e1d3,
+          idleSpeed: 0.12,
+          maximumMotifs: 6,
+        },
+      ),
+    [coatingSeed],
+  )
   const physicsDebris =
     usePhysicsDebrisSources<SoapId>(SOAP_SOURCE_IDS)
   const handlePhysicsDebrisChange = useCallback(
@@ -354,7 +383,15 @@ export function SoapScene({
 
   return (
     <>
-      <color attach="background" args={[SCENE_BACKGROUND]} />
+      <color
+        attach="background"
+        args={[synesthesiaTheme.shadowColor]}
+      />
+      <SynesthesiaBackground
+        reducedMotion={reducedMotion}
+        signals={visualSignals}
+        theme={synesthesiaTheme}
+      />
       {import.meta.env.DEV ? <PerformanceDiagnostics /> : null}
       <ResponsiveSoapCamera />
       <ambientLight color="#ffffff" intensity={0.42} />
@@ -380,6 +417,7 @@ export function SoapScene({
         playCrackSound={playCrackSound}
         reducedMotion={reducedMotion}
         unlockCrackAudio={unlockCrackAudio}
+        visualSignals={visualSignals}
       />
       {physicsDebris.clusters.length > 0 ? (
         <Suspense fallback={null}>

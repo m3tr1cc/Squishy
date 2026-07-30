@@ -2,8 +2,8 @@ const UINT32_MAX = 0xffffffff
 
 export const SYNESTHESIA_MOTIF_SLOT_COUNT = 6
 export const SYNESTHESIA_MOTIF_STRIDE = 4
-export const SYNESTHESIA_MOTIF_LIFETIME_SECONDS = 3.2
-export const SYNESTHESIA_BURST_HALF_LIFE_SECONDS = 0.55
+export const SYNESTHESIA_MOTIF_LIFETIME_SECONDS = 2
+export const SYNESTHESIA_BURST_HALF_LIFE_SECONDS = 0.35
 
 export type SynesthesiaTheme = Readonly<{
   leadingColor: string
@@ -14,11 +14,21 @@ export type SynesthesiaTheme = Readonly<{
   maximumMotifs: number
 }>
 
+export type SynesthesiaPaletteEntry = Readonly<{
+  leadingColor: string
+  complementaryColor: string
+}>
+
 export type SquishyVisualSignals = {
   pressStrength: number
   damageProgress: number
   crackSequence: number
   crackStrength: number
+}
+
+export type SquishyVisualSignalMixer = {
+  readonly combinedSignals: SquishyVisualSignals
+  readonly observedCrackSequences: Uint32Array
 }
 
 export type SynesthesiaAnimationState = {
@@ -77,6 +87,32 @@ export function createSynesthesiaTheme(
   })
 }
 
+export function createSynesthesiaThemeFromPalette(
+  palette: readonly SynesthesiaPaletteEntry[],
+  options: Readonly<{
+    shadowColor: string
+    seed: number
+    idleSpeed: number
+    maximumMotifs: number
+  }>,
+) {
+  if (palette.length === 0) {
+    throw new Error('Synesthesia palette must include at least one entry')
+  }
+  const normalizedSeed = options.seed >>> 0
+  const paletteIndex = hashUint32(normalizedSeed) % palette.length
+  const selected = palette[paletteIndex]
+
+  return createSynesthesiaTheme({
+    leadingColor: selected.leadingColor,
+    complementaryColor: selected.complementaryColor,
+    shadowColor: options.shadowColor,
+    seed: hashUint32(normalizedSeed ^ 0xa53c9e17),
+    idleSpeed: options.idleSpeed,
+    maximumMotifs: options.maximumMotifs,
+  })
+}
+
 export function createSquishyVisualSignals(): SquishyVisualSignals {
   return {
     pressStrength: 0,
@@ -84,6 +120,68 @@ export function createSquishyVisualSignals(): SquishyVisualSignals {
     crackSequence: 0,
     crackStrength: 0,
   }
+}
+
+export function createSquishyVisualSignalSources(count: number) {
+  if (!Number.isInteger(count) || count < 1) {
+    throw new Error('Visual signal source count must be at least one')
+  }
+  return Array.from(
+    { length: count },
+    createSquishyVisualSignals,
+  )
+}
+
+export function createSquishyVisualSignalMixer(
+  sourceCount: number,
+): SquishyVisualSignalMixer {
+  if (!Number.isInteger(sourceCount) || sourceCount < 1) {
+    throw new Error('Visual signal source count must be at least one')
+  }
+  return {
+    combinedSignals: createSquishyVisualSignals(),
+    observedCrackSequences: new Uint32Array(sourceCount),
+  }
+}
+
+export function mixSquishyVisualSignals(
+  mixer: SquishyVisualSignalMixer,
+  sources: readonly SquishyVisualSignals[],
+) {
+  if (sources.length !== mixer.observedCrackSequences.length) {
+    throw new Error('Visual signal source count changed after initialization')
+  }
+
+  let pressStrength = 0
+  let damageProgress = 0
+  let crackStrength = 0
+  let hasNewCrack = false
+
+  for (let index = 0; index < sources.length; index += 1) {
+    const source = sources[index]
+    pressStrength = Math.max(pressStrength, source.pressStrength)
+    damageProgress += source.damageProgress
+    if (
+      source.crackSequence !==
+      mixer.observedCrackSequences[index]
+    ) {
+      mixer.observedCrackSequences[index] = source.crackSequence
+      crackStrength = Math.max(
+        crackStrength,
+        source.crackStrength,
+      )
+      hasNewCrack = true
+    }
+  }
+
+  const combined = mixer.combinedSignals
+  combined.pressStrength = pressStrength
+  combined.damageProgress = damageProgress / sources.length
+  if (hasNewCrack) {
+    combined.crackSequence += 1
+    combined.crackStrength = crackStrength
+  }
+  return combined
 }
 
 export function writeSquishyVisualSignals(

@@ -2,6 +2,7 @@ import {
   BUTTER_SIZE,
   SHELL_OFFSET,
 } from '../constants'
+import type { SynesthesiaPaletteEntry } from '../synesthesia'
 
 export type ButterId = 'yellow' | 'pink' | 'blue'
 
@@ -95,6 +96,21 @@ export const BUTTER_DEFINITIONS = Object.freeze([
     }),
   }),
 ] satisfies readonly ButterDefinition[])
+
+export const BUTTER_SYNESTHESIA_PALETTE = Object.freeze([
+  Object.freeze({
+    leadingColor: BUTTER_DEFINITIONS[0].bodyColor,
+    complementaryColor: '#7656d8',
+  }),
+  Object.freeze({
+    leadingColor: BUTTER_DEFINITIONS[1].bodyColor,
+    complementaryColor: '#42c995',
+  }),
+  Object.freeze({
+    leadingColor: BUTTER_DEFINITIONS[2].bodyColor,
+    complementaryColor: '#f28b4b',
+  }),
+] satisfies readonly SynesthesiaPaletteEntry[])
 
 export const BUTTER_STACK_POSITIONS = Object.freeze(
   BUTTER_DEFINITIONS.map(({ position }) => position),

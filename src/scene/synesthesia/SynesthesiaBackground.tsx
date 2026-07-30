@@ -3,7 +3,10 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import {
+  createSquishyVisualSignalMixer,
   createSynesthesiaAnimationState,
+  mixSquishyVisualSignals,
+  SYNESTHESIA_MOTIF_LIFETIME_SECONDS,
   SYNESTHESIA_MOTIF_SLOT_COUNT,
   type SquishyVisualSignals,
   type SynesthesiaTheme,
@@ -12,7 +15,7 @@ import {
 
 type SynesthesiaBackgroundProps = Readonly<{
   reducedMotion: boolean
-  signals: SquishyVisualSignals
+  signals: readonly SquishyVisualSignals[]
   theme: SynesthesiaTheme
 }>
 
@@ -31,6 +34,7 @@ const FRAGMENT_SHADER = /* glsl */ `
   #define PI 3.141592653589793
   #define TAU 6.283185307179586
   #define MOTIF_COUNT ${SYNESTHESIA_MOTIF_SLOT_COUNT}
+  #define MOTIF_LIFETIME ${SYNESTHESIA_MOTIF_LIFETIME_SECONDS.toFixed(1)}
 
   uniform vec2 uResolution;
   uniform vec3 uLeadingColor;
@@ -274,9 +278,13 @@ const FRAGMENT_SHADER = /* glsl */ `
       float activeAmount =
         step(0.0001, motif.z) *
         step(0.0, age) *
-        (1.0 - step(3.2, age));
+        (1.0 - step(MOTIF_LIFETIME, age));
       float entrance = smoothstep(0.0, 0.2, age);
-      float exit = 1.0 - smoothstep(2.35, 3.2, age);
+      float exit = 1.0 - smoothstep(
+        MOTIF_LIFETIME * 0.62,
+        MOTIF_LIFETIME,
+        age
+      );
       float envelope =
         activeAmount *
         entrance *
@@ -365,6 +373,10 @@ export function SynesthesiaBackground({
   const canvasElement = useThree((state) => state.gl.domElement)
   const diagnosticsFrameRef = useRef(0)
   const materialRef = useRef<THREE.ShaderMaterial>(null)
+  const signalMixer = useMemo(
+    () => createSquishyVisualSignalMixer(signals.length),
+    [signals],
+  )
   const animationState = useMemo(
     createSynesthesiaAnimationState,
     [theme],
@@ -411,9 +423,13 @@ export function SynesthesiaBackground({
   )
 
   useFrame((_, delta) => {
+    const combinedSignals = mixSquishyVisualSignals(
+      signalMixer,
+      signals,
+    )
     stepSynesthesiaAnimation(
       animationState,
-      signals,
+      combinedSignals,
       theme,
       delta,
       reducedMotion,

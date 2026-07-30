@@ -17,7 +17,7 @@ import {
   useReducedMotion,
 } from './SquishyScene'
 import {
-  createSquishyVisualSignals,
+  createSquishyVisualSignalSources,
   SynesthesiaBackground,
 } from './synesthesia'
 
@@ -108,7 +108,7 @@ export function ChocolateScene({
     [],
   )
   const visualSignals = useMemo(
-    createSquishyVisualSignals,
+    () => createSquishyVisualSignalSources(1),
     [],
   )
 
@@ -155,7 +155,7 @@ export function ChocolateScene({
         reducedMotion={reducedMotion}
         runtimeConfig={CHOCOLATE_RUNTIME_CONFIG}
         unlockCrackAudio={unlockCrackAudio}
-        visualSignals={visualSignals}
+        visualSignals={visualSignals[0]}
       />
       {physicsDebris.clusters.length > 0 ? (
         <Suspense fallback={null}>

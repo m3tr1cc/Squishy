@@ -75,6 +75,10 @@ import {
   PRESS_SPRING,
   stepSpring,
 } from './spring'
+import {
+  type SquishyVisualSignals,
+  writeSquishyVisualSignals,
+} from './synesthesia'
 import type {
   DentImpact,
   SquishyImpact,
@@ -97,6 +101,7 @@ type ButterSquishyProps = {
   ) => void
   playCrackSound: (brokenBondCount: number) => void
   unlockCrackAudio: () => void
+  visualSignals?: SquishyVisualSignals
   onImpact?: (impact: SquishyImpact) => void
 }
 
@@ -244,6 +249,7 @@ export const ButterSquishy = memo(function ButterSquishy({
   onPhysicsDebrisChange,
   playCrackSound,
   unlockCrackAudio,
+  visualSignals,
   onImpact,
 }: ButterSquishyProps) {
   const presentationRef = useRef<THREE.Group>(null)
@@ -1093,20 +1099,25 @@ export const ButterSquishy = memo(function ButterSquishy({
       }
     }
 
+    let pressStrength = 0
+    for (const pressInput of pressInputs) {
+      pressStrength = Math.max(pressStrength, pressInput.pressure)
+    }
+
     stepFracture(
       fractureModel,
       fractureState,
       pressInputs,
       delta,
     )
+    let newlyBrokenBondCount = 0
     if (fractureState.events.length > 0) {
       geometryDirtyRef.current = true
       const newClusters: DebrisCluster[] = []
       const detachedFragments: number[] = []
-      let brokenBondCount = 0
       for (const event of fractureState.events) {
         if (event.type === 'bond-break') {
-          brokenBondCount += 1
+          newlyBrokenBondCount += 1
         } else if (event.type === 'fragment-detach') {
           detachedFragments.push(event.fragmentIndex)
           if (reducedMotion) {
@@ -1123,8 +1134,8 @@ export const ButterSquishy = memo(function ButterSquishy({
           onComplete()
         }
       }
-      if (brokenBondCount > 0) {
-        playCrackSound(brokenBondCount)
+      if (newlyBrokenBondCount > 0) {
+        playCrackSound(newlyBrokenBondCount)
       }
       const connectedGroups = groupConnectedFragments(
         detachedFragments,
@@ -1145,6 +1156,16 @@ export const ButterSquishy = memo(function ButterSquishy({
           ...newClusters,
         ])
       }
+    }
+
+    if (visualSignals) {
+      writeSquishyVisualSignals(
+        visualSignals,
+        pressStrength,
+        fractureState.brokenBondCount,
+        fractureModel.bondCount,
+        newlyBrokenBondCount,
+      )
     }
 
     const peelAmounts = peelAmountsRef.current

@@ -1,6 +1,7 @@
 export {
   SOAP_DEFINITION_COUNT,
   SOAP_DEFINITIONS,
+  SOAP_SYNESTHESIA_PALETTE,
   getSoapDefinition,
   mixSoapSeed,
 } from './soapCatalog'

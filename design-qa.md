@@ -186,6 +186,59 @@ with angle changes retained only where real shard boundaries meet.
 
 final result: passed
 
+## Cross-page synesthesia propagation and two-second response
+
+### Source and implementation evidence
+
+- The original active-state visual comparison remains
+  `qa/chocolate-synesthesia-active-comparison.png`, with the local
+  Ratatouille frame reference on the left and the procedural chocolate
+  implementation on the right.
+- Fresh in-app browser captures were inspected for butter, soap, and
+  chocolate at 1440 x 900 and 390 x 844, DPR 1.
+- Butter selected one of its three body colors as the lead and used its
+  paired complement. Soap selected one of its six body colors and its
+  paired complement. The selection stayed stable within each session.
+- Active physical-fracture captures were inspected for all three pages.
+  Butter reported one active motif, soap five, and chocolate six after
+  real bond-break events; a press without a chocolate bond break raised
+  flow speed without introducing a motif.
+
+### Findings and comparison history
+
+- [Resolved P1] The original black butter ground plane covered the lower
+  half of the new procedural field. The non-physical visual plane was
+  removed; the existing static debris collider remains unchanged, and
+  the synesthesia field now fills the complete frame.
+- [Passed] The same blurred patch field, dark pockets, contours, ribbons,
+  and seeded motifs are shared by all pages without duplicating shader or
+  fracture code.
+- [Passed] Butter and soap palettes use explicit lead/complement pairs
+  sourced from their real body-color catalogs. Session-seeded selection
+  provides random variety without changing colors during animation.
+- [Passed] Fonts, copy, navigation placement, completion controls, object
+  geometry, lighting, and interaction targets remain unchanged.
+- [Passed] Every effect remains behind products and debris. No motif or
+  field layer blocks pointer or touch interaction.
+
+### Timing, responsive, and regression QA
+
+- Motif lifetime is now 2 seconds and burst energy uses a 0.35-second
+  half-life. Fresh diagnostics showed zero active motifs and near-ambient
+  flow after a 2.3-second post-fracture wait on soap and chocolate.
+- Butter, soap, and chocolate retained `clientWidth == scrollWidth` and
+  `clientHeight == scrollHeight` at 390 x 844, with no viewport cropping,
+  overflow, navigation collision, or aspect distortion.
+- The fixed signal mixer preserved active presses from any of the three
+  butter or six soap instances, averaged cumulative page damage, and
+  advanced bursts only when a source's real crack sequence changed.
+- Fresh browser inspection found no Vite overlay or application-owned
+  console error. Reduced-motion timing and static motif suppression remain
+  covered by deterministic unit tests.
+- No dependency or Supabase migration was added.
+
+final result: passed
+
 ## Chocolate synesthesia background
 
 ### Source and implementation evidence
@@ -1085,13 +1138,14 @@ retained displacement directly comparable.
 
 final result: passed
 
-## Latest QA status: chocolate synesthesia background
+## Latest QA status: cross-page synesthesia background
 
 The complete source/implementation evidence, normalized comparison details,
-fidelity-surface review, iteration history, responsive checks, interaction
-results, and performance measurements are recorded in the
-`Chocolate synesthesia background` section above. Its final desktop and mobile
-captures contain no actionable P0/P1/P2 finding and fresh browser sessions
+fidelity-surface review, responsive checks, interaction results, and
+performance measurements are recorded in the `Chocolate synesthesia
+background` and `Cross-page synesthesia propagation and two-second response`
+sections above. Final desktop and mobile captures for butter, soap, and
+chocolate contain no actionable P0/P1/P2 finding, and fresh browser sessions
 report no application-owned console error.
 
 final result: passed

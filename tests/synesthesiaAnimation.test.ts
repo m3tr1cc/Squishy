@@ -1,9 +1,21 @@
 import { describe, expect, it } from 'vitest'
+import {
+  BUTTER_DEFINITIONS,
+  BUTTER_SYNESTHESIA_PALETTE,
+} from '../src/scene/butters'
 import { CHOCOLATE_SYNESTHESIA_THEME } from '../src/scene/chocolate'
 import {
+  SOAP_DEFINITIONS,
+  SOAP_SYNESTHESIA_PALETTE,
+} from '../src/scene/soaps'
+import {
+  createSquishyVisualSignalMixer,
+  createSquishyVisualSignalSources,
   createSquishyVisualSignals,
   createSynesthesiaAnimationState,
   createSynesthesiaTheme,
+  createSynesthesiaThemeFromPalette,
+  mixSquishyVisualSignals,
   stepSynesthesiaAnimation,
   SYNESTHESIA_MOTIF_SLOT_COUNT,
   writeSquishyVisualSignals,
@@ -56,6 +68,68 @@ describe('synesthesia animation', () => {
         maximumMotifs: SYNESTHESIA_MOTIF_SLOT_COUNT + 1,
       }),
     ).toThrow('maximumMotifs must be between')
+  })
+
+  it('selects a stable random page color and its paired complement', () => {
+    const options = {
+      shadowColor: '#110d08',
+      seed: 0x78ab31de,
+      idleSpeed: 0.12,
+      maximumMotifs: 6,
+    }
+    const first = createSynesthesiaThemeFromPalette(
+      BUTTER_SYNESTHESIA_PALETTE,
+      options,
+    )
+    const second = createSynesthesiaThemeFromPalette(
+      BUTTER_SYNESTHESIA_PALETTE,
+      options,
+    )
+    const paletteEntry = BUTTER_SYNESTHESIA_PALETTE.find(
+      (entry) => entry.leadingColor === first.leadingColor,
+    )
+
+    expect(first).toEqual(second)
+    expect(paletteEntry?.complementaryColor).toBe(
+      first.complementaryColor,
+    )
+  })
+
+  it('uses every butter and soap body color as a lead option', () => {
+    expect(
+      BUTTER_SYNESTHESIA_PALETTE.map(
+        ({ leadingColor }) => leadingColor,
+      ),
+    ).toEqual(BUTTER_DEFINITIONS.map(({ bodyColor }) => bodyColor))
+    expect(
+      SOAP_SYNESTHESIA_PALETTE.map(
+        ({ leadingColor }) => leadingColor,
+      ),
+    ).toEqual(
+      SOAP_DEFINITIONS.map(({ style }) => style.bodyColor),
+    )
+  })
+
+  it('mixes independent page signals without overwriting presses', () => {
+    const sources = createSquishyVisualSignalSources(3)
+    const mixer = createSquishyVisualSignalMixer(sources.length)
+    writeSquishyVisualSignals(sources[0], 0.8, 30, 100, 2)
+    writeSquishyVisualSignals(sources[1], 0, 15, 100, 0)
+    writeSquishyVisualSignals(sources[2], 0.3, 0, 100, 0)
+
+    const combined = mixSquishyVisualSignals(mixer, sources)
+    expect(combined.pressStrength).toBeCloseTo(0.8)
+    expect(combined.damageProgress).toBeCloseTo(0.15)
+    expect(combined.crackSequence).toBe(1)
+    expect(combined.crackStrength).toBeCloseTo(2 / 3)
+
+    mixSquishyVisualSignals(mixer, sources)
+    expect(combined.crackSequence).toBe(1)
+
+    writeSquishyVisualSignals(sources[2], 0, 3, 100, 1)
+    mixSquishyVisualSignals(mixer, sources)
+    expect(combined.crackSequence).toBe(2)
+    expect(combined.crackStrength).toBeCloseTo(1 / 3)
   })
 
   it('accelerates for a press without inventing a crack burst', () => {
@@ -129,7 +203,7 @@ describe('synesthesia animation', () => {
     )
   })
 
-  it('layers cumulative energy and retires transient motifs', () => {
+  it('fades crack energy and motifs back to idle in two seconds', () => {
     const signals = createSquishyVisualSignals()
     const state = createSynesthesiaAnimationState()
     writeSquishyVisualSignals(signals, 0, 100, 100, 3)
@@ -144,7 +218,7 @@ describe('synesthesia animation', () => {
     expect(state.flowSpeed).toBeGreaterThan(2.25)
     expect(state.flowSpeed).toBeLessThanOrEqual(4)
 
-    for (let step = 0; step < 34; step += 1) {
+    for (let step = 0; step < 20; step += 1) {
       stepSynesthesiaAnimation(
         state,
         signals,
