@@ -77,6 +77,10 @@ import {
   type SoapDefinition,
 } from './soaps'
 import { INTRO_SPRING, stepSpring } from './spring'
+import {
+  type SquishyVisualSignals,
+  writeSquishyVisualSignals,
+} from './synesthesia'
 import type {
   DentImpact,
   SurfaceHit,
@@ -138,6 +142,7 @@ type SoapSquishyProps = Readonly<{
   unlockCrackAudio: () => void
   introDelay?: number
   runtimeConfig?: FracturableSquishyConfig
+  visualSignals?: SquishyVisualSignals
 }>
 
 export type SoapPhysicsDebrisSource = PhysicsDebrisSource
@@ -266,6 +271,7 @@ export const SoapSquishy = memo(function SoapSquishy({
   unlockCrackAudio,
   introDelay = 0,
   runtimeConfig,
+  visualSignals,
 }: SoapSquishyProps) {
   const presentationRef = useRef<THREE.Group>(null)
   const compressionRef = useRef<THREE.Group>(null)
@@ -1199,14 +1205,19 @@ export const SoapSquishy = memo(function SoapSquishy({
       }
     }
 
+    let pressStrength = 0
+    for (const pressInput of pressInputs) {
+      pressStrength = Math.max(pressStrength, pressInput.pressure)
+    }
+
     stepFracture(fractureModel, fractureState, pressInputs, delta)
+    let newlyBrokenBondCount = 0
     if (fractureState.events.length > 0) {
       const detachedFragments: number[] = []
       const newClusters: DebrisCluster[] = []
-      let brokenBondCount = 0
       for (const event of fractureState.events) {
         if (event.type === 'bond-break') {
-          brokenBondCount += 1
+          newlyBrokenBondCount += 1
         } else if (event.type === 'fragment-detach') {
           detachedFragments.push(event.fragmentIndex)
           hasDetachedRef.current = true
@@ -1224,8 +1235,8 @@ export const SoapSquishy = memo(function SoapSquishy({
           onComplete(definition.id)
         }
       }
-      if (brokenBondCount > 0) {
-        playCrackSound(brokenBondCount)
+      if (newlyBrokenBondCount > 0) {
+        playCrackSound(newlyBrokenBondCount)
       }
       const connectedGroups = groupConnectedFragments(
         detachedFragments,
@@ -1247,6 +1258,16 @@ export const SoapSquishy = memo(function SoapSquishy({
         ])
       }
       geometryDirtyRef.current = true
+    }
+
+    if (visualSignals) {
+      writeSquishyVisualSignals(
+        visualSignals,
+        pressStrength,
+        fractureState.brokenBondCount,
+        fractureModel.bondCount,
+        newlyBrokenBondCount,
+      )
     }
 
     const peelAmounts = peelAmountsRef.current
