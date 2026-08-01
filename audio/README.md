@@ -9,3 +9,16 @@
 - License: Creative Commons Attribution 4.0
 - Changes: Freesound’s high-quality MP3 preview is bundled locally; playback is
   shortened, gain-shaped, low-shelf emphasized, and pitch-varied in the app.
+
+## `slime-squish-1.mp3`, `slime-squish-2.mp3`, and `slime-squish-4.mp3`
+
+- Sources: “Slime Squish 1”, “Slime Squish 2”, and “Slime Squish 4”
+- Creator: floraphonic
+- Source URLs:
+  - https://pixabay.com/sound-effects/film-special-effects-slime-squish-1-218565/
+  - https://pixabay.com/sound-effects/film-special-effects-slime-squish-2-218566/
+  - https://pixabay.com/sound-effects/film-special-effects-slime-squish-4-218568/
+- License: Pixabay Content License
+- Changes: the original MP3 recordings are bundled locally; playback is
+  gain-shaped, compressed, shuffled without immediate repetition, and given
+  slight deterministic pitch variation in the app.

@@ -186,6 +186,80 @@ with angle changes retained only where real shard boundaries meet.
 
 final result: passed
 
+## Slime container page
+
+### Source and implementation evidence
+
+- Supplied source: `.codex-remote-attachments/019fbe0b-0cff-7951-9cfd-68544b3b161a/ed2e1cc1-7db5-4a8d-be0f-041deb9e64d8/1-Photo-1.jpg`
+  at 592 x 1280 pixels.
+- Desktop untouched state: `qa/slime-desktop-fresh.png` at 1440 x 900 CSS
+  pixels, DPR 1.
+- Desktop fully mixed state: `qa/slime-desktop-mixed.png` at 1440 x 900 CSS
+  pixels, DPR 1, after 12 distributed presses.
+- Mobile untouched state: `qa/slime-mobile-fresh.png` at 390 x 844 CSS
+  pixels, DPR 1.
+- Equal-height portrait comparison: `qa/slime-reference-comparison.png` at
+  1184 x 1280 pixels. The supplied phone capture and mobile implementation
+  occupy equal 592 x 1280 slots with proportional scaling and no crop or
+  stretch.
+
+The full-view portrait comparison is sufficient because the container, exposed
+slime, two-color split, clear rim, and front label are all readable at the
+normalized size. The source's social-video chrome and hands are treated as
+capture context rather than product UI, consistent with Squishy's full-frame
+canvas contract.
+
+### Findings and comparison history
+
+- [Resolved P1] The first procedural render supplied sRGB channel values to
+  Three.js vertex colors as linear values. This washed orange toward cream and
+  the final coral toward white. The palette is now converted to linear space
+  before interpolation, retaining the vivid pink/orange split and a saturated
+  single-color coral finish.
+- [Passed] Fonts and typography: the outside label reads lowercase `slime` in
+  the same local Fredoka family used for soap labels. The dark berry ink remains
+  legible through the clear wall on desktop and mobile.
+- [Passed] Spacing and layout rhythm: the round jar is centered in both target
+  viewports, clears the previous/next controls, and retains a product scale
+  comparable to the supplied portrait reference without clipping as it grows.
+- [Passed] Colors and visual tokens: the untouched crown has a soft irregular
+  orange/pink boundary. Interaction blends locally and globally until the
+  twelfth permanent deformation resolves to one coral color. The shared
+  synesthesia field uses the same palette and responds to every accepted press.
+- [Passed] Image quality and asset fidelity: the slime and clear round tub are
+  procedural WebGL geometry with physical materials, real highlights, rim
+  ridges, curved label geometry, and a cast shadow. No raster product stand-in,
+  post-processing, or fake deformation overlay ships with the page.
+- [Passed] Copy and content: `/slime` is page four of five, with accessible
+  instructions, completion announcement, adjacent Chocolate slime/Thocky
+  clicker navigation, and `Reset slime` after full mixing.
+- [Passed] Interaction and accessibility: exposed-top pointer and touch presses
+  retain their dents, lift and spread the crown with a tapering bounded growth
+  curve, and stop adding permanent volume after 12 interactions. Later presses
+  still create transient feedback, sound, and a background burst. Reset clears
+  all dents and restores both colors. Touch drift cancellation, two-pointer
+  limiting, pointer capture, and reduced-motion behavior remain explicit.
+
+### Browser, audio, and performance QA
+
+- Twelve desktop presses produced the permanent, fully mixed state and exposed
+  the reset control. Reset removed the control and restored the untouched
+  two-color state. A mobile top press deformed the crown without navigation
+  collision or overflow.
+- A genuine Chromium mouse gesture unlocked the dedicated Web Audio graph and
+  reported `ready`, one playback, `slime-squish-2`, playback rate `1.01`, user
+  activation true, and no resume error. The three local samples, shuffle bag,
+  pitch sequence, rate limit, and overlap cap have automated coverage.
+- The mobile sampled state reported 13 renderer calls and 11,777 triangles.
+  Across 300 settled frames it averaged 16.67 ms with 16.7 ms p50, 18.1 ms p95,
+  and 25.3 ms maximum.
+- Fresh browser logs contained no application-owned error. The existing
+  upstream `THREE.Clock` deprecation warning remains non-blocking.
+- No dependency, persistence, backend, Rapier usage, or Supabase migration was
+  added for this page.
+
+final result: passed
+
 ## Clicker inner-groove outline refinement
 
 ### Evidence and normalization

@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react'
 import { useCrackAudio } from './audio/useCrackAudio'
+import { useSlimeAudio } from './audio/useSlimeAudio'
 import { useThockAudio } from './audio/useThockAudio'
 import {
   PageNavigation,
@@ -35,6 +36,12 @@ const LazyChocolateScene = lazy(() =>
 const LazyClickerScene = lazy(() =>
   import('./scene/ClickerScene').then((module) => ({
     default: module.ClickerScene,
+  })),
+)
+
+const LazySlimeScene = lazy(() =>
+  import('./scene/SlimeScene').then((module) => ({
+    default: module.SlimeScene,
   })),
 )
 
@@ -71,6 +78,8 @@ function LoadingState({ pageId }: { pageId: PageId }) {
       ? 'Preparing six fresh coatings...'
       : pageId === 'chocolate'
         ? 'Tempering chocolate slime...'
+        : pageId === 'slime'
+          ? 'Filling a fresh slime tub...'
         : pageId === 'clicker'
           ? 'Warming up nine thocky keys...'
           : 'Warming three fresh coatings...'
@@ -109,11 +118,17 @@ export function App() {
   )
   const headingRef = useRef<HTMLHeadingElement>(null)
   const isClickerPage = route?.id === 'clicker'
+  const isSlimePage = route?.id === 'slime'
+  const isCrackPage =
+    route?.id === 'butter' ||
+    route?.id === 'soaps' ||
+    route?.id === 'chocolate'
   const crackAudio = useCrackAudio(
     session.seed,
-    route !== null && !isClickerPage,
+    isCrackPage,
   )
   const thockAudio = useThockAudio(session.seed, isClickerPage)
+  const slimeAudio = useSlimeAudio(session.seed, isSlimePage)
   const isCoarsePointer =
     typeof window !== 'undefined' &&
     window.matchMedia('(pointer: coarse)').matches
@@ -148,6 +163,7 @@ export function App() {
     }))
   }, [])
   const handleChocolateComplete = handleButterComplete
+  const handleSlimeSaturated = handleButterComplete
 
   const handleSoapComplete = useCallback((soapId: SoapId) => {
     setSession((current) => ({
@@ -172,8 +188,8 @@ export function App() {
           <div className="not-found-card" role="alert">
             <h1>That squishy is not here.</h1>
             <p>
-              The butter, soap, chocolate, and clicker experiences are
-              ready.
+              The butter, soap, chocolate, slime, and clicker experiences
+              are ready.
             </p>
             <a href="/">Return to the butter</a>
           </div>
@@ -191,7 +207,7 @@ export function App() {
           search={navigation.search}
         />
         <main className="app-shell app-shell--fallback">
-          {route.id === 'clicker' ? null : (
+          {route.id === 'clicker' || route.id === 'slime' ? null : (
             <div
               className={
                 route.id === 'soaps'
@@ -229,6 +245,8 @@ export function App() {
       ? 'Tap any of the six soaps to dent and crack its wax coating.'
       : route.id === 'chocolate'
         ? 'Click or tap the chocolate squares to crack the shell and spread the slime filling.'
+        : route.id === 'slime'
+          ? 'Click or tap the exposed slime to leave a permanent dent, grow it through the container, mix both colors, and play a wet squish.'
         : route.id === 'clicker'
           ? 'Click or tap any of the nine keys to press it, play a mechanical thock, and animate the background.'
           : 'Click or tap any of the three butter sticks to press its wax surface.'
@@ -237,6 +255,8 @@ export function App() {
       ? 'A soap wax layer is fully broken. Re-coat all soaps to play again.'
       : route.id === 'chocolate'
         ? 'The chocolate shell is fully broken. Re-form it to play again.'
+        : route.id === 'slime'
+          ? 'The slime is fully mixed. Reset it to play again.'
         : 'A butter wax layer is fully broken. Re-coat all three to play again.'
     : ''
 
@@ -273,7 +293,9 @@ export function App() {
               powerPreference: 'high-performance',
             }}
             shadows={
-              route.id === 'butter' || route.id === 'clicker'
+              route.id === 'butter' ||
+              route.id === 'clicker' ||
+              route.id === 'slime'
                 ? 'percentage'
                 : false
             }
@@ -304,6 +326,14 @@ export function App() {
                   unlockCrackAudio={crackAudio.unlock}
                 />
               </Suspense>
+            ) : route.id === 'slime' ? (
+              <Suspense fallback={null}>
+                <LazySlimeScene
+                  experienceSeed={session.seed}
+                  onSaturated={handleSlimeSaturated}
+                  playSlime={slimeAudio.trigger}
+                />
+              </Suspense>
             ) : (
               <Suspense fallback={null}>
                 <LazyClickerScene
@@ -324,6 +354,8 @@ export function App() {
               ? 'Re-coat soaps'
               : route.id === 'chocolate'
                 ? 'Re-form chocolate'
+                : route.id === 'slime'
+                  ? 'Reset slime'
                 : 'Re-coat butters'}
           </button>
         ) : null}
