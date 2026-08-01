@@ -1227,3 +1227,62 @@ chocolate contain no actionable P0/P1/P2 finding, and fresh browser sessions
 report no application-owned console error.
 
 final result: passed
+
+## Clicker housing alignment and molded-corner refinement
+
+### Evidence and normalization
+
+- Source visual truth:
+  `C:\Users\jleon\AppData\Local\Temp\codex-clipboard-5c1d3ba8-0c29-4db5-ac40-b0ad2e7110a8.png`
+  at 629 x 851 pixels.
+- Browser-rendered implementation:
+  `qa/clicker-housing-smooth-final.png` at 627 x 851 pixels, captured from a
+  627 x 851 CSS viewport at DPR 1 on `/clicker?qaDpr=1`.
+- Equal-height full-view comparison:
+  `qa/clicker-housing-before-after.png` at 1256 x 851 pixels. The supplied
+  source occupies the left 629-pixel slot and the revised implementation the
+  right 627-pixel slot without cropping, scaling, or stretching.
+- State: idle clicker after the scene settled, with identical route controls.
+
+The clicker fills enough of both captures to inspect the outer silhouette and
+corner continuity directly, so a separate focused crop was not necessary.
+
+### Findings and comparison history
+
+- [Resolved P2] The source clicker's top and bottom edges descended toward the
+  right because the product group retained a `-0.035` screen-plane rotation.
+  Removing that rotation is equivalent to the requested slight
+  counter-clockwise correction. The revised top and bottom edges now run
+  parallel with the screen while the subtle depth presentation remains.
+- [Resolved P2] The previous outer housing used a sparsely subdivided deformed
+  cuboid. Its large corner arcs exposed straight facets and discontinuous edge
+  highlights. The housing now uses Three.js's rounded-box surface with four
+  curved segments per corner, continuous supplied normals, and the existing
+  clear-coated plastic material. All four outer corners and side transitions
+  read as one smooth molded part in the revised comparison.
+- [Passed] Fonts and typography: no visible type or navigation typography was
+  changed.
+- [Passed] Spacing and layout rhythm: key positions, wells, rim thickness,
+  centered framing, and navigation safe area are unchanged. Only the unwanted
+  in-plane product tilt was removed.
+- [Passed] Colors and visual tokens: the white plastic, yellow/pink/blue keys,
+  studio lighting, background palette, and shadow treatment are unchanged.
+- [Passed] Image quality and asset fidelity: the housing remains procedural
+  WebGL geometry rather than a raster replacement. Smooth corner normals and a
+  higher-resolution molded arc remove visible faceting without post-processing.
+- [Passed] Copy and content: route title, hidden instructions, accessible
+  navigation labels, and audio behavior are unchanged.
+
+### Interaction, responsiveness, and performance
+
+- A center-key pointer press still depressed and released the correct key and
+  triggered the shared background burst. The page retained exact 627 x 851
+  viewport dimensions with no overflow or Vite error overlay.
+- The revised scene reports 18 draw calls and 11,175 rendered triangles, below
+  the existing 12,000 clicker budget. Frame samples remained predominantly
+  16.4-17.1 ms; the isolated automation capture pause was excluded.
+- Fresh browser logs contained no application-owned error. The existing
+  upstream `THREE.Clock` deprecation warning remains non-blocking.
+- No dependency, persistence, backend, or Supabase migration was added.
+
+final result: passed

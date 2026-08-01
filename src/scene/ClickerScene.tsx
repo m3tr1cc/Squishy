@@ -7,6 +7,7 @@ import {
   useRef,
 } from 'react'
 import * as THREE from 'three'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import {
   CLICKER_HOUSING,
   CLICKER_KEY_COUNT,
@@ -46,7 +47,7 @@ type ActiveKeyPress = Readonly<{
 
 const KEY_REST_Z = 0.78
 const STEM_REST_Z = 0.57
-const PRESENTATION_ROTATION = [-0.16, 0.045, -0.035] as const
+const PRESENTATION_ROTATION = [-0.16, 0.045, 0] as const
 
 function ResponsiveClickerCamera() {
   const { camera, size } = useThree()
@@ -86,15 +87,13 @@ export function ClickerScene({
   )
   const housingGeometry = useMemo(
     () =>
-      createRoundedCuboidGeometry({
-        width: CLICKER_HOUSING.width,
-        height: CLICKER_HOUSING.height,
-        depth: CLICKER_HOUSING.depth,
-        radius: CLICKER_HOUSING.radius,
-        widthSegments: 8,
-        heightSegments: 8,
-        depthSegments: 3,
-      }),
+      new RoundedBoxGeometry(
+        CLICKER_HOUSING.width,
+        CLICKER_HOUSING.height,
+        CLICKER_HOUSING.depth,
+        4,
+        CLICKER_HOUSING.radius,
+      ),
     [],
   )
   const plateGeometry = useMemo(

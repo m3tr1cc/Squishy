@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { describe, expect, it } from 'vitest'
 import {
   CLICKER_HOUSING,
@@ -27,12 +28,13 @@ describe('clicker definition', () => {
   })
 
   it('keeps the complete procedural device below the triangle budget', () => {
-    const housing = createRoundedCuboidGeometry({
-      ...CLICKER_HOUSING,
-      widthSegments: 8,
-      heightSegments: 8,
-      depthSegments: 3,
-    })
+    const housing = new RoundedBoxGeometry(
+      CLICKER_HOUSING.width,
+      CLICKER_HOUSING.height,
+      CLICKER_HOUSING.depth,
+      4,
+      CLICKER_HOUSING.radius,
+    )
     const plate = createRoundedCuboidGeometry({
       width: 4.85,
       height: 4.85,
@@ -72,7 +74,7 @@ describe('clicker definition', () => {
 
     try {
       const triangles =
-        housing.getIndex()!.count / 3 +
+        housing.getAttribute('position').count / 3 +
         plate.getIndex()!.count / 3 +
         (key.getIndex()!.count / 3) * 9 +
         (well.getIndex()!.count / 3) * 9 +
