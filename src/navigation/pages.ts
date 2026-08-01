@@ -21,6 +21,11 @@ export const PAGE_ROUTES = [
     title: 'Chocolate slime',
   },
   {
+    id: 'slime',
+    path: '/slime',
+    title: 'Slime container',
+  },
+  {
     id: 'clicker',
     path: '/clicker',
     title: 'Thocky clicker',

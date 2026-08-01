@@ -1,5 +1,8 @@
 import * as THREE from 'three'
-import fredokaFontUrl from '../../assets/fonts/Fredoka-Variable.ttf?url'
+import {
+  PRODUCT_LABEL_FONT_FAMILY,
+  loadProductLabelFont,
+} from '../labels/productLabelFont'
 import type {
   SoapAtlasUvBounds,
   SoapId,
@@ -9,10 +12,9 @@ export const SOAP_LABEL_ATLAS_COLUMNS = 3
 export const SOAP_LABEL_ATLAS_ROWS = 2
 export const SOAP_LABEL_ATLAS_WIDTH = 1_024
 export const SOAP_LABEL_ATLAS_HEIGHT = 512
-export const SOAP_LABEL_FONT_FAMILY = 'Squishy Fredoka'
+export const SOAP_LABEL_FONT_FAMILY = PRODUCT_LABEL_FONT_FAMILY
 
 const CELL_UV_PADDING = 0.055
-let soapLabelFontPromise: Promise<void> | null = null
 
 export type SoapLabelAtlasEntry = Readonly<{
   id: SoapId
@@ -81,30 +83,7 @@ export function getSoapLabelAtlasEntry(id: SoapId) {
 }
 
 export function loadSoapLabelFont() {
-  if (soapLabelFontPromise) {
-    return soapLabelFontPromise
-  }
-  if (
-    typeof document === 'undefined' ||
-    typeof FontFace === 'undefined'
-  ) {
-    soapLabelFontPromise = Promise.resolve()
-    return soapLabelFontPromise
-  }
-
-  soapLabelFontPromise = new FontFace(
-    SOAP_LABEL_FONT_FAMILY,
-    `url(${fredokaFontUrl})`,
-    {
-      style: 'normal',
-      weight: '600',
-    },
-  )
-    .load()
-    .then((font) => {
-      document.fonts.add(font)
-    })
-  return soapLabelFontPromise
+  return loadProductLabelFont()
 }
 
 /**

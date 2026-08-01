@@ -186,6 +186,80 @@ with angle changes retained only where real shard boundaries meet.
 
 final result: passed
 
+## Slime container page
+
+### Source and implementation evidence
+
+- Supplied source: `.codex-remote-attachments/019fbe0b-0cff-7951-9cfd-68544b3b161a/ed2e1cc1-7db5-4a8d-be0f-041deb9e64d8/1-Photo-1.jpg`
+  at 592 x 1280 pixels.
+- Desktop untouched state: `qa/slime-desktop-fresh.png` at 1440 x 900 CSS
+  pixels, DPR 1.
+- Desktop fully mixed state: `qa/slime-desktop-mixed.png` at 1440 x 900 CSS
+  pixels, DPR 1, after 12 distributed presses.
+- Mobile untouched state: `qa/slime-mobile-fresh.png` at 390 x 844 CSS
+  pixels, DPR 1.
+- Equal-height portrait comparison: `qa/slime-reference-comparison.png` at
+  1184 x 1280 pixels. The supplied phone capture and mobile implementation
+  occupy equal 592 x 1280 slots with proportional scaling and no crop or
+  stretch.
+
+The full-view portrait comparison is sufficient because the container, exposed
+slime, two-color split, clear rim, and front label are all readable at the
+normalized size. The source's social-video chrome and hands are treated as
+capture context rather than product UI, consistent with Squishy's full-frame
+canvas contract.
+
+### Findings and comparison history
+
+- [Resolved P1] The first procedural render supplied sRGB channel values to
+  Three.js vertex colors as linear values. This washed orange toward cream and
+  the final coral toward white. The palette is now converted to linear space
+  before interpolation, retaining the vivid pink/orange split and a saturated
+  single-color coral finish.
+- [Passed] Fonts and typography: the outside label reads lowercase `slime` in
+  the same local Fredoka family used for soap labels. The dark berry ink remains
+  legible through the clear wall on desktop and mobile.
+- [Passed] Spacing and layout rhythm: the round jar is centered in both target
+  viewports, clears the previous/next controls, and retains a product scale
+  comparable to the supplied portrait reference without clipping as it grows.
+- [Passed] Colors and visual tokens: the untouched crown has a soft irregular
+  orange/pink boundary. Interaction blends locally and globally until the
+  twelfth permanent deformation resolves to one coral color. The shared
+  synesthesia field uses the same palette and responds to every accepted press.
+- [Passed] Image quality and asset fidelity: the slime and clear round tub are
+  procedural WebGL geometry with physical materials, real highlights, rim
+  ridges, curved label geometry, and a cast shadow. No raster product stand-in,
+  post-processing, or fake deformation overlay ships with the page.
+- [Passed] Copy and content: `/slime` is page four of five, with accessible
+  instructions, completion announcement, adjacent Chocolate slime/Thocky
+  clicker navigation, and `Reset slime` after full mixing.
+- [Passed] Interaction and accessibility: exposed-top pointer and touch presses
+  retain their dents, lift and spread the crown with a tapering bounded growth
+  curve, and stop adding permanent volume after 12 interactions. Later presses
+  still create transient feedback, sound, and a background burst. Reset clears
+  all dents and restores both colors. Touch drift cancellation, two-pointer
+  limiting, pointer capture, and reduced-motion behavior remain explicit.
+
+### Browser, audio, and performance QA
+
+- Twelve desktop presses produced the permanent, fully mixed state and exposed
+  the reset control. Reset removed the control and restored the untouched
+  two-color state. A mobile top press deformed the crown without navigation
+  collision or overflow.
+- A genuine Chromium mouse gesture unlocked the dedicated Web Audio graph and
+  reported `ready`, one playback, `slime-squish-2`, playback rate `1.01`, user
+  activation true, and no resume error. The three local samples, shuffle bag,
+  pitch sequence, rate limit, and overlap cap have automated coverage.
+- The mobile sampled state reported 13 renderer calls and 11,777 triangles.
+  Across 300 settled frames it averaged 16.67 ms with 16.7 ms p50, 18.1 ms p95,
+  and 25.3 ms maximum.
+- Fresh browser logs contained no application-owned error. The existing
+  upstream `THREE.Clock` deprecation warning remains non-blocking.
+- No dependency, persistence, backend, Rapier usage, or Supabase migration was
+  added for this page.
+
+final result: passed
+
 ## Clicker inner-groove outline refinement
 
 ### Evidence and normalization
@@ -240,6 +314,73 @@ equal-size comparison, so an additional focused crop was unnecessary.
 - Fresh browser logs contained no application-owned error. The existing
   upstream `THREE.Clock` deprecation warning remains non-blocking.
 - No dependency, persistence, backend, or Supabase migration was added.
+
+final result: passed
+
+## Slime label centering and extended saturation
+
+### Evidence and normalization
+
+- Source visual truth:
+  `.codex-remote-attachments/019fbe0b-0cff-7951-9cfd-68544b3b161a/ed2e1cc1-7db5-4a8d-be0f-041deb9e64d8/1-Photo-1.jpg`
+  at 592 x 1280 pixels.
+- Revised untouched state: `qa/slime-refinement-fresh.png` at 390 x 844 CSS
+  pixels, DPR 1.
+- Revised quarter-way state: `qa/slime-refinement-quarter.png` at 390 x 844
+  CSS pixels, DPR 1, after 12 of 48 presses.
+- Revised saturated state: `qa/slime-refinement-saturated.png` at 390 x 844
+  CSS pixels, DPR 1, after 48 presses.
+- Equal-height source/implementation comparison:
+  `qa/slime-refinement-reference-comparison.png` at 1184 x 1280 pixels. The
+  source and 12-press implementation occupy equal 592 x 1280 slots with
+  proportional scaling and no crop or stretch.
+
+The source depicts an actively pressed two-color slime, so the 12-press state
+is the matching comparison state. It keeps the product, exposed two-color
+surface, retained dent, transparent rim, and front label readable together.
+
+### Findings and comparison history
+
+- [Resolved P1] The curved label was centered around the jar's positive Z axis,
+  but the responsive camera views the jar from a positive-X azimuth. The label
+  center now uses that same camera azimuth, placing `slime` squarely on the
+  visible front face at both desktop and portrait-mobile sizes.
+- [Resolved P1] The original 12-interaction cap completed global color mixing
+  and nearly all bounded growth too quickly. The cap is now 48 interactions,
+  with the growth decay scaled from 4 to 16 so the same taper unfolds across
+  four times as many presses.
+- [Resolved P2] Simply extending the cap still allowed distributed local color
+  mixing to make the 12-press state look nearly complete. Local mixing now has
+  an eight-interaction maturation window and a progress-scaled ceiling. At
+  press 12 the orange/pink split and dents remain distinct; press 48 converges
+  to one coral color and exposes reset.
+- [Passed] Fonts and typography: the shared Fredoka label face, weight, color,
+  size, and curved application remain unchanged; only its azimuth moved.
+- [Passed] Spacing and layout rhythm: the tub remains centered, clear of route
+  controls, and unclipped through untouched, quarter-way, and saturated states.
+- [Passed] Colors and visual tokens: orange, pink, coral, container materials,
+  studio lighting, shadow, and the shared animated background remain coherent
+  with the supplied reference and the previous approved implementation.
+- [Passed] Image quality and asset fidelity: label placement and mixing remain
+  procedural WebGL behavior with no raster overlay, replacement asset, or
+  post-processing pass.
+- [Passed] Copy and content: route title, interaction instruction, completion
+  announcement, reset label, and neighboring navigation remain unchanged.
+
+### Interaction and performance QA
+
+- Browser interaction confirmed no reset control after 12 presses and one
+  unique `Reset slime` control after the 48th press. Reset restores the
+  untouched centered-label state.
+- Genuine pointer presses continued to play local wet-squish samples and
+  animate the shared background throughout the extended interaction window.
+- The 48-impact state reports 13 draw calls and 11,777 rendered triangles.
+  Across 300 settled frames it averaged 16.67 ms with a 16.7 ms p50, 17.1 ms
+  p95, and 22.9 ms maximum.
+- Browser logs contained no application-owned error. The existing upstream
+  `THREE.Clock` deprecation warning remains non-blocking.
+- No dependency, persistence, backend, Rapier usage, or Supabase migration was
+  added for this refinement.
 
 final result: passed
 
@@ -1341,5 +1482,67 @@ corner continuity directly, so a separate focused crop was not necessary.
 - Fresh browser logs contained no application-owned error. The existing
   upstream `THREE.Clock` deprecation warning remains non-blocking.
 - No dependency, persistence, backend, or Supabase migration was added.
+
+final result: passed
+
+## Threefold slime deformation magnitude
+
+### Evidence and normalization
+
+- Source visual truth:
+  `.codex-remote-attachments/019fbe0b-0cff-7951-9cfd-68544b3b161a/ed2e1cc1-7db5-4a8d-be0f-041deb9e64d8/1-Photo-1.jpg`
+  at 592 x 1280 pixels.
+- Revised one-press mobile state: `qa/slime-triple-deformation-mobile.png` at
+  390 x 844 CSS pixels, DPR 1.
+- Revised twelve-press mobile state:
+  `qa/slime-triple-deformation-quarter.png` at 390 x 844 CSS pixels, DPR 1.
+- Equal-height one-press comparison:
+  `qa/slime-triple-deformation-comparison.png` at 1184 x 1280 pixels. Source
+  and implementation occupy equal 592 x 1280 slots with proportional scaling
+  and no crop or stretch.
+
+The source's finger press makes the requested tactile magnitude directly
+readable, so the focused implementation state uses one centered released press.
+The additional twelve-press capture verifies that distributed permanent dents
+remain smooth and contained when the stronger response accumulates.
+
+### Findings and comparison history
+
+- [Resolved P1] The previous 0.16-unit permanent dent and 0.08-unit live press
+  read as a shallow surface dimple. An explicit threefold scale now produces a
+  0.48-unit permanent dent, a 0.24-unit live press, and a 1.02-unit permanent
+  accumulation cap without changing growth, spread, or the 48-press mixing
+  timeline.
+- [Resolved P2] Directly summing multiple stronger dents could create steep
+  folded intersections after distributed presses. Overlapping permanent dents
+  now combine as root-sum-square energy and use a broader 0.9-unit influence,
+  retaining the full one-press magnitude while producing smooth accumulated
+  basins instead of sharp seams.
+- [Passed] Fonts and typography: the centered Fredoka `slime` label remains
+  unchanged and legible in untouched and deformed states.
+- [Passed] Spacing and layout rhythm: the deeper pocket remains inside the open
+  jar, clears the rigid rim, and stays within desktop and portrait framing.
+- [Passed] Colors and visual tokens: the orange/pink split, coral progression,
+  transparent tub, lighting, shadow, and shared background response are
+  unchanged.
+- [Passed] Image quality and asset fidelity: deformation remains deterministic
+  procedural WebGL geometry with recomputed normals, not a decal, shader dent,
+  extra mesh, or post-processing effect.
+- [Passed] Copy and content: route copy, 48-press completion behavior, reset,
+  navigation, and wet-squish audio remain unchanged.
+
+### Interaction and performance QA
+
+- A single centered pointer press left a broad permanent pocket visible after
+  release. Twelve distributed presses retained multiple smooth dents with no
+  wall clipping, inverted black gap, reset-state regression, or navigation
+  collision.
+- The sampled twelve-impact state reported 13 draw calls and 11,777 rendered
+  triangles. Across 300 settled frames it averaged 16.67 ms with a 16.7 ms
+  p50, 16.9 ms p95, and 19.6 ms maximum.
+- Browser logs contained no application-owned error. The existing upstream
+  `THREE.Clock` deprecation warning remains non-blocking.
+- No dependency, persistence, backend, Rapier usage, or Supabase migration was
+  added for this refinement.
 
 final result: passed

@@ -29,6 +29,9 @@ describe('page routes', () => {
     expect(getPageRouteByPathname('/chocolate')).toMatchObject({
       id: 'chocolate',
     })
+    expect(getPageRouteByPathname('/slime')).toMatchObject({
+      id: 'slime',
+    })
     expect(getPageRouteByPathname('/clicker/')).toMatchObject({
       id: 'clicker',
     })
@@ -53,10 +56,14 @@ describe('page routes', () => {
     })
     expect(getPageNeighbors('chocolate')).toEqual({
       previous: getPageRouteById('soaps'),
+      next: getPageRouteById('slime'),
+    })
+    expect(getPageNeighbors('slime')).toEqual({
+      previous: getPageRouteById('chocolate'),
       next: getPageRouteById('clicker'),
     })
     expect(getPageNeighbors('clicker')).toEqual({
-      previous: getPageRouteById('chocolate'),
+      previous: getPageRouteById('slime'),
       next: null,
     })
     expect(getPageNeighbors(null)).toEqual({
