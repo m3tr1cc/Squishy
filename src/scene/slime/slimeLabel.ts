@@ -11,6 +11,7 @@ import {
 const LABEL_WIDTH_SEGMENTS = 24
 const LABEL_HEIGHT_SEGMENTS = 6
 const LABEL_HALF_ANGLE = 0.66
+export const SLIME_LABEL_CENTER_ANGLE = Math.atan2(0.49, 0.8)
 const LABEL_BOTTOM_Y = SLIME_CONTAINER_BASE_Y + 0.42
 const LABEL_TOP_Y = SLIME_CONTAINER_BASE_Y + 1.32
 
@@ -25,7 +26,9 @@ export function createSlimeLabelGeometry() {
     const y = THREE.MathUtils.lerp(LABEL_BOTTOM_Y, LABEL_TOP_Y, v)
     for (let column = 0; column <= LABEL_WIDTH_SEGMENTS; column += 1) {
       const u = column / LABEL_WIDTH_SEGMENTS
-      const angle = THREE.MathUtils.lerp(-LABEL_HALF_ANGLE, LABEL_HALF_ANGLE, u)
+      const angle =
+        SLIME_LABEL_CENTER_ANGLE +
+        THREE.MathUtils.lerp(-LABEL_HALF_ANGLE, LABEL_HALF_ANGLE, u)
       vertices.push(
         Math.sin(angle) * radius,
         y,

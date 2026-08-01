@@ -317,6 +317,73 @@ equal-size comparison, so an additional focused crop was unnecessary.
 
 final result: passed
 
+## Slime label centering and extended saturation
+
+### Evidence and normalization
+
+- Source visual truth:
+  `.codex-remote-attachments/019fbe0b-0cff-7951-9cfd-68544b3b161a/ed2e1cc1-7db5-4a8d-be0f-041deb9e64d8/1-Photo-1.jpg`
+  at 592 x 1280 pixels.
+- Revised untouched state: `qa/slime-refinement-fresh.png` at 390 x 844 CSS
+  pixels, DPR 1.
+- Revised quarter-way state: `qa/slime-refinement-quarter.png` at 390 x 844
+  CSS pixels, DPR 1, after 12 of 48 presses.
+- Revised saturated state: `qa/slime-refinement-saturated.png` at 390 x 844
+  CSS pixels, DPR 1, after 48 presses.
+- Equal-height source/implementation comparison:
+  `qa/slime-refinement-reference-comparison.png` at 1184 x 1280 pixels. The
+  source and 12-press implementation occupy equal 592 x 1280 slots with
+  proportional scaling and no crop or stretch.
+
+The source depicts an actively pressed two-color slime, so the 12-press state
+is the matching comparison state. It keeps the product, exposed two-color
+surface, retained dent, transparent rim, and front label readable together.
+
+### Findings and comparison history
+
+- [Resolved P1] The curved label was centered around the jar's positive Z axis,
+  but the responsive camera views the jar from a positive-X azimuth. The label
+  center now uses that same camera azimuth, placing `slime` squarely on the
+  visible front face at both desktop and portrait-mobile sizes.
+- [Resolved P1] The original 12-interaction cap completed global color mixing
+  and nearly all bounded growth too quickly. The cap is now 48 interactions,
+  with the growth decay scaled from 4 to 16 so the same taper unfolds across
+  four times as many presses.
+- [Resolved P2] Simply extending the cap still allowed distributed local color
+  mixing to make the 12-press state look nearly complete. Local mixing now has
+  an eight-interaction maturation window and a progress-scaled ceiling. At
+  press 12 the orange/pink split and dents remain distinct; press 48 converges
+  to one coral color and exposes reset.
+- [Passed] Fonts and typography: the shared Fredoka label face, weight, color,
+  size, and curved application remain unchanged; only its azimuth moved.
+- [Passed] Spacing and layout rhythm: the tub remains centered, clear of route
+  controls, and unclipped through untouched, quarter-way, and saturated states.
+- [Passed] Colors and visual tokens: orange, pink, coral, container materials,
+  studio lighting, shadow, and the shared animated background remain coherent
+  with the supplied reference and the previous approved implementation.
+- [Passed] Image quality and asset fidelity: label placement and mixing remain
+  procedural WebGL behavior with no raster overlay, replacement asset, or
+  post-processing pass.
+- [Passed] Copy and content: route title, interaction instruction, completion
+  announcement, reset label, and neighboring navigation remain unchanged.
+
+### Interaction and performance QA
+
+- Browser interaction confirmed no reset control after 12 presses and one
+  unique `Reset slime` control after the 48th press. Reset restores the
+  untouched centered-label state.
+- Genuine pointer presses continued to play local wet-squish samples and
+  animate the shared background throughout the extended interaction window.
+- The 48-impact state reports 13 draw calls and 11,777 rendered triangles.
+  Across 300 settled frames it averaged 16.67 ms with a 16.7 ms p50, 17.1 ms
+  p95, and 22.9 ms maximum.
+- Browser logs contained no application-owned error. The existing upstream
+  `THREE.Clock` deprecation warning remains non-blocking.
+- No dependency, persistence, backend, Rapier usage, or Supabase migration was
+  added for this refinement.
+
+final result: passed
+
 ## Thocky clicker page
 
 ### Source and implementation evidence

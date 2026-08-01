@@ -6,6 +6,7 @@ import {
   SLIME_CROWN_Y,
   SLIME_DRAW_CALL_BUDGET,
   SLIME_INNER_RADIUS,
+  SLIME_LABEL_CENTER_ANGLE,
   SLIME_TRIANGLE_BUDGET,
   countGeometryTriangles,
   createSlimeContainerGeometries,
@@ -14,6 +15,18 @@ import {
 } from '../src/scene/slime'
 
 describe('slime presentation geometry', () => {
+  it('centers the curved label toward the angled camera', () => {
+    const label = createSlimeLabelGeometry()
+    const positions = label.getAttribute('position')
+    const centerVertex =
+      Math.floor(6 / 2) * (24 + 1) + Math.floor(24 / 2)
+    const x = positions.getX(centerVertex)
+    const z = positions.getZ(centerVertex)
+    expect(Math.atan2(x, z)).toBeCloseTo(SLIME_LABEL_CENTER_ANGLE, 6)
+    expect(SLIME_LABEL_CENTER_ANGLE).toBeCloseTo(Math.atan2(0.49, 0.8), 8)
+    label.dispose()
+  })
+
   it('creates a finite, indexed, watertight slime volume', () => {
     const geometry = createSlimeGeometry()
     const positions = geometry.getAttribute('position')

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 
-export const SLIME_MAX_INTERACTIONS = 12
+export const SLIME_MAX_INTERACTIONS = 48
 export const SLIME_MAX_GROWTH = 0.55
 export const SLIME_MAX_RADIAL_SPREAD = 0.18
 export const SLIME_DENT_RADIUS = 0.62
@@ -8,8 +8,11 @@ export const SLIME_DENT_DEPTH = 0.16
 export const SLIME_MAX_DENT_DEPTH = 0.34
 export const SLIME_TRANSIENT_DENT_DEPTH = 0.08
 
-const GROWTH_DECAY = 4
+const GROWTH_DECAY = SLIME_MAX_INTERACTIONS / 3
 const LOCAL_MIX_RADIUS = 1.28
+const LOCAL_MIX_AGE = 8
+const LOCAL_MIX_FLOOR = 0.25
+const GLOBAL_MIX_CONTRIBUTION = 0.6
 const UINT32_MAX = 0xffffffff
 
 export type SlimeInteractionResult = Readonly<{
@@ -213,7 +216,13 @@ export function sampleSlimeColor(
 ) {
   const boundary = x + Math.sin(y * 2.15 + z * 0.9) * 0.17
   const pinkWeight = smoothStep(-0.16, 0.16, boundary)
-  let mixAmount = getSlimeMixProgress(displayedInteractionCount) * 0.72
+  const mixProgress = getSlimeMixProgress(displayedInteractionCount)
+  const localMixCeiling = THREE.MathUtils.lerp(
+    LOCAL_MIX_FLOOR,
+    1,
+    mixProgress,
+  )
+  let mixAmount = mixProgress * GLOBAL_MIX_CONTRIBUTION
 
   for (let index = 0; index < runtime.interactionCount; index += 1) {
     const offset = index * 2
@@ -228,7 +237,8 @@ export function sampleSlimeColor(
     mixAmount = Math.max(
       mixAmount,
       smoothWeight(distance, LOCAL_MIX_RADIUS) *
-        Math.min(1, impactAge * 0.72),
+        Math.min(1, impactAge / LOCAL_MIX_AGE) *
+        localMixCeiling,
     )
   }
 

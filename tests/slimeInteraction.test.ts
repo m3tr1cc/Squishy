@@ -70,13 +70,17 @@ describe('slime interaction runtime', () => {
 
     expect(progress[0]).toBe(0)
     expect(progress.at(-1)).toBeCloseTo(1, 8)
+    expect(SLIME_MAX_INTERACTIONS).toBe(48)
+    expect(getSlimeMixProgress(12)).toBeCloseTo(0.25, 8)
+    expect(getSlimeGrowthProgress(12)).toBeGreaterThan(0.5)
+    expect(getSlimeGrowthProgress(12)).toBeLessThan(0.6)
     for (let index = 1; index < increments.length; index += 1) {
       expect(increments[index]).toBeLessThan(increments[index - 1])
       expect(increments[index]).toBeGreaterThan(0)
     }
   })
 
-  it('records twelve permanent impacts and rejects unbounded growth', () => {
+  it('records forty-eight permanent impacts and rejects unbounded growth', () => {
     const runtime = createSlimeInteractionRuntime()
     for (let index = 0; index < SLIME_MAX_INTERACTIONS; index += 1) {
       const result = applySlimeInteraction(
@@ -152,7 +156,14 @@ describe('slime interaction runtime', () => {
     expect(locallyMixed.g).toBeLessThan(orange.g)
     expect(locallyMixed.b).toBeGreaterThan(orange.b)
 
-    for (let index = 1; index < SLIME_MAX_INTERACTIONS; index += 1) {
+    for (let index = 1; index < 12; index += 1) {
+      applySlimeInteraction(runtime, index % 2 === 0 ? -1 : 1, 0)
+    }
+    const quarterOrange = sampleColor(runtime, -1.4, 0.2, 0.3)
+    const quarterPink = sampleColor(runtime, 1.4, -0.4, -0.2)
+    expect(Math.abs(quarterOrange.g - quarterPink.g)).toBeGreaterThan(0.02)
+
+    for (let index = 12; index < SLIME_MAX_INTERACTIONS; index += 1) {
       applySlimeInteraction(runtime, index % 2 === 0 ? -1 : 1, 0)
     }
     expect(sampleColor(runtime, -1.4, 0.2, 0.3)).toEqual(
