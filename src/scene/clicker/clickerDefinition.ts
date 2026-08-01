@@ -16,6 +16,15 @@ export const CLICKER_HOUSING = Object.freeze({
   radius: 0.34,
 })
 
+export const CLICKER_INNER_GROOVE = Object.freeze({
+  inset: 0.25,
+  width: CLICKER_HOUSING.width - 0.5,
+  height: CLICKER_HOUSING.height - 0.5,
+  depth: 0.22,
+  radius: CLICKER_HOUSING.radius - 0.25,
+  segments: 3,
+})
+
 export const CLICKER_KEY_ROWS = Object.freeze([
   Object.freeze({ id: 'yellow', color: '#f3e7a4', y: CLICKER_KEY_SPACING }),
   Object.freeze({ id: 'pink', color: '#f3a9ca', y: 0 }),

@@ -186,6 +186,63 @@ with angle changes retained only where real shard boundaries meet.
 
 final result: passed
 
+## Clicker inner-groove outline refinement
+
+### Evidence and normalization
+
+- Source visual truth:
+  `C:\Users\jleon\AppData\Local\Temp\codex-clipboard-40b16117-b5ce-4a3f-b6a8-efb514736382.png`
+  at 706 x 850 pixels. The red annotation marks the requested groove outline.
+- Browser-rendered implementation:
+  `qa/clicker-inner-groove-final.png` at 706 x 850 pixels, captured from a
+  706 x 850 CSS viewport at DPR 1 on `/clicker?qaDpr=1`.
+- Equal-size full-view comparison:
+  `qa/clicker-inner-groove-comparison.png` at 1412 x 850 pixels. Source and
+  implementation occupy equal 706 x 850 slots with no crop, scaling, or
+  stretching.
+- State: idle clicker after the scene settled, with matching route controls.
+
+The inner groove is large and clearly visible around the full key field in the
+equal-size comparison, so an additional focused crop was unnecessary.
+
+### Findings and comparison history
+
+- [Resolved P2] The previous groove plate used the general deformed-cuboid
+  helper, which produced stepped corners and made the inner edge look unrelated
+  to the molded housing. The revised groove uses the same rounded-box geometry
+  family as the outer shell with continuous supplied normals.
+- [Resolved P2] The previous corner value was independent of the housing
+  outline. The groove is now a precise 0.25-unit inset on all four sides, and
+  its 0.09-unit radius is derived as `housing radius - inset`. The resulting
+  corner centers and straight runs are concentric with the outer housing and
+  closely follow the supplied red guide.
+- [Passed] Fonts and typography: no visible type or navigation treatment was
+  changed.
+- [Passed] Spacing and layout rhythm: key centers, wells, rim width, product
+  framing, and controls are unchanged. The groove remains evenly inset around
+  the complete 3 x 3 field.
+- [Passed] Colors and visual tokens: white plastic, the neutral groove surface,
+  key palette, lighting, shadow, and background animation remain unchanged.
+- [Passed] Image quality and asset fidelity: the groove remains procedural
+  WebGL geometry with a continuous rounded silhouette and no raster overlay,
+  drawn annotation, post-processing, or fake edge treatment.
+- [Passed] Copy and content: route title, instructions, navigation labels, and
+  audio behavior are unchanged.
+
+### Interaction, responsiveness, and performance
+
+- A center-key pointer press still depressed and released the correct key and
+  triggered the shared background burst. The page retained exact 706 x 850
+  dimensions with no overflow or Vite error overlay.
+- The revised scene reports 18 draw calls and 11,871 rendered triangles, below
+  the existing 12,000 clicker budget. Steady-state frames remained primarily
+  16.4-17.2 ms; browser-automation capture pauses were excluded.
+- Fresh browser logs contained no application-owned error. The existing
+  upstream `THREE.Clock` deprecation warning remains non-blocking.
+- No dependency, persistence, backend, or Supabase migration was added.
+
+final result: passed
+
 ## Thocky clicker page
 
 ### Source and implementation evidence

@@ -10,6 +10,7 @@ import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import {
   CLICKER_HOUSING,
+  CLICKER_INNER_GROOVE,
   CLICKER_KEY_COUNT,
   CLICKER_KEY_DEPTH,
   CLICKER_KEY_ROWS,
@@ -98,15 +99,13 @@ export function ClickerScene({
   )
   const plateGeometry = useMemo(
     () =>
-      createRoundedCuboidGeometry({
-        width: 4.85,
-        height: 4.85,
-        depth: 0.22,
-        radius: 0.25,
-        widthSegments: 6,
-        heightSegments: 6,
-        depthSegments: 2,
-      }),
+      new RoundedBoxGeometry(
+        CLICKER_INNER_GROOVE.width,
+        CLICKER_INNER_GROOVE.height,
+        CLICKER_INNER_GROOVE.depth,
+        CLICKER_INNER_GROOVE.segments,
+        CLICKER_INNER_GROOVE.radius,
+      ),
     [],
   )
   const keyGeometry = useMemo(

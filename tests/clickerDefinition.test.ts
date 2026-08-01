@@ -3,6 +3,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { describe, expect, it } from 'vitest'
 import {
   CLICKER_HOUSING,
+  CLICKER_INNER_GROOVE,
   CLICKER_KEY_COUNT,
   CLICKER_KEY_ROWS,
   CLICKER_KEY_SIZE,
@@ -27,6 +28,19 @@ describe('clicker definition', () => {
     )
   })
 
+  it('keeps the inner groove concentric with the molded housing', () => {
+    expect(CLICKER_INNER_GROOVE.width).toBeCloseTo(
+      CLICKER_HOUSING.width - CLICKER_INNER_GROOVE.inset * 2,
+    )
+    expect(CLICKER_INNER_GROOVE.height).toBeCloseTo(
+      CLICKER_HOUSING.height - CLICKER_INNER_GROOVE.inset * 2,
+    )
+    expect(CLICKER_INNER_GROOVE.radius).toBeCloseTo(
+      CLICKER_HOUSING.radius - CLICKER_INNER_GROOVE.inset,
+    )
+    expect(CLICKER_INNER_GROOVE.radius).toBeGreaterThan(0)
+  })
+
   it('keeps the complete procedural device below the triangle budget', () => {
     const housing = new RoundedBoxGeometry(
       CLICKER_HOUSING.width,
@@ -35,15 +49,13 @@ describe('clicker definition', () => {
       4,
       CLICKER_HOUSING.radius,
     )
-    const plate = createRoundedCuboidGeometry({
-      width: 4.85,
-      height: 4.85,
-      depth: 0.22,
-      radius: 0.25,
-      widthSegments: 6,
-      heightSegments: 6,
-      depthSegments: 2,
-    })
+    const plate = new RoundedBoxGeometry(
+      CLICKER_INNER_GROOVE.width,
+      CLICKER_INNER_GROOVE.height,
+      CLICKER_INNER_GROOVE.depth,
+      CLICKER_INNER_GROOVE.segments,
+      CLICKER_INNER_GROOVE.radius,
+    )
     const key = createRoundedCuboidGeometry({
       width: CLICKER_KEY_SIZE,
       height: CLICKER_KEY_SIZE,
@@ -75,7 +87,7 @@ describe('clicker definition', () => {
     try {
       const triangles =
         housing.getAttribute('position').count / 3 +
-        plate.getIndex()!.count / 3 +
+        plate.getAttribute('position').count / 3 +
         (key.getIndex()!.count / 3) * 9 +
         (well.getIndex()!.count / 3) * 9 +
         (stem.getIndex()!.count / 3) * 9 +
