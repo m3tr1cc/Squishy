@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import {
   SLIME_CROWN_Y,
+  SLIME_DEFORMATION_SCALE,
+  SLIME_DENT_DEPTH,
   SLIME_INNER_RADIUS,
   SLIME_MAX_DENT_DEPTH,
   SLIME_MAX_GROWTH,
   SLIME_MAX_INTERACTIONS,
   SLIME_MAX_RADIAL_SPREAD,
   SLIME_RIM_Y,
+  SLIME_TRANSIENT_DENT_DEPTH,
   applySlimeInteraction,
   createSlimeInteractionRuntime,
   getSlimeGrowthProgress,
@@ -59,6 +62,13 @@ function sampleColor(
 }
 
 describe('slime interaction runtime', () => {
+  it('uses an exact threefold press-driven deformation scale', () => {
+    expect(SLIME_DEFORMATION_SCALE).toBe(3)
+    expect(SLIME_DENT_DEPTH).toBeCloseTo(0.48, 8)
+    expect(SLIME_MAX_DENT_DEPTH).toBeCloseTo(1.02, 8)
+    expect(SLIME_TRANSIENT_DENT_DEPTH).toBeCloseTo(0.24, 8)
+  })
+
   it('uses decreasing growth increments and reaches its exact cap', () => {
     const progress = Array.from(
       { length: SLIME_MAX_INTERACTIONS + 1 },
@@ -125,6 +135,7 @@ describe('slime interaction runtime', () => {
       0,
     )
     expect(pressedCenter.y).toBeLessThan(pristineCenter.y)
+    expect(pressedCenter.y).toBeLessThan(pristineCenter.y - 0.4)
     expect(repeated).toEqual(pressedCenter)
 
     for (let index = 1; index < SLIME_MAX_INTERACTIONS; index += 1) {

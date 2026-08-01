@@ -3,10 +3,11 @@ import * as THREE from 'three'
 export const SLIME_MAX_INTERACTIONS = 48
 export const SLIME_MAX_GROWTH = 0.55
 export const SLIME_MAX_RADIAL_SPREAD = 0.18
-export const SLIME_DENT_RADIUS = 0.62
-export const SLIME_DENT_DEPTH = 0.16
-export const SLIME_MAX_DENT_DEPTH = 0.34
-export const SLIME_TRANSIENT_DENT_DEPTH = 0.08
+export const SLIME_DENT_RADIUS = 0.9
+export const SLIME_DEFORMATION_SCALE = 3
+export const SLIME_DENT_DEPTH = 0.16 * SLIME_DEFORMATION_SCALE
+export const SLIME_MAX_DENT_DEPTH = 0.34 * SLIME_DEFORMATION_SCALE
+export const SLIME_TRANSIENT_DENT_DEPTH = 0.08 * SLIME_DEFORMATION_SCALE
 
 const GROWTH_DECAY = SLIME_MAX_INTERACTIONS / 3
 const LOCAL_MIX_RADIUS = 1.28
@@ -139,7 +140,7 @@ export function sampleSlimeDisplacement(
     growth *
     smoothStep(0.52, 0.98, normalizedRadius)
 
-  let permanentDent = 0
+  let permanentDentEnergy = 0
   for (let index = 0; index < runtime.interactionCount; index += 1) {
     const offset = index * 2
     const distance = Math.hypot(
@@ -147,13 +148,17 @@ export function sampleSlimeDisplacement(
       z - runtime.impactCoordinates[offset + 1],
     )
     const strength = impactStrengths?.[index] ?? 1
-    permanentDent +=
+    const dent =
       SLIME_DENT_DEPTH *
       strength *
       smoothWeight(distance, SLIME_DENT_RADIUS) *
       topWeight
+    permanentDentEnergy += dent * dent
   }
-  displacementY -= Math.min(SLIME_MAX_DENT_DEPTH, permanentDent)
+  displacementY -= Math.min(
+    SLIME_MAX_DENT_DEPTH,
+    Math.sqrt(permanentDentEnergy),
+  )
 
   if (transientPresses) {
     for (let index = 0; index < transientPresses.strengths.length; index += 1) {

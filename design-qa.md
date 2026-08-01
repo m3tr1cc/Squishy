@@ -1484,3 +1484,65 @@ corner continuity directly, so a separate focused crop was not necessary.
 - No dependency, persistence, backend, or Supabase migration was added.
 
 final result: passed
+
+## Threefold slime deformation magnitude
+
+### Evidence and normalization
+
+- Source visual truth:
+  `.codex-remote-attachments/019fbe0b-0cff-7951-9cfd-68544b3b161a/ed2e1cc1-7db5-4a8d-be0f-041deb9e64d8/1-Photo-1.jpg`
+  at 592 x 1280 pixels.
+- Revised one-press mobile state: `qa/slime-triple-deformation-mobile.png` at
+  390 x 844 CSS pixels, DPR 1.
+- Revised twelve-press mobile state:
+  `qa/slime-triple-deformation-quarter.png` at 390 x 844 CSS pixels, DPR 1.
+- Equal-height one-press comparison:
+  `qa/slime-triple-deformation-comparison.png` at 1184 x 1280 pixels. Source
+  and implementation occupy equal 592 x 1280 slots with proportional scaling
+  and no crop or stretch.
+
+The source's finger press makes the requested tactile magnitude directly
+readable, so the focused implementation state uses one centered released press.
+The additional twelve-press capture verifies that distributed permanent dents
+remain smooth and contained when the stronger response accumulates.
+
+### Findings and comparison history
+
+- [Resolved P1] The previous 0.16-unit permanent dent and 0.08-unit live press
+  read as a shallow surface dimple. An explicit threefold scale now produces a
+  0.48-unit permanent dent, a 0.24-unit live press, and a 1.02-unit permanent
+  accumulation cap without changing growth, spread, or the 48-press mixing
+  timeline.
+- [Resolved P2] Directly summing multiple stronger dents could create steep
+  folded intersections after distributed presses. Overlapping permanent dents
+  now combine as root-sum-square energy and use a broader 0.9-unit influence,
+  retaining the full one-press magnitude while producing smooth accumulated
+  basins instead of sharp seams.
+- [Passed] Fonts and typography: the centered Fredoka `slime` label remains
+  unchanged and legible in untouched and deformed states.
+- [Passed] Spacing and layout rhythm: the deeper pocket remains inside the open
+  jar, clears the rigid rim, and stays within desktop and portrait framing.
+- [Passed] Colors and visual tokens: the orange/pink split, coral progression,
+  transparent tub, lighting, shadow, and shared background response are
+  unchanged.
+- [Passed] Image quality and asset fidelity: deformation remains deterministic
+  procedural WebGL geometry with recomputed normals, not a decal, shader dent,
+  extra mesh, or post-processing effect.
+- [Passed] Copy and content: route copy, 48-press completion behavior, reset,
+  navigation, and wet-squish audio remain unchanged.
+
+### Interaction and performance QA
+
+- A single centered pointer press left a broad permanent pocket visible after
+  release. Twelve distributed presses retained multiple smooth dents with no
+  wall clipping, inverted black gap, reset-state regression, or navigation
+  collision.
+- The sampled twelve-impact state reported 13 draw calls and 11,777 rendered
+  triangles. Across 300 settled frames it averaged 16.67 ms with a 16.7 ms
+  p50, 16.9 ms p95, and 19.6 ms maximum.
+- Browser logs contained no application-owned error. The existing upstream
+  `THREE.Clock` deprecation warning remains non-blocking.
+- No dependency, persistence, backend, Rapier usage, or Supabase migration was
+  added for this refinement.
+
+final result: passed

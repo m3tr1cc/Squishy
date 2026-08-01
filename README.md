@@ -97,9 +97,10 @@ The `/slime` experience centers a low transparent plastic tub filled with one
 watertight procedural slime volume. Pink and orange vertex colors begin as a
 soft split, then converge locally around each exposed-top press and globally
 over forty-eight bounded interactions. Those same presses add permanent dents
-and lift the crown through the open rim with decreasing growth increments. The
-container stays rigid, the final coral state remains tappable, and three local
-wet-slime recordings play through a bounded Web Audio shuffle. The bundled
+at a threefold tactile depth and lift the crown through the open rim with
+decreasing growth increments. The container stays rigid, the final coral state
+remains tappable, and three local wet-slime recordings play through a bounded
+Web Audio shuffle. The bundled
 Fredoka face used by the soaps also renders the curved lowercase `slime` mark.
 
 ## Experience boundary
