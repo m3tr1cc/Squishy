@@ -15,6 +15,7 @@ const MIN_PLAY_INTERVAL_SECONDS = 0.07
 const MAX_RECENT_TRACKS = 20
 
 type CrackAudioStatus =
+  | 'disabled'
   | 'loading'
   | 'locked'
   | 'ready'
@@ -306,7 +307,7 @@ function primeAudioContext(context: AudioContext) {
   source.start()
 }
 
-export function useCrackAudio(coatingSeed: number) {
+export function useCrackAudio(coatingSeed: number, enabled = true) {
   const runtimeRef = useRef<CrackAudioRuntime | null>(null)
   if (!runtimeRef.current) {
     runtimeRef.current = {
@@ -337,6 +338,12 @@ export function useCrackAudio(coatingSeed: number) {
   const runtime = runtimeRef.current
 
   useEffect(() => {
+    if (!enabled) {
+      runtime.disposed = true
+      runtime.diagnostics.status = 'disabled'
+      publishDiagnostics(runtime)
+      return
+    }
     runtime.disposed = false
     if (import.meta.env.DEV) {
       window.__squishyAudioDiagnostics = runtime.diagnostics
@@ -378,7 +385,7 @@ export function useCrackAudio(coatingSeed: number) {
       }
       delete document.documentElement.dataset.squishyAudioDiagnostics
     }
-  }, [runtime])
+  }, [enabled, runtime])
 
   useEffect(() => {
     runtime.shuffleBag = createCrackShuffleBag(
@@ -389,7 +396,9 @@ export function useCrackAudio(coatingSeed: number) {
     stopActiveSources(runtime)
     resetDiagnostics(
       runtime,
-      runtime.buffers
+      !enabled
+        ? 'disabled'
+        : runtime.buffers
         ? runtime.context?.state === 'running'
           ? 'ready'
           : 'suspended'
@@ -397,10 +406,10 @@ export function useCrackAudio(coatingSeed: number) {
           ? 'loading'
           : 'locked',
     )
-  }, [coatingSeed, runtime])
+  }, [coatingSeed, enabled, runtime])
 
   const unlock = useCallback(() => {
-    if (runtime.disposed) {
+    if (!enabled || runtime.disposed) {
       return
     }
     runtime.diagnostics.lastUnlockHadUserActivation =
@@ -453,13 +462,14 @@ export function useCrackAudio(coatingSeed: number) {
     void ensureDecodedTracks(runtime, context).catch(() => {
       // Diagnostics report the failure while the visual interaction continues.
     })
-  }, [runtime])
+  }, [enabled, runtime])
 
   const play = useCallback(
     (brokenBondCount: number) => {
       if (
         !Number.isFinite(brokenBondCount) ||
         brokenBondCount <= 0 ||
+        !enabled ||
         runtime.disposed
       ) {
         return
@@ -483,7 +493,7 @@ export function useCrackAudio(coatingSeed: number) {
       }
       playTrack(runtime, Math.round(brokenBondCount))
     },
-    [runtime],
+    [enabled, runtime],
   )
 
   return { unlock, play } as const

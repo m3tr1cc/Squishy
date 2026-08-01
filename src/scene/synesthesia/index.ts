@@ -6,6 +6,7 @@ export {
   createSynesthesiaAnimationState,
   createSynesthesiaTheme,
   createSynesthesiaThemeFromPalette,
+  emitSynesthesiaBurst,
   mixSquishyVisualSignals,
   stepSynesthesiaAnimation,
   SYNESTHESIA_BURST_HALF_LIFE_SECONDS,

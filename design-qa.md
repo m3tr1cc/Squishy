@@ -186,6 +186,141 @@ with angle changes retained only where real shard boundaries meet.
 
 final result: passed
 
+## Clicker inner-groove outline refinement
+
+### Evidence and normalization
+
+- Source visual truth:
+  `C:\Users\jleon\AppData\Local\Temp\codex-clipboard-40b16117-b5ce-4a3f-b6a8-efb514736382.png`
+  at 706 x 850 pixels. The red annotation marks the requested groove outline.
+- Browser-rendered implementation:
+  `qa/clicker-inner-groove-final.png` at 706 x 850 pixels, captured from a
+  706 x 850 CSS viewport at DPR 1 on `/clicker?qaDpr=1`.
+- Equal-size full-view comparison:
+  `qa/clicker-inner-groove-comparison.png` at 1412 x 850 pixels. Source and
+  implementation occupy equal 706 x 850 slots with no crop, scaling, or
+  stretching.
+- State: idle clicker after the scene settled, with matching route controls.
+
+The inner groove is large and clearly visible around the full key field in the
+equal-size comparison, so an additional focused crop was unnecessary.
+
+### Findings and comparison history
+
+- [Resolved P2] The previous groove plate used the general deformed-cuboid
+  helper, which produced stepped corners and made the inner edge look unrelated
+  to the molded housing. The revised groove uses the same rounded-box geometry
+  family as the outer shell with continuous supplied normals.
+- [Resolved P2] The previous corner value was independent of the housing
+  outline. The groove is now a precise 0.25-unit inset on all four sides, and
+  its 0.09-unit radius is derived as `housing radius - inset`. The resulting
+  corner centers and straight runs are concentric with the outer housing and
+  closely follow the supplied red guide.
+- [Passed] Fonts and typography: no visible type or navigation treatment was
+  changed.
+- [Passed] Spacing and layout rhythm: key centers, wells, rim width, product
+  framing, and controls are unchanged. The groove remains evenly inset around
+  the complete 3 x 3 field.
+- [Passed] Colors and visual tokens: white plastic, the neutral groove surface,
+  key palette, lighting, shadow, and background animation remain unchanged.
+- [Passed] Image quality and asset fidelity: the groove remains procedural
+  WebGL geometry with a continuous rounded silhouette and no raster overlay,
+  drawn annotation, post-processing, or fake edge treatment.
+- [Passed] Copy and content: route title, instructions, navigation labels, and
+  audio behavior are unchanged.
+
+### Interaction, responsiveness, and performance
+
+- A center-key pointer press still depressed and released the correct key and
+  triggered the shared background burst. The page retained exact 706 x 850
+  dimensions with no overflow or Vite error overlay.
+- The revised scene reports 18 draw calls and 11,871 rendered triangles, below
+  the existing 12,000 clicker budget. Steady-state frames remained primarily
+  16.4-17.2 ms; browser-automation capture pauses were excluded.
+- Fresh browser logs contained no application-owned error. The existing
+  upstream `THREE.Clock` deprecation warning remains non-blocking.
+- No dependency, persistence, backend, or Supabase migration was added.
+
+final result: passed
+
+## Thocky clicker page
+
+### Source and implementation evidence
+
+- Supplied source: `.codex-remote-attachments/019fbafe-a680-7d23-965c-c934de7e3da5/0f31554a-c280-4afe-a385-0d2424954548/1-Photo-1.jpg`
+  at 591 x 1280 pixels.
+- Desktop implementation: `qa/clicker-desktop-idle.png`.
+- Mobile idle and active states: `qa/clicker-mobile-idle.png` and
+  `qa/clicker-mobile-pressed.png`, captured at 390 x 844 CSS pixels, DPR 1.
+- Focused source and implementation crops: `qa/clicker-reference-product.png`
+  and `qa/clicker-mobile-product.png`.
+- Normalized focused comparison: `qa/clicker-reference-comparison.png`, with
+  each clicker aspect-fit into an equal 500 x 500 slot without stretching.
+
+The focused comparison excludes the source video's phone chrome, hands, and
+surrounding props because the product target is the clicker itself. It compares
+the square white housing, inset 3 x 3 key grid, row palette, cap proportions,
+and glossy highlight language directly.
+
+### Findings and comparison history
+
+- [Resolved P2] The first procedural pass exceeded the planned 12,000-triangle
+  product budget. Rounded-box segment counts were reduced without changing the
+  silhouette; the final scene reports 18 draw calls and 9,603 rendered
+  triangles in the mobile diagnostic pass.
+- [Resolved P2] The initial key palette and corners read flatter and less jelly
+  like than the supplied source. Yellow, pink, and blue saturation was raised,
+  the cap radius was increased, and the physical material retained clearcoat,
+  low roughness, and broad studio highlights.
+- [Passed] Fonts and typography: the full-frame product adds no visible display
+  typography. The route heading and instruction remain available to assistive
+  technology, and existing navigation labels are unchanged.
+- [Passed] Spacing and layout rhythm: the white housing remains centered and
+  fully visible at 1440 x 900, 844 x 390, 390 x 844, and 280 x 560. The grid,
+  rim, wells, and row spacing match the source hierarchy without clipping or
+  colliding with navigation.
+- [Passed] Colors and visual tokens: the final top, middle, and bottom rows are
+  warm pastel yellow, glossy pink, and clear cyan-blue in a neutral white
+  housing. The shared background starts quiet and uses the same palette for a
+  brief press-triggered burst.
+- [Passed] Image quality and asset fidelity: housing, wells, stems, and caps are
+  procedural WebGL geometry with physical materials and real lighting. No
+  raster product replacement, CSS key drawing, post-processing, or copied
+  video frame ships with the page.
+- [Passed] Copy and content: the fourth route is `Thocky clicker`; its hidden
+  instruction describes pressing any of nine keys, the mechanical sound, and
+  the background response.
+- [Passed] Interaction and accessibility: mouse and touch presses use pointer
+  capture, scroll cancellation, a two-touch cap, and independent key springs.
+  Short taps remain visibly depressed for at least 70 ms. Reduced motion keeps
+  immediate shallow travel without rebound overshoot.
+
+### Browser, audio, and performance QA
+
+- Portrait mobile, narrow mobile, landscape, and desktop layouts passed with no
+  overflow or obscured navigation.
+- Top, middle, and bottom-row clicks each depressed the targeted key and emitted
+  a shared synesthesia burst. The burst settled back to the calm field.
+- The previous-page control navigated from `/clicker` to `/chocolate` with the
+  QA query preserved, and direct return to `/clicker` restored the experience.
+- A real Chromium pointer gesture unlocked Web Audio. Three rapid key presses
+  produced two audible sample starts and one intentional rate-limit skip;
+  diagnostics ended `ready` with playback-rate variation at `0.955`.
+- The final mobile diagnostic reported 18 draw calls and 9,603 rendered
+  triangles. Frame samples were predominantly 16.6-16.8 ms, with a sampled
+  maximum of 18.4 ms.
+- No dependency, persistence, backend, Rapier usage, or Supabase migration was
+  added for this page. The thock sample and CC BY 4.0 attribution are committed
+  under `audio/`.
+
+### Remaining polish
+
+- P3: the procedural caps are intentionally more uniform than the handmade
+  jelly-keycap irregularity in the source. This preserves deterministic shared
+  geometry, instancing, and the verified mobile render budget.
+
+final result: passed
+
 ## Cross-page synesthesia propagation and two-second response
 
 ### Source and implementation evidence
@@ -1147,5 +1282,64 @@ background` and `Cross-page synesthesia propagation and two-second response`
 sections above. Final desktop and mobile captures for butter, soap, and
 chocolate contain no actionable P0/P1/P2 finding, and fresh browser sessions
 report no application-owned console error.
+
+final result: passed
+
+## Clicker housing alignment and molded-corner refinement
+
+### Evidence and normalization
+
+- Source visual truth:
+  `C:\Users\jleon\AppData\Local\Temp\codex-clipboard-5c1d3ba8-0c29-4db5-ac40-b0ad2e7110a8.png`
+  at 629 x 851 pixels.
+- Browser-rendered implementation:
+  `qa/clicker-housing-smooth-final.png` at 627 x 851 pixels, captured from a
+  627 x 851 CSS viewport at DPR 1 on `/clicker?qaDpr=1`.
+- Equal-height full-view comparison:
+  `qa/clicker-housing-before-after.png` at 1256 x 851 pixels. The supplied
+  source occupies the left 629-pixel slot and the revised implementation the
+  right 627-pixel slot without cropping, scaling, or stretching.
+- State: idle clicker after the scene settled, with identical route controls.
+
+The clicker fills enough of both captures to inspect the outer silhouette and
+corner continuity directly, so a separate focused crop was not necessary.
+
+### Findings and comparison history
+
+- [Resolved P2] The source clicker's top and bottom edges descended toward the
+  right because the product group retained a `-0.035` screen-plane rotation.
+  Removing that rotation is equivalent to the requested slight
+  counter-clockwise correction. The revised top and bottom edges now run
+  parallel with the screen while the subtle depth presentation remains.
+- [Resolved P2] The previous outer housing used a sparsely subdivided deformed
+  cuboid. Its large corner arcs exposed straight facets and discontinuous edge
+  highlights. The housing now uses Three.js's rounded-box surface with four
+  curved segments per corner, continuous supplied normals, and the existing
+  clear-coated plastic material. All four outer corners and side transitions
+  read as one smooth molded part in the revised comparison.
+- [Passed] Fonts and typography: no visible type or navigation typography was
+  changed.
+- [Passed] Spacing and layout rhythm: key positions, wells, rim thickness,
+  centered framing, and navigation safe area are unchanged. Only the unwanted
+  in-plane product tilt was removed.
+- [Passed] Colors and visual tokens: the white plastic, yellow/pink/blue keys,
+  studio lighting, background palette, and shadow treatment are unchanged.
+- [Passed] Image quality and asset fidelity: the housing remains procedural
+  WebGL geometry rather than a raster replacement. Smooth corner normals and a
+  higher-resolution molded arc remove visible faceting without post-processing.
+- [Passed] Copy and content: route title, hidden instructions, accessible
+  navigation labels, and audio behavior are unchanged.
+
+### Interaction, responsiveness, and performance
+
+- A center-key pointer press still depressed and released the correct key and
+  triggered the shared background burst. The page retained exact 627 x 851
+  viewport dimensions with no overflow or Vite error overlay.
+- The revised scene reports 18 draw calls and 11,175 rendered triangles, below
+  the existing 12,000 clicker budget. Frame samples remained predominantly
+  16.4-17.1 ms; the isolated automation capture pause was excluded.
+- Fresh browser logs contained no application-owned error. The existing
+  upstream `THREE.Clock` deprecation warning remains non-blocking.
+- No dependency, persistence, backend, or Supabase migration was added.
 
 final result: passed

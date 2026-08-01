@@ -86,13 +86,20 @@ Five short crack recordings are decoded once through Web Audio. Playback is
 driven only by actual bond-break events, uses every recording once per shuffled
 cycle, avoids immediate repeats, and caps overlap during sustained fractures.
 
+The `/clicker` experience adds a procedural white 3 x 3 key housing with
+yellow, pink, and blue glossy key rows. Each key has independent spring travel,
+a minimum visible tap duration, reduced-motion handling, and a sampled thock
+routed through a small Web Audio mastering chain. A press also emits a bounded
+burst into the shared synesthesia background without pretending that a wax
+fracture occurred.
+
 ## Experience boundary
 
-This version includes a three-butter page and a six-soap page, persistent
-thick color-tinted wax shells, progressive damage and crack merging, local
+This version includes three-butter, six-soap, chocolate-slime, and nine-key
+clicker pages, persistent thick color-tinted wax shells, progressive damage and crack merging, local
 dents, compression and rebound, peeling and fading debris, product decals,
 exact surface raycasting, idle invitation motion, reduced-motion behavior,
-randomized crack audio, route-aware previous/next navigation, completion
+randomized crack and clicker audio, route-aware previous/next navigation, completion
 feedback, and in-page re-coating.
 
 Impact/debris-specific audio, haptics, saved progress, analytics, and

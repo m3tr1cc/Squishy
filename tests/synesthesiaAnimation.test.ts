@@ -15,6 +15,7 @@ import {
   createSynesthesiaAnimationState,
   createSynesthesiaTheme,
   createSynesthesiaThemeFromPalette,
+  emitSynesthesiaBurst,
   mixSquishyVisualSignals,
   stepSynesthesiaAnimation,
   SYNESTHESIA_MOTIF_SLOT_COUNT,
@@ -120,16 +121,16 @@ describe('synesthesia animation', () => {
     const combined = mixSquishyVisualSignals(mixer, sources)
     expect(combined.pressStrength).toBeCloseTo(0.8)
     expect(combined.damageProgress).toBeCloseTo(0.15)
-    expect(combined.crackSequence).toBe(1)
-    expect(combined.crackStrength).toBeCloseTo(2 / 3)
+    expect(combined.burstSequence).toBe(1)
+    expect(combined.burstStrength).toBeCloseTo(2 / 3)
 
     mixSquishyVisualSignals(mixer, sources)
-    expect(combined.crackSequence).toBe(1)
+    expect(combined.burstSequence).toBe(1)
 
     writeSquishyVisualSignals(sources[2], 0, 3, 100, 1)
     mixSquishyVisualSignals(mixer, sources)
-    expect(combined.crackSequence).toBe(2)
-    expect(combined.crackStrength).toBeCloseTo(1 / 3)
+    expect(combined.burstSequence).toBe(2)
+    expect(combined.burstStrength).toBeCloseTo(1 / 3)
   })
 
   it('accelerates for a press without inventing a crack burst', () => {
@@ -145,10 +146,24 @@ describe('synesthesia animation', () => {
       false,
     )
 
-    expect(signals.crackSequence).toBe(0)
+    expect(signals.burstSequence).toBe(0)
     expect(state.flowSpeed).toBeCloseTo(1.5)
     expect(state.burstEnergy).toBe(0)
     expect(activeMotifCount(state.motifData)).toBe(0)
+  })
+
+  it('allows a non-fracture interaction to emit a real visual burst', () => {
+    const signals = createSquishyVisualSignals()
+    const state = createSynesthesiaAnimationState()
+    emitSynesthesiaBurst(signals, 0.72)
+
+    stepSynesthesiaAnimation(state, signals, TEST_THEME, 1 / 60, false)
+
+    expect(signals.damageProgress).toBe(0)
+    expect(signals.burstSequence).toBe(1)
+    expect(signals.burstStrength).toBeCloseTo(0.72)
+    expect(state.burstEnergy).toBeGreaterThan(0)
+    expect(activeMotifCount(state.motifData)).toBeGreaterThan(0)
   })
 
   it('keeps damage monotonic and emits only real break sequences', () => {
@@ -158,17 +173,17 @@ describe('synesthesia animation', () => {
     expect(signals).toMatchObject({
       pressStrength: 0.4,
       damageProgress: 0.08,
-      crackSequence: 0,
+      burstSequence: 0,
     })
 
     writeSquishyVisualSignals(signals, 0, 6, 100, 0)
     expect(signals.damageProgress).toBeCloseTo(0.08)
-    expect(signals.crackSequence).toBe(0)
+    expect(signals.burstSequence).toBe(0)
 
     writeSquishyVisualSignals(signals, 0, 10, 100, 2)
     expect(signals.damageProgress).toBeCloseTo(0.1)
-    expect(signals.crackSequence).toBe(1)
-    expect(signals.crackStrength).toBeCloseTo(2 / 3)
+    expect(signals.burstSequence).toBe(1)
+    expect(signals.burstStrength).toBeCloseTo(2 / 3)
   })
 
   it('selects bounded crack motifs deterministically', () => {
@@ -267,8 +282,8 @@ describe('synesthesia animation', () => {
     expect(resetSignals).toEqual({
       pressStrength: 0,
       damageProgress: 0,
-      crackSequence: 0,
-      crackStrength: 0,
+      burstSequence: 0,
+      burstStrength: 0,
     })
     expect(resetState.flowSpeed).toBe(1)
     expect(resetState.flowTime).toBe(0)

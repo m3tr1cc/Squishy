@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react'
 import { useCrackAudio } from './audio/useCrackAudio'
+import { useThockAudio } from './audio/useThockAudio'
 import {
   PageNavigation,
   usePageNavigation,
@@ -28,6 +29,12 @@ const LazySoapScene = lazy(() =>
 const LazyChocolateScene = lazy(() =>
   import('./scene/ChocolateScene').then((module) => ({
     default: module.ChocolateScene,
+  })),
+)
+
+const LazyClickerScene = lazy(() =>
+  import('./scene/ClickerScene').then((module) => ({
+    default: module.ClickerScene,
   })),
 )
 
@@ -64,7 +71,9 @@ function LoadingState({ pageId }: { pageId: PageId }) {
       ? 'Preparing six fresh coatings...'
       : pageId === 'chocolate'
         ? 'Tempering chocolate slime...'
-        : 'Warming three fresh coatings...'
+        : pageId === 'clicker'
+          ? 'Warming up nine thocky keys...'
+          : 'Warming three fresh coatings...'
   return (
     <div className="status-card" role="status">
       {message}
@@ -99,7 +108,12 @@ export function App() {
     createExperienceSession(route?.id ?? 'butter'),
   )
   const headingRef = useRef<HTMLHeadingElement>(null)
-  const crackAudio = useCrackAudio(session.seed)
+  const isClickerPage = route?.id === 'clicker'
+  const crackAudio = useCrackAudio(
+    session.seed,
+    route !== null && !isClickerPage,
+  )
+  const thockAudio = useThockAudio(session.seed, isClickerPage)
   const isCoarsePointer =
     typeof window !== 'undefined' &&
     window.matchMedia('(pointer: coarse)').matches
@@ -158,8 +172,8 @@ export function App() {
           <div className="not-found-card" role="alert">
             <h1>That squishy is not here.</h1>
             <p>
-              The butter, soap, and chocolate experiences are ready to
-              crack.
+              The butter, soap, chocolate, and clicker experiences are
+              ready.
             </p>
             <a href="/">Return to the butter</a>
           </div>
@@ -177,14 +191,16 @@ export function App() {
           search={navigation.search}
         />
         <main className="app-shell app-shell--fallback">
-          <div
-            className={
-              route.id === 'soaps'
-                ? 'fallback-soaps'
-                : 'fallback-butter'
-            }
-            aria-hidden="true"
-          />
+          {route.id === 'clicker' ? null : (
+            <div
+              className={
+                route.id === 'soaps'
+                  ? 'fallback-soaps'
+                  : 'fallback-butter'
+              }
+              aria-hidden="true"
+            />
+          )}
           <div className="status-card" role="alert">
             This squishy needs a browser with WebGL 2 enabled.
           </div>
@@ -213,7 +229,9 @@ export function App() {
       ? 'Tap any of the six soaps to dent and crack its wax coating.'
       : route.id === 'chocolate'
         ? 'Click or tap the chocolate squares to crack the shell and spread the slime filling.'
-        : 'Click or tap any of the three butter sticks to press its wax surface.'
+        : route.id === 'clicker'
+          ? 'Click or tap any of the nine keys to press it, play a mechanical thock, and animate the background.'
+          : 'Click or tap any of the three butter sticks to press its wax surface.'
   const liveMessage = session.isComplete
     ? route.id === 'soaps'
       ? 'A soap wax layer is fully broken. Re-coat all soaps to play again.'
@@ -254,7 +272,11 @@ export function App() {
               antialias: true,
               powerPreference: 'high-performance',
             }}
-            shadows={route.id === 'butter' ? 'percentage' : false}
+            shadows={
+              route.id === 'butter' || route.id === 'clicker'
+                ? 'percentage'
+                : false
+            }
           >
             {route.id === 'butter' ? (
               <SquishyScene
@@ -273,13 +295,20 @@ export function App() {
                   unlockCrackAudio={crackAudio.unlock}
                 />
               </Suspense>
-            ) : (
+            ) : route.id === 'chocolate' ? (
               <Suspense fallback={null}>
                 <LazyChocolateScene
                   coatingSeed={session.seed}
                   onComplete={handleChocolateComplete}
                   playCrackSound={crackAudio.play}
                   unlockCrackAudio={crackAudio.unlock}
+                />
+              </Suspense>
+            ) : (
+              <Suspense fallback={null}>
+                <LazyClickerScene
+                  experienceSeed={session.seed}
+                  playThock={thockAudio.trigger}
                 />
               </Suspense>
             )}
