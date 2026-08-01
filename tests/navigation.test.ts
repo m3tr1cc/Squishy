@@ -29,6 +29,9 @@ describe('page routes', () => {
     expect(getPageRouteByPathname('/chocolate')).toMatchObject({
       id: 'chocolate',
     })
+    expect(getPageRouteByPathname('/clicker/')).toMatchObject({
+      id: 'clicker',
+    })
 
     const unknown = resolvePageRoute('/missing')
     expect(unknown).toEqual({
@@ -50,6 +53,10 @@ describe('page routes', () => {
     })
     expect(getPageNeighbors('chocolate')).toEqual({
       previous: getPageRouteById('soaps'),
+      next: getPageRouteById('clicker'),
+    })
+    expect(getPageNeighbors('clicker')).toEqual({
+      previous: getPageRouteById('chocolate'),
       next: null,
     })
     expect(getPageNeighbors(null)).toEqual({

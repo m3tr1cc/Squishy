@@ -22,13 +22,13 @@ export type SynesthesiaPaletteEntry = Readonly<{
 export type SquishyVisualSignals = {
   pressStrength: number
   damageProgress: number
-  crackSequence: number
-  crackStrength: number
+  burstSequence: number
+  burstStrength: number
 }
 
 export type SquishyVisualSignalMixer = {
   readonly combinedSignals: SquishyVisualSignals
-  readonly observedCrackSequences: Uint32Array
+  readonly observedBurstSequences: Uint32Array
 }
 
 export type SynesthesiaAnimationState = {
@@ -37,7 +37,7 @@ export type SynesthesiaAnimationState = {
   flowSpeed: number
   burstEnergy: number
   damageProgress: number
-  observedCrackSequence: number
+  observedBurstSequence: number
   motifCursor: number
   readonly motifData: Float32Array
 }
@@ -117,8 +117,8 @@ export function createSquishyVisualSignals(): SquishyVisualSignals {
   return {
     pressStrength: 0,
     damageProgress: 0,
-    crackSequence: 0,
-    crackStrength: 0,
+    burstSequence: 0,
+    burstStrength: 0,
   }
 }
 
@@ -140,7 +140,7 @@ export function createSquishyVisualSignalMixer(
   }
   return {
     combinedSignals: createSquishyVisualSignals(),
-    observedCrackSequences: new Uint32Array(sourceCount),
+    observedBurstSequences: new Uint32Array(sourceCount),
   }
 }
 
@@ -148,38 +148,38 @@ export function mixSquishyVisualSignals(
   mixer: SquishyVisualSignalMixer,
   sources: readonly SquishyVisualSignals[],
 ) {
-  if (sources.length !== mixer.observedCrackSequences.length) {
+  if (sources.length !== mixer.observedBurstSequences.length) {
     throw new Error('Visual signal source count changed after initialization')
   }
 
   let pressStrength = 0
   let damageProgress = 0
-  let crackStrength = 0
-  let hasNewCrack = false
+  let burstStrength = 0
+  let hasNewBurst = false
 
   for (let index = 0; index < sources.length; index += 1) {
     const source = sources[index]
     pressStrength = Math.max(pressStrength, source.pressStrength)
     damageProgress += source.damageProgress
     if (
-      source.crackSequence !==
-      mixer.observedCrackSequences[index]
+      source.burstSequence !==
+      mixer.observedBurstSequences[index]
     ) {
-      mixer.observedCrackSequences[index] = source.crackSequence
-      crackStrength = Math.max(
-        crackStrength,
-        source.crackStrength,
+      mixer.observedBurstSequences[index] = source.burstSequence
+      burstStrength = Math.max(
+        burstStrength,
+        source.burstStrength,
       )
-      hasNewCrack = true
+      hasNewBurst = true
     }
   }
 
   const combined = mixer.combinedSignals
   combined.pressStrength = pressStrength
   combined.damageProgress = damageProgress / sources.length
-  if (hasNewCrack) {
-    combined.crackSequence += 1
-    combined.crackStrength = crackStrength
+  if (hasNewBurst) {
+    combined.burstSequence += 1
+    combined.burstStrength = burstStrength
   }
   return combined
 }
@@ -202,9 +202,16 @@ export function writeSquishyVisualSignals(
   )
 
   if (newlyBrokenBondCount > 0) {
-    signals.crackSequence += 1
-    signals.crackStrength = clamp01(newlyBrokenBondCount / 3)
+    emitSynesthesiaBurst(signals, newlyBrokenBondCount / 3)
   }
+}
+
+export function emitSynesthesiaBurst(
+  signals: SquishyVisualSignals,
+  strength: number,
+) {
+  signals.burstSequence += 1
+  signals.burstStrength = clamp01(strength)
 }
 
 export function createSynesthesiaAnimationState():
@@ -215,7 +222,7 @@ export function createSynesthesiaAnimationState():
     flowSpeed: 1,
     burstEnergy: 0,
     damageProgress: 0,
-    observedCrackSequence: 0,
+    observedBurstSequence: 0,
     motifCursor: 0,
     motifData: new Float32Array(
       SYNESTHESIA_MOTIF_SLOT_COUNT *
@@ -278,22 +285,22 @@ export function stepSynesthesiaAnimation(
   if (reducedMotion) {
     state.flowSpeed = 0
     state.burstEnergy = 0
-    state.observedCrackSequence = signals.crackSequence
+    state.observedBurstSequence = signals.burstSequence
     state.motifData.fill(0)
     return
   }
 
   state.elapsedSeconds += delta
   const sequenceChanged =
-    signals.crackSequence !== state.observedCrackSequence
+    signals.burstSequence !== state.observedBurstSequence
   if (sequenceChanged) {
-    const strength = clamp01(signals.crackStrength)
-    state.observedCrackSequence = signals.crackSequence
+    const strength = clamp01(signals.burstStrength)
+    state.observedBurstSequence = signals.burstSequence
     state.burstEnergy = Math.max(state.burstEnergy, strength)
     activateMotifs(
       state,
       theme,
-      signals.crackSequence,
+      signals.burstSequence,
       strength,
     )
   }

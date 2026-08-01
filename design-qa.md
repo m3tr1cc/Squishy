@@ -186,6 +186,84 @@ with angle changes retained only where real shard boundaries meet.
 
 final result: passed
 
+## Thocky clicker page
+
+### Source and implementation evidence
+
+- Supplied source: `.codex-remote-attachments/019fbafe-a680-7d23-965c-c934de7e3da5/0f31554a-c280-4afe-a385-0d2424954548/1-Photo-1.jpg`
+  at 591 x 1280 pixels.
+- Desktop implementation: `qa/clicker-desktop-idle.png`.
+- Mobile idle and active states: `qa/clicker-mobile-idle.png` and
+  `qa/clicker-mobile-pressed.png`, captured at 390 x 844 CSS pixels, DPR 1.
+- Focused source and implementation crops: `qa/clicker-reference-product.png`
+  and `qa/clicker-mobile-product.png`.
+- Normalized focused comparison: `qa/clicker-reference-comparison.png`, with
+  each clicker aspect-fit into an equal 500 x 500 slot without stretching.
+
+The focused comparison excludes the source video's phone chrome, hands, and
+surrounding props because the product target is the clicker itself. It compares
+the square white housing, inset 3 x 3 key grid, row palette, cap proportions,
+and glossy highlight language directly.
+
+### Findings and comparison history
+
+- [Resolved P2] The first procedural pass exceeded the planned 12,000-triangle
+  product budget. Rounded-box segment counts were reduced without changing the
+  silhouette; the final scene reports 18 draw calls and 9,603 rendered
+  triangles in the mobile diagnostic pass.
+- [Resolved P2] The initial key palette and corners read flatter and less jelly
+  like than the supplied source. Yellow, pink, and blue saturation was raised,
+  the cap radius was increased, and the physical material retained clearcoat,
+  low roughness, and broad studio highlights.
+- [Passed] Fonts and typography: the full-frame product adds no visible display
+  typography. The route heading and instruction remain available to assistive
+  technology, and existing navigation labels are unchanged.
+- [Passed] Spacing and layout rhythm: the white housing remains centered and
+  fully visible at 1440 x 900, 844 x 390, 390 x 844, and 280 x 560. The grid,
+  rim, wells, and row spacing match the source hierarchy without clipping or
+  colliding with navigation.
+- [Passed] Colors and visual tokens: the final top, middle, and bottom rows are
+  warm pastel yellow, glossy pink, and clear cyan-blue in a neutral white
+  housing. The shared background starts quiet and uses the same palette for a
+  brief press-triggered burst.
+- [Passed] Image quality and asset fidelity: housing, wells, stems, and caps are
+  procedural WebGL geometry with physical materials and real lighting. No
+  raster product replacement, CSS key drawing, post-processing, or copied
+  video frame ships with the page.
+- [Passed] Copy and content: the fourth route is `Thocky clicker`; its hidden
+  instruction describes pressing any of nine keys, the mechanical sound, and
+  the background response.
+- [Passed] Interaction and accessibility: mouse and touch presses use pointer
+  capture, scroll cancellation, a two-touch cap, and independent key springs.
+  Short taps remain visibly depressed for at least 70 ms. Reduced motion keeps
+  immediate shallow travel without rebound overshoot.
+
+### Browser, audio, and performance QA
+
+- Portrait mobile, narrow mobile, landscape, and desktop layouts passed with no
+  overflow or obscured navigation.
+- Top, middle, and bottom-row clicks each depressed the targeted key and emitted
+  a shared synesthesia burst. The burst settled back to the calm field.
+- The previous-page control navigated from `/clicker` to `/chocolate` with the
+  QA query preserved, and direct return to `/clicker` restored the experience.
+- A real Chromium pointer gesture unlocked Web Audio. Three rapid key presses
+  produced two audible sample starts and one intentional rate-limit skip;
+  diagnostics ended `ready` with playback-rate variation at `0.955`.
+- The final mobile diagnostic reported 18 draw calls and 9,603 rendered
+  triangles. Frame samples were predominantly 16.6-16.8 ms, with a sampled
+  maximum of 18.4 ms.
+- No dependency, persistence, backend, Rapier usage, or Supabase migration was
+  added for this page. The thock sample and CC BY 4.0 attribution are committed
+  under `audio/`.
+
+### Remaining polish
+
+- P3: the procedural caps are intentionally more uniform than the handmade
+  jelly-keycap irregularity in the source. This preserves deterministic shared
+  geometry, instancing, and the verified mobile render budget.
+
+final result: passed
+
 ## Cross-page synesthesia propagation and two-second response
 
 ### Source and implementation evidence

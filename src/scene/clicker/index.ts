@@ -1,0 +1,25 @@
+export {
+  CLICKER_COLUMN_COUNT,
+  CLICKER_HOUSING,
+  CLICKER_KEY_COUNT,
+  CLICKER_KEY_DEPTH,
+  CLICKER_KEY_POSITIONS,
+  CLICKER_KEY_ROWS,
+  CLICKER_KEY_SIZE,
+  CLICKER_KEY_SPACING,
+  CLICKER_KEY_TRAVEL,
+  CLICKER_MINIMUM_PRESS_MS,
+  CLICKER_ROW_COUNT,
+  CLICKER_SYNESTHESIA_THEME,
+  getClickerKeyIndex,
+  getClickerKeyPosition,
+  getResponsiveClickerCameraPose,
+} from './clickerDefinition'
+export {
+  CLICKER_PRESS_SPRING,
+  createClickerKeyRuntime,
+  pressClickerKey,
+  releaseClickerKey,
+  stepClickerKeys,
+  type ClickerKeyRuntime,
+} from './clickerInteraction'

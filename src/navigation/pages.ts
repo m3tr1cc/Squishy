@@ -20,6 +20,11 @@ export const PAGE_ROUTES = [
     path: '/chocolate',
     title: 'Chocolate slime',
   },
+  {
+    id: 'clicker',
+    path: '/clicker',
+    title: 'Thocky clicker',
+  },
 ] as const satisfies readonly PageRouteDefinition[]
 
 export type PageRoute = (typeof PAGE_ROUTES)[number]

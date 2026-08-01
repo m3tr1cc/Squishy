@@ -1,0 +1,26 @@
+import thockKeypressUrl from '../../audio/thock-keypress.mp3?url'
+
+export const THOCK_TRACK = Object.freeze({
+  id: 'mechanical-keypress',
+  url: thockKeypressUrl,
+  gain: 0.82,
+})
+
+const PLAYBACK_RATES = Object.freeze([0.92, 0.955, 0.99, 1.015])
+
+function hashUint32(value: number) {
+  let hash = value >>> 0
+  hash ^= hash >>> 16
+  hash = Math.imul(hash, 0x7feb352d)
+  hash ^= hash >>> 15
+  hash = Math.imul(hash, 0x846ca68b)
+  hash ^= hash >>> 16
+  return hash >>> 0
+}
+
+export function selectThockPlaybackRate(seed: number, sequence: number) {
+  const hash = hashUint32(
+    (seed ^ Math.imul(sequence + 1, 0x9e3779b1)) >>> 0,
+  )
+  return PLAYBACK_RATES[hash % PLAYBACK_RATES.length]
+}
