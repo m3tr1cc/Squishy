@@ -1,5 +1,15 @@
 # Audio sources
 
+## iPod mini click-wheel sound
+
+- Source: synthesized locally with the Web Audio API; no recorded asset is
+  bundled.
+- Model: a short 1,846 Hz piezo-like pulse based on published click-wheel
+  reverse-engineering notes, with a 0.4 ms drive and 4 ms decay.
+- License: original application code.
+- Changes: generated only after user interaction and rate-limited to one click
+  per registered menu increment.
+
 ## `thock-keypress.mp3`
 
 - Source: “Keyboard, computer, mechanical, typing, individual keys, press,

@@ -58,6 +58,10 @@ body {
   touch-action: pan-y;
 }
 
+.app-shell--ipod canvas {
+  touch-action: none;
+}
+
 .app-shell canvas.wax-pointer-hover {
   cursor: pointer;
 }

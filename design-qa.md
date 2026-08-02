@@ -186,6 +186,118 @@ with angle changes retained only where real shard boundaries meet.
 
 final result: passed
 
+## Green iPod mini page
+
+### Source and implementation evidence
+
+- Green product source visual truth:
+  `.codex-remote-attachments/019fc330-3791-7311-a11e-9426beebf6b1/924209ee-3512-4c50-a09a-7dfb3552a7c8/1-Photo-1.jpg`
+  at 743 x 1280 pixels.
+- Monochrome menu source visual truth:
+  `.codex-remote-attachments/019fc330-3791-7311-a11e-9426beebf6b1/924209ee-3512-4c50-a09a-7dfb3552a7c8/2-Photo-2.jpg`
+  at 965 x 1280 pixels.
+- Browser-rendered reference viewport:
+  `qa/ipod-reference-viewport-final.png` at a 743 x 1280 CSS viewport,
+  DPR 1.
+- Browser-rendered mobile viewport: `qa/ipod-mobile-final.png` at a
+  390 x 844 CSS viewport, DPR 1.
+- Full-view combined evidence: `qa/ipod-reference-comparison-final.jpg` at
+  2229 x 1280 pixels. The green source and implementation occupy exact
+  743 x 1280 slots; the gray source is proportionally fit to 743 x 986 and
+  vertically centered without cropping or stretching.
+- Focused screen comparison: `qa/ipod-screen-comparison-final.jpg` at
+  932 x 365 pixels. The 420 x 328 source display crop and 466 x 365
+  implementation crop are normalized into adjacent 466 x 365 slots.
+- Interaction evidence: `qa/ipod-keyboard-browse.png` shows the keyboard-
+  selected Browse state. The primary full-view comparison uses the initial
+  Playlists state.
+
+The full-view comparison is required for body proportions, wheel placement,
+green material, and reflective background. The focused screen comparison is
+also required because the five small menu rows, battery, header, highlight,
+and chevrons are not readable enough in the three-panel full view.
+
+### Findings and comparison history
+
+1. **Resolved P1 - the first browser render was undersized and dark olive.**
+   `qa/ipod-reference-viewport-initial.png` showed the product using only about
+   75% of the source's height, with strong green-black shading and a hard cast
+   shadow. The responsive fit, base color, metalness, hemisphere fill, and
+   shadow treatment were corrected. The final product now matches the source's
+   29-pixel side margins and near-full portrait height while retaining visible
+   anodized highlights against the green reflective background.
+2. **Resolved P2 - the first display and wheel were oversized relative to the
+   body.** The screen/window proportions were measured against both supplied
+   products and the wheel was reduced to the source's body-relative diameter.
+   `qa/ipod-reference-viewport-pass2.png` verified the corrected full-frame
+   scale; the final pass tightened the bezel and restored the photographed
+   center-button artwork from the source texture.
+3. **Passed after final comparison.** The equal-size full view and normalized
+   screen crop contain no remaining actionable P0, P1, or P2 mismatch. The
+   original wheel photograph supplies the visible MENU, previous, next,
+   play/pause, center outline, and subtle paper texture instead of code-native
+   replacement artwork.
+
+### Required fidelity surfaces
+
+- **Fonts and typography:** the screen uses a pixel-resolved bold Arial fallback
+  at a native 138 x 110 texture size. The normalized crop preserves the gray
+  source's condensed hierarchy, high-weight selected label, centered `iPod`
+  header, and readable five-row density. The implementation is slightly
+  cleaner and less optically heavy than the compressed source, classified as
+  P3 rather than a usability or hierarchy mismatch.
+- **Spacing and layout rhythm:** body, display, and wheel centers align with the
+  green source at the equal 743 x 1280 viewport. The 390 x 844 capture keeps the
+  complete product, wheel target, and existing route controls inside safe
+  margins without clipping or overlap.
+- **Colors and visual tokens:** the body uses pale yellow-green anodized metal,
+  the background uses the same green family with a physical reflective surface,
+  the wheel stays warm white, and the screen retains blue-gray LCD, charcoal
+  text, and muted violet selection colors.
+- **Image quality and asset fidelity:** the body, bezel, glass, screen, wheel,
+  backdrop, and interaction surfaces remain native WebGL geometry. The supplied
+  green source is bundled as the wheel decal and cropped with texture UVs at
+  runtime, preserving the real labels and center art without a CSS drawing,
+  inline SVG, or generated replacement. The menu is a nearest-filtered dynamic
+  138 x 110 CanvasTexture so selection can move without raster scaling blur.
+- **Copy and content:** the screen contains exactly `iPod`, `Playlists`,
+  `Browse`, `Extras`, `Settings`, and `Backlight`, matching the gray reference.
+  No submenu, fake playback state, or unsupported success state was added.
+- **Interaction and accessibility:** a clockwise 25-degree drag moved Browse to
+  Extras, confirming angular wheel input rather than horizontal/vertical drag
+  approximation. ArrowDown selected Browse, and the hidden listbox exposed the
+  selected state to accessibility APIs. A real pointer center tap unlocked the
+  licensed thock sample and reported one completed play. The complete wheel and
+  center are touch-sized targets; the iPod canvas alone disables browser pan so
+  wheel gestures remain stable on mobile.
+
+### Browser, performance, and migration QA
+
+- Primary interactions tested: clockwise wheel drag, keyboard arrow scroll,
+  keyboard Enter path, and center-button pointer tap.
+- Audio diagnostics after the center tap reported `ready`, one play, no skipped
+  play, active user activation, and no resume error. Browser automation key
+  presses do not create native user activation, so the pointer tap was used for
+  the authoritative playback check.
+- Final desktop and mobile browser sessions reported zero application console
+  errors. Existing upstream Three.js deprecation/shader precision warnings are
+  dependency-owned and non-blocking.
+- Settled mobile diagnostics across 300 frames: 10 draw calls, 2,134 rendered
+  triangles, 16.66 ms average, 16.7 ms p50, 17.9 ms p95, and 18.9 ms maximum.
+- No new dependency, backend, persistence layer, Rapier body, or Supabase
+  schema/RLS/seed/function/trigger/policy migration was required.
+
+### Follow-up polish
+
+- [P3] The procedural rounded cuboid has slightly softer top and bottom corner
+  transitions than the photographed aluminum extrusion. The difference is
+  visible only in direct comparison and does not affect the 1:1 frontal read.
+- [P3] The reconstructed LCD typography is sharper than the compressed gray
+  photograph; retaining native 138 x 110 nearest-filtering keeps the intended
+  monochrome hardware character without adding a bitmap font dependency.
+
+final result: passed
+
 ## Clear neon clicker redesign
 
 ### Evidence and normalization
@@ -1808,5 +1920,16 @@ crop.
   frame samples predominantly 16.4-17.1 ms.
 - Lint, TypeScript checks, all 180 tests, and the production build pass.
 - No dependency, persistence, backend, or Supabase migration was added.
+
+final result: passed
+
+## Latest QA status: green iPod mini page
+
+The complete source/implementation evidence, equal-size full-view comparison,
+focused LCD comparison, required fidelity-surface review, iteration history,
+desktop/mobile captures, click-wheel and button interaction results, audio
+diagnostics, and performance measurements are recorded in the `Green iPod mini
+page` section above. No actionable P0/P1/P2 finding remains, and the final
+browser sessions contain no application-owned console error.
 
 final result: passed
