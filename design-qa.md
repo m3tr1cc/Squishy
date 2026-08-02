@@ -1993,13 +1993,80 @@ crop.
 
 final result: passed
 
-## Latest QA status: green iPod mini refinement
+## Green iPod mini extruded slot body
 
-The equal-size before/after comparison, final desktop and mobile captures,
-required fidelity-surface review, continuous pointer/keyboard wrapping,
-deeper button-audio diagnostics, animated-background signal response, and
-settled performance measurements are recorded in the `Green iPod mini
-refinement` section above. No actionable P0/P1/P2 finding remains, and a clean
-reload produced no new application-owned console error.
+### Evidence and normalization
+
+- Source visual truth: `src/assets/ipod-mini-green-reference.jpg` at
+  743 x 1280 pixels.
+- Pre-fix flat-body evidence: `qa/ipod-refinement-desktop-final.png` at
+  743 x 851 pixels.
+- Final desktop implementation: `qa/ipod-slot-body-desktop-final.png` at a
+  743 x 851 CSS viewport, DPR 1.
+- Final mobile implementation: `qa/ipod-slot-body-mobile-final.png` at a
+  390 x 844 CSS viewport, DPR 1.
+- Combined full-view comparison: `qa/ipod-slot-body-comparison-final.jpg` at
+  2229 x 851 pixels. The source is proportionally contained in the first
+  743 x 851 panel; the equal-size pre-fix and final implementation occupy the
+  second and third panels without scaling.
+- State: initial `Playlists` selection at `/ipod?qaDpr=1`.
+
+The complete body, screen, wheel, background, and navigation are readable in
+the full-view comparison, so no focused region crop was needed. The vertical
+side highlights and top/bottom corner silhouette remain clear at this scale.
+
+### Findings and comparison history
+
+- [Resolved P1] The prior hard-edged `BoxGeometry` preserved square corners
+  but left the body as a uniform green rectangle. The final body is a custom
+  vertical extrusion of a capsule-shaped width/depth section: its broad front
+  plane stays flat, while 32-segment front-to-side arcs supply continuous
+  normals for real anodized-metal reflections.
+- [Resolved P2] The earlier presentation rotation made a depth-aware body read
+  slightly rounded at its top corners. The final group is viewed on-axis with
+  zero rotation; its extrusion caps stay horizontal and its projected front
+  silhouette meets the vertical sides at 90 degrees.
+- [Passed] Fonts and typography: LCD family, weight, line height, hierarchy,
+  antialiasing, menu density, and selection reversal are unchanged.
+- [Passed] Spacing and layout rhythm: the 75% device scale, screen and wheel
+  positions, main-menu spacing, margins, and navigation clearance are
+  unchanged at desktop and mobile sizes.
+- [Passed] Colors and visual tokens: the iPod retains its established green,
+  physical clearcoat material, and green/hot-pink animated background. The new
+  side reflections come from geometry normals and the existing environment,
+  not painted gradients or overlays.
+- [Passed] Image quality and asset fidelity: the supplied wheel texture remains
+  sharp and unchanged. The body is procedural Three.js geometry appropriate
+  for a live reflective product; no raster body replacement, custom SVG,
+  post-processing, or extra asset was introduced.
+- [Passed] Copy and content: the five main-menu items, interaction instructions,
+  accessibility labels, and route semantics are unchanged.
+
+### Interaction, browser, performance, and migration QA
+
+- A real keyboard `ArrowUp` press wrapped `Playlists` to `Backlight`; a real
+  clockwise pointer drag across the rendered wheel then selected `Extras`,
+  confirming the new body does not occlude or intercept the controls.
+- Desktop 743 x 851 and mobile 390 x 844 renders retain the full device with
+  square top/bottom silhouette corners, bright continuous side highlights,
+  and no clipping or overlap.
+- A clean final reload produced zero new application-owned console errors.
+- Settled diagnostics reported 10 draw calls and 1,113 triangles across 300
+  samples: 16.67 ms average, 16.70 ms p50, and 17.00 ms p95. The slot body adds
+  252 triangles while staying well inside the scene budget.
+- The geometry unit test verifies exact width, height, and depth bounds,
+  curved side normals, and hard top-cap normals.
+- No dependency, persistence, backend, schema, RLS, seed, function, trigger,
+  policy, or Supabase migration was required.
+
+final result: passed
+
+## Latest QA status: green iPod mini extruded slot body
+
+The source/pre-fix/final comparison, square-silhouette geometry test, final
+desktop and mobile captures, pointer/keyboard interaction checks, required
+fidelity-surface review, console check, and settled performance measurements
+are recorded in the `Green iPod mini extruded slot body` section above. No
+actionable P0/P1/P2 finding remains.
 
 final result: passed

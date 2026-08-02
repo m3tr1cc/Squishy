@@ -105,6 +105,9 @@ Fredoka face used by the soaps also renders the curved lowercase `slime` mark.
 
 The `/ipod` experience presents a first-generation green iPod mini with a
 reflective anodized body and a flowing green/hot-pink synesthesia background.
+Its body uses a vertically extruded slot cross-section, keeping a square
+straight-on silhouette while curved depth transitions produce real side
+highlights.
 Its monochrome main menu is drawn at the original 138 x 110 display resolution.
 Pointer and touch drags around the click wheel accumulate signed angle, move
 one row per 18.75 degrees, and wrap continuously across both menu ends;

@@ -9,6 +9,7 @@ import {
 } from 'react'
 import * as THREE from 'three'
 import greenIpodReferenceUrl from '../assets/ipod-mini-green-reference.jpg'
+import { createIpodBodyGeometry } from './ipod/createIpodBodyGeometry'
 import {
   createIpodScreenTexture,
   updateIpodScreenTexture,
@@ -65,7 +66,7 @@ type ActiveButtonPress = {
   startY: number
 }
 
-const PRESENTATION_ROTATION = [-0.025, 0.022, 0] as const
+const PRESENTATION_ROTATION = [0, 0, 0] as const
 
 function ResponsiveIpodCamera() {
   const { camera, size } = useThree()
@@ -124,11 +125,12 @@ export function IpodScene({
   )
   const bodyGeometry = useMemo(
     () =>
-      new THREE.BoxGeometry(
-        IPOD_MINI_BODY.width,
-        IPOD_MINI_BODY.height,
-        IPOD_MINI_BODY.depth,
-      ),
+      createIpodBodyGeometry({
+        width: IPOD_MINI_BODY.width,
+        height: IPOD_MINI_BODY.height,
+        depth: IPOD_MINI_BODY.depth,
+        sideSegments: 32,
+      }),
     [],
   )
   const bezelGeometry = useMemo(
