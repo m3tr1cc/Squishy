@@ -427,7 +427,7 @@ export function ClickerScene({
         >
           <meshPhysicalMaterial
             {...CLICKER_CLEAR_INSERT_MATERIAL}
-            opacity={0.045}
+            opacity={0.13}
           />
         </mesh>
         <instancedMesh
@@ -439,7 +439,7 @@ export function ClickerScene({
         >
           <meshPhysicalMaterial
             {...CLICKER_CLEAR_INSERT_MATERIAL}
-            opacity={0.29}
+            opacity={0.38}
           />
         </instancedMesh>
         <instancedMesh

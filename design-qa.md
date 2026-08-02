@@ -1755,3 +1755,58 @@ enough for direct inspection. No additional focused crop was needed.
   currently selected neon gradient instead of appearing colorless.
 
 final result: passed
+
+## Clicker housing opacity refinement
+
+### Evidence and normalization
+
+- Source visual truth:
+  `.codex-remote-attachments/019fbf99-03c0-7ed3-81cb-e70316b54676/a05eca67-422e-4969-9bda-f6dc194fc92c/1-Photo-1.jpg`
+  at 1280 x 1280 pixels.
+- Desktop implementation: `qa/clicker-housing-opacity-desktop.png` at
+  1440 x 900 CSS pixels, DPR 1.
+- Normalized implementation: `qa/clicker-housing-opacity-square.png` at
+  900 x 900 pixels, cropped from the centered desktop viewport without
+  scaling the product.
+- Equal-size comparison: `qa/clicker-housing-opacity-reference-comparison.png`
+  at 1800 x 900 pixels.
+- Mobile implementation: `qa/clicker-housing-opacity-mobile.png` at
+  390 x 844 CSS pixels, DPR 1.
+- State: settled idle at `/clicker`.
+
+The full product fills both square comparison slots, making the outer frame,
+backplate, sockets, and button shoulders readable without a separate detail
+crop.
+
+### Findings
+
+- [Resolved P2] The previous 0.23-opacity outer frame and 0.045-opacity
+  backplate let the animated gradient dominate, making the acrylic housing
+  look almost absent. The outer frame is now 0.38 opacity, the shared insert
+  material is 0.32, the backplate override is 0.13, and the socket override is
+  0.38. The final comparison shows a continuous translucent tray while
+  preserving the nested clear rim and colored button-shell separation.
+- [Passed] Fonts and typography: no visible typography changed.
+- [Passed] Spacing and layout rhythm: housing dimensions, rim widths, socket
+  positions, key proportions, and desktop/mobile framing are unchanged.
+- [Passed] Colors and visual tokens: the housing remains a cool neutral
+  acrylic and continues inheriting some live background color instead of
+  becoming opaque white plastic.
+- [Passed] Image quality and asset fidelity: all surfaces remain procedural
+  WebGL geometry with clearcoat materials; no image, overlay, or
+  post-processing substitute was introduced.
+- [Passed] Copy and content: interaction instructions, navigation, audio, and
+  route semantics are unchanged.
+
+### Browser, performance, and migration QA
+
+- Desktop 1440 x 900 and mobile 390 x 844 renders retain the complete tray and
+  navigation clearance without clipping.
+- Browser logs contain no application-owned error; the existing upstream
+  `THREE.Clock` deprecation warning remains non-blocking.
+- Settled diagnostics remain 7 draw calls and 10,165 rendered triangles, with
+  frame samples predominantly 16.4-17.1 ms.
+- Lint, TypeScript checks, all 180 tests, and the production build pass.
+- No dependency, persistence, backend, or Supabase migration was added.
+
+final result: passed

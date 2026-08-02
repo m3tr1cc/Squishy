@@ -65,7 +65,7 @@ describe('clicker definition', () => {
   it('defines clear acrylic housing and glossy resin key materials', () => {
     expect(CLICKER_CLEAR_HOUSING_MATERIAL).toMatchObject({
       transmission: 0,
-      opacity: 0.23,
+      opacity: 0.38,
       transparent: true,
       roughness: 0.065,
       ior: 1.49,
