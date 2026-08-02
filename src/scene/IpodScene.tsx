@@ -9,7 +9,6 @@ import {
 } from 'react'
 import * as THREE from 'three'
 import greenIpodReferenceUrl from '../assets/ipod-mini-green-reference.jpg'
-import { createRoundedCuboidGeometry } from './createRoundedCuboidGeometry'
 import {
   createIpodScreenTexture,
   updateIpodScreenTexture,
@@ -23,16 +22,27 @@ import {
 } from './ipod/ipodInteraction'
 import {
   getResponsiveIpodCameraPose,
-  IPOD_BACKGROUND_GREEN,
+  IPOD_COMPLEMENTARY_PINK,
   IPOD_GREEN,
   IPOD_MINI_BODY,
   IPOD_MINI_SCREEN,
   IPOD_MINI_WHEEL,
+  IPOD_PRESENTATION_SCALE,
 } from './ipod/ipodDefinition'
 import { bindPointerCancellation } from './interaction'
-import { PerformanceDiagnostics } from './SquishyScene'
+import {
+  PerformanceDiagnostics,
+  useReducedMotion,
+} from './SquishyScene'
+import {
+  createSquishyVisualSignalSources,
+  createSynesthesiaTheme,
+  emitSynesthesiaBurst,
+  SynesthesiaBackground,
+} from './synesthesia'
 
 type IpodSceneProps = Readonly<{
+  experienceSeed: number
   selectedMenuIndex: number
   onSelectMenuIndex: (index: number) => void
   playScrollClick: () => void
@@ -78,12 +88,14 @@ function ResponsiveIpodCamera() {
 }
 
 export function IpodScene({
+  experienceSeed,
   selectedMenuIndex,
   onSelectMenuIndex,
   playScrollClick,
   playThock,
   unlockScrollAudio,
 }: IpodSceneProps) {
+  const reducedMotion = useReducedMotion()
   const canvasElement = useThree((state) => state.gl.domElement)
   const selectedIndexRef = useRef(selectedMenuIndex)
   const activeWheelRef = useRef<ActiveWheelGesture | null>(null)
@@ -91,27 +103,41 @@ export function IpodScene({
   const wheelRuntimeRef = useRef<IpodWheelRuntime>(
     createIpodWheelRuntime(),
   )
+  const visualSignals = useMemo(
+    () => createSquishyVisualSignalSources(1),
+    [experienceSeed],
+  )
+  const synesthesiaTheme = useMemo(
+    () =>
+      createSynesthesiaTheme({
+        leadingColor: IPOD_GREEN,
+        complementaryColor: IPOD_COMPLEMENTARY_PINK,
+        shadowColor: '#25102c',
+        seed: (0x1b0d6d3f ^ experienceSeed) >>> 0,
+        idleSpeed: 0.12,
+        maximumMotifs: 5,
+        colorLoop: {
+          colors: [IPOD_GREEN, IPOD_COMPLEMENTARY_PINK],
+        },
+      }),
+    [experienceSeed],
+  )
   const bodyGeometry = useMemo(
     () =>
-      createRoundedCuboidGeometry({
-        ...IPOD_MINI_BODY,
-        widthSegments: 10,
-        heightSegments: 16,
-        depthSegments: 4,
-      }),
+      new THREE.BoxGeometry(
+        IPOD_MINI_BODY.width,
+        IPOD_MINI_BODY.height,
+        IPOD_MINI_BODY.depth,
+      ),
     [],
   )
   const bezelGeometry = useMemo(
     () =>
-      createRoundedCuboidGeometry({
-        width: IPOD_MINI_SCREEN.width + 0.04,
-        height: IPOD_MINI_SCREEN.height + 0.04,
-        depth: 0.075,
-        radius: 0.075,
-        widthSegments: 6,
-        heightSegments: 6,
-        depthSegments: 2,
-      }),
+      new THREE.BoxGeometry(
+        IPOD_MINI_SCREEN.width + 0.04,
+        IPOD_MINI_SCREEN.height + 0.04,
+        0.075,
+      ),
     [],
   )
   const screenTexture = useMemo(
@@ -233,10 +259,19 @@ export function IpodScene({
         ) {
           playScrollClick()
         }
+        emitSynesthesiaBurst(
+          visualSignals[0],
+          Math.min(0.72, 0.34 + result.selectionChangeCount * 0.1),
+        )
       }
     },
-    [onSelectMenuIndex, playScrollClick],
+    [onSelectMenuIndex, playScrollClick, visualSignals],
   )
+
+  const playButtonThock = useCallback(() => {
+    emitSynesthesiaBurst(visualSignals[0], 0.76)
+    playThock()
+  }, [playThock, visualSignals])
 
   const finishWheelPress = useCallback(
     (event: ThreeEvent<PointerEvent>) => {
@@ -253,7 +288,7 @@ export function IpodScene({
           event.clientY - activeWheel.startY,
         ) <= 10
       ) {
-        playThock()
+        playButtonThock()
       }
       const captureTarget = event.target as EventTarget & {
         hasPointerCapture?: (capturedPointerId: number) => boolean
@@ -269,7 +304,7 @@ export function IpodScene({
       activeWheelRef.current = null
       wheelRuntimeRef.current = createIpodWheelRuntime()
     },
-    [playThock],
+    [playButtonThock],
   )
 
   const cancelWheelPress = useCallback(
@@ -321,7 +356,7 @@ export function IpodScene({
           event.clientY - activeCenter.startY,
         ) <= 10
       ) {
-        playThock()
+        playButtonThock()
       }
       const captureTarget = event.target as EventTarget & {
         hasPointerCapture?: (capturedPointerId: number) => boolean
@@ -336,7 +371,7 @@ export function IpodScene({
       }
       activeCenterRef.current = null
     },
-    [playThock],
+    [playButtonThock],
   )
 
   const cancelCenterPress = useCallback(
@@ -353,7 +388,12 @@ export function IpodScene({
 
   return (
     <>
-      <color attach="background" args={[IPOD_BACKGROUND_GREEN]} />
+      <color attach="background" args={['#25102c']} />
+      <SynesthesiaBackground
+        reducedMotion={reducedMotion}
+        signals={visualSignals}
+        theme={synesthesiaTheme}
+      />
       {import.meta.env.DEV ? <PerformanceDiagnostics /> : null}
       <ResponsiveIpodCamera />
       <ambientLight color="#f7ffd9" intensity={0.42} />
@@ -387,18 +427,10 @@ export function IpodScene({
           scale={[2, 4, 1]}
         />
       </Environment>
-      <mesh position={[0, 0, -1.05]} receiveShadow>
-        <planeGeometry args={[18, 18]} />
-        <meshPhysicalMaterial
-          color={IPOD_BACKGROUND_GREEN}
-          metalness={0.22}
-          roughness={0.34}
-          clearcoat={0.42}
-          clearcoatRoughness={0.24}
-        />
-      </mesh>
-
-      <group rotation={PRESENTATION_ROTATION}>
+      <group
+        rotation={PRESENTATION_ROTATION}
+        scale={IPOD_PRESENTATION_SCALE}
+      >
         <mesh geometry={bodyGeometry} receiveShadow>
           <meshPhysicalMaterial
             color={IPOD_GREEN}

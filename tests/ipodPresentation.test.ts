@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   getResponsiveIpodCameraPose,
+  IPOD_COMPLEMENTARY_PINK,
   IPOD_MENU_ITEMS,
   IPOD_MINI_BODY,
   IPOD_MINI_SCREEN,
   IPOD_MINI_WHEEL,
+  IPOD_PRESENTATION_SCALE,
 } from '../src/scene/ipod'
 
 describe('iPod mini presentation', () => {
@@ -13,7 +15,11 @@ describe('iPod mini presentation', () => {
       width: 2,
       height: 3.6,
       depth: 0.54,
+      radius: 0,
     })
+    expect(IPOD_MINI_SCREEN.radius).toBe(0)
+    expect(IPOD_PRESENTATION_SCALE).toBe(0.75)
+    expect(IPOD_COMPLEMENTARY_PINK).toBe('#ff1493')
     expect(IPOD_MINI_SCREEN.width / IPOD_MINI_SCREEN.height).toBeCloseTo(
       138 / 110,
       1,

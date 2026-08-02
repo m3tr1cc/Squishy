@@ -1,7 +1,7 @@
 import {
   IPOD_MENU_ITEM_COUNT,
   IPOD_WHEEL_DEGREES_PER_MENU_STEP,
-  clampIpodMenuIndex,
+  wrapIpodMenuIndex,
 } from './ipodDefinition'
 
 export type IpodWheelRuntime = Readonly<{
@@ -52,7 +52,7 @@ export function stepIpodWheel(
 
   let accumulatedDegrees =
     runtime.accumulatedDegrees + clockwiseDeltaDegrees
-  let nextIndex = clampIpodMenuIndex(selectedIndex)
+  let nextIndex = wrapIpodMenuIndex(selectedIndex, itemCount)
   let selectionChangeCount = 0
 
   while (
@@ -62,9 +62,9 @@ export function stepIpodWheel(
     const direction = accumulatedDegrees > 0 ? 1 : -1
     accumulatedDegrees -=
       direction * IPOD_WHEEL_DEGREES_PER_MENU_STEP
-    const candidateIndex = Math.min(
-      itemCount - 1,
-      Math.max(0, nextIndex + direction),
+    const candidateIndex = wrapIpodMenuIndex(
+      nextIndex + direction,
+      itemCount,
     )
     if (candidateIndex !== nextIndex) {
       nextIndex = candidateIndex

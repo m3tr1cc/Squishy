@@ -23,8 +23,8 @@ import { createSquishyPointerEvents } from './scene/createSquishyPointerEvents'
 import { SquishyScene } from './scene/SquishyScene'
 import type { SoapId } from './scene/soaps'
 import {
-  clampIpodMenuIndex,
   IPOD_MENU_ITEMS,
+  wrapIpodMenuIndex,
 } from './scene/ipod/ipodDefinition'
 
 const LazySoapScene = lazy(() =>
@@ -147,6 +147,7 @@ export function App() {
   const { trigger: playThock } = useThockAudio(
     session.seed,
     isClickerPage || isIpodPage,
+    isIpodPage ? 'deep' : 'standard',
   )
   const {
     trigger: playIpodScroll,
@@ -207,7 +208,7 @@ export function App() {
   }, [session.pageId, session.resetKey])
 
   const handleIpodMenuSelection = useCallback((index: number) => {
-    const nextIndex = clampIpodMenuIndex(index)
+    const nextIndex = wrapIpodMenuIndex(index)
     ipodMenuIndexRef.current = nextIndex
     setIpodMenuIndex(nextIndex)
   }, [])
@@ -226,7 +227,7 @@ export function App() {
       if (direction !== 0) {
         event.preventDefault()
         unlockIpodScroll()
-        const nextIndex = clampIpodMenuIndex(
+        const nextIndex = wrapIpodMenuIndex(
           ipodMenuIndexRef.current + direction,
         )
         if (nextIndex !== ipodMenuIndexRef.current) {
@@ -417,6 +418,7 @@ export function App() {
             ) : (
               <Suspense fallback={null}>
                 <LazyIpodScene
+                  experienceSeed={session.seed}
                   selectedMenuIndex={ipodMenuIndex}
                   onSelectMenuIndex={handleIpodMenuSelection}
                   playScrollClick={playIpodScroll}

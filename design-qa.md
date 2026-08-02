@@ -186,6 +186,76 @@ with angle changes retained only where real shard boundaries meet.
 
 final result: passed
 
+## Green iPod mini refinement
+
+### Evidence and normalization
+
+- Source visual truth: `C:/Users/jleon/AppData/Local/Temp/codex-clipboard-749e85b5-5366-49a2-add6-fceb9e29767a.png`
+  at 743 x 851 pixels.
+- Initial implementation capture: `qa/ipod-refinement-desktop-initial.png`.
+- Final desktop implementation: `qa/ipod-refinement-desktop-final.png` at
+  743 x 851 CSS pixels, DPR 1.
+- Equal-size comparison: `qa/ipod-refinement-comparison-final.jpg` at
+  1486 x 851 pixels, with the source on the left and final implementation on
+  the right without product scaling.
+- Mobile implementation: `qa/ipod-refinement-mobile-final.png` at
+  390 x 844 CSS pixels, DPR 1.
+- State: initial `Playlists` selection at `/ipod?qaDpr=1`.
+
+### Findings and fixes
+
+- [Resolved P1] The device dominated the viewport in the supplied source.
+  A single 0.75 presentation scale now applies to the complete iPod, preserving
+  its internal proportions while restoring surrounding breathing room.
+- [Resolved P2] Segmented rounded geometry made the body and LCD outline look
+  faceted. Both are now hard-edged box geometry with true 90-degree front
+  corners, while the reflective aluminum material remains intact.
+- [Resolved P2] The flat green clear color was replaced by the product's shared
+  animated synesthesia background, seeded from the experience and themed with
+  iPod green, hot pink, and a dark plum shadow color. Click-wheel movement and
+  button presses emit real background signal bursts.
+- [Resolved P2] Selection previously stopped at the first and last menu rows.
+  Pointer rotation and keyboard navigation now use the same modulo helper, so
+  scrolling wraps continuously in either direction.
+- [Resolved P2] The shared click response sounded too sharp for the iPod. The
+  route now selects a dedicated deep thock profile with lower pitch, stronger
+  low-shelf gain, a 2.6 kHz low-pass, and a longer decay without adding an
+  audio asset or changing the other experiences.
+- [Passed] Fonts and typography: the monochrome LCD type, hierarchy, weights,
+  row labels, battery mark, and selected-row reversal remain unchanged.
+- [Passed] Spacing and layout rhythm: screen, wheel, center button, labels, and
+  navigation clearance remain proportional at desktop and mobile sizes.
+- [Passed] Colors and visual tokens: the green body remains faithful to the
+  iPod reference while the complementary hot pink is confined to the animated
+  background requested for this refinement.
+- [Passed] Image quality and asset fidelity: the device remains procedural
+  WebGL geometry with physical clearcoat highlights; no fake raster overlay,
+  handcrafted SVG, or post-processing dependency was introduced.
+- [Passed] Copy and content: the five-item main menu and existing control labels
+  are unchanged.
+
+### Interaction, browser, performance, and migration QA
+
+- Keyboard `ArrowUp` from `Playlists` selected `Backlight`; a real clockwise
+  click-wheel drag from `Backlight` selected `Playlists`, verifying wrap in
+  both input paths. Unit coverage also verifies twelve consecutive wrapped
+  increments.
+- A real center-button press produced audio diagnostics with playback rate
+  0.7308 and activated the synesthesia burst signal. The wheel and center
+  controls remain touch-capable and no button animation was added.
+- Desktop 743 x 851 and mobile 390 x 844 renders keep the full device visible
+  and centered without clipping or overlap.
+- A clean reload after the implementation completed produced no new
+  application error. The earlier development-only React warning at 21:13:53Z
+  was caused by hot replacement changing a hook dependency-list length and did
+  not recur after the 21:18 reload.
+- Settled diagnostics reported 10 draw calls and 861 rendered triangles across
+  300 samples: 16.67 ms average, 16.70 ms p50, 16.80 ms p95, and 17.20 ms max.
+- No dependency, persistence, backend, schema, RLS, seed, function, trigger,
+  policy, or Supabase migration was required.
+
+final result: passed
+
 ## Green iPod mini page
 
 ### Source and implementation evidence
@@ -1923,13 +1993,13 @@ crop.
 
 final result: passed
 
-## Latest QA status: green iPod mini page
+## Latest QA status: green iPod mini refinement
 
-The complete source/implementation evidence, equal-size full-view comparison,
-focused LCD comparison, required fidelity-surface review, iteration history,
-desktop/mobile captures, click-wheel and button interaction results, audio
-diagnostics, and performance measurements are recorded in the `Green iPod mini
-page` section above. No actionable P0/P1/P2 finding remains, and the final
-browser sessions contain no application-owned console error.
+The equal-size before/after comparison, final desktop and mobile captures,
+required fidelity-surface review, continuous pointer/keyboard wrapping,
+deeper button-audio diagnostics, animated-background signal response, and
+settled performance measurements are recorded in the `Green iPod mini
+refinement` section above. No actionable P0/P1/P2 finding remains, and a clean
+reload produced no new application-owned console error.
 
 final result: passed

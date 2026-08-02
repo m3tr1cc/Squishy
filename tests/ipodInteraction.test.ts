@@ -51,13 +51,29 @@ describe('iPod click-wheel interaction', () => {
     expect(counterClockwise.selectionChangeCount).toBe(1)
   })
 
-  it('clamps at menu bounds without reporting phantom changes', () => {
-    const top = stepIpodWheel(createIpodWheelRuntime(), -90, 0)
-    expect(top.selectedIndex).toBe(0)
-    expect(top.selectionChangeCount).toBe(0)
+  it('wraps continuously across both menu bounds', () => {
+    const top = stepIpodWheel(
+      createIpodWheelRuntime(),
+      -IPOD_WHEEL_DEGREES_PER_MENU_STEP,
+      0,
+    )
+    expect(top.selectedIndex).toBe(4)
+    expect(top.selectionChangeCount).toBe(1)
 
-    const bottom = stepIpodWheel(createIpodWheelRuntime(), 90, 4)
-    expect(bottom.selectedIndex).toBe(4)
-    expect(bottom.selectionChangeCount).toBe(0)
+    const bottom = stepIpodWheel(
+      createIpodWheelRuntime(),
+      IPOD_WHEEL_DEGREES_PER_MENU_STEP,
+      4,
+    )
+    expect(bottom.selectedIndex).toBe(0)
+    expect(bottom.selectionChangeCount).toBe(1)
+
+    const multipleTurns = stepIpodWheel(
+      createIpodWheelRuntime(),
+      IPOD_WHEEL_DEGREES_PER_MENU_STEP * 12,
+      4,
+    )
+    expect(multipleTurns.selectedIndex).toBe(1)
+    expect(multipleTurns.selectionChangeCount).toBe(12)
   })
 })

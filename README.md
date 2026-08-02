@@ -104,12 +104,13 @@ Web Audio shuffle. The bundled
 Fredoka face used by the soaps also renders the curved lowercase `slime` mark.
 
 The `/ipod` experience presents a first-generation green iPod mini with a
-reflective anodized body and matching studio background. Its monochrome main
-menu is drawn at the original 138 x 110 display resolution. Pointer and touch
-drags around the click wheel accumulate signed angle and move one bounded menu
-row per 18.75 degrees; keyboard arrows expose the same selection behavior.
-Wheel increments play a short synthesized piezo click, while wheel and center
-button taps reuse the licensed mechanical thock sample.
+reflective anodized body and a flowing green/hot-pink synesthesia background.
+Its monochrome main menu is drawn at the original 138 x 110 display resolution.
+Pointer and touch drags around the click wheel accumulate signed angle, move
+one row per 18.75 degrees, and wrap continuously across both menu ends;
+keyboard arrows expose the same selection behavior. Wheel increments play a
+short synthesized piezo click, while wheel and center button taps reuse the
+licensed mechanical sample through a deeper low-passed thock profile.
 
 ## Experience boundary
 

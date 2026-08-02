@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react'
 import {
-  selectThockPlaybackRate,
+  resolveThockPlaybackRate,
+  THOCK_AUDIO_PROFILES,
   THOCK_TRACK,
+  type ThockAudioProfile,
 } from './thockTrack'
 
 const MAX_ACTIVE_SOURCES = 6
@@ -37,6 +39,7 @@ type ThockAudioRuntime = {
   context: AudioContext | null
   masterGain: GainNode | null
   lowShelf: BiquadFilterNode | null
+  lowPass: BiquadFilterNode | null
   compressor: DynamicsCompressorNode | null
   buffer: AudioBuffer | null
   decodePromise: Promise<AudioBuffer> | null
@@ -105,7 +108,10 @@ function stopActiveSources(runtime: ThockAudioRuntime) {
   runtime.activePlaybacks.clear()
 }
 
-function createAudioGraph(runtime: ThockAudioRuntime) {
+function createAudioGraph(
+  runtime: ThockAudioRuntime,
+  profile: ThockAudioProfile,
+) {
   const AudioContextConstructor = getAudioContextConstructor()
   if (!AudioContextConstructor) {
     runtime.diagnostics.status = 'unsupported'
@@ -126,28 +132,39 @@ function createAudioGraph(runtime: ThockAudioRuntime) {
 
   const masterGain = context.createGain()
   const lowShelf = context.createBiquadFilter()
+  const lowPass = context.createBiquadFilter()
   const compressor = context.createDynamicsCompressor()
-  masterGain.gain.value = 0.78
+  const audioProfile = THOCK_AUDIO_PROFILES[profile]
+  masterGain.gain.value = audioProfile.masterGain
   lowShelf.type = 'lowshelf'
   lowShelf.frequency.value = 180
-  lowShelf.gain.value = 4.5
+  lowShelf.gain.value = audioProfile.lowShelfGain
+  lowPass.type = 'lowpass'
+  lowPass.frequency.value = audioProfile.lowPassFrequency
+  lowPass.Q.value = 0.65
   compressor.threshold.value = -16
   compressor.knee.value = 14
   compressor.ratio.value = 5
   compressor.attack.value = 0.002
   compressor.release.value = 0.1
   masterGain.connect(lowShelf)
-  lowShelf.connect(compressor)
+  lowShelf.connect(lowPass)
+  lowPass.connect(compressor)
   compressor.connect(context.destination)
 
   runtime.context = context
   runtime.masterGain = masterGain
   runtime.lowShelf = lowShelf
+  runtime.lowPass = lowPass
   runtime.compressor = compressor
   return context
 }
 
-function playSample(runtime: ThockAudioRuntime, seed: number) {
+function playSample(
+  runtime: ThockAudioRuntime,
+  seed: number,
+  profile: ThockAudioProfile,
+) {
   const { buffer, context, masterGain } = runtime
   if (
     runtime.disposed ||
@@ -171,14 +188,25 @@ function playSample(runtime: ThockAudioRuntime, seed: number) {
 
   const source = context.createBufferSource()
   const gain = context.createGain()
-  const playbackRate = selectThockPlaybackRate(seed, runtime.sequence)
+  const audioProfile = THOCK_AUDIO_PROFILES[profile]
+  const playbackRate = resolveThockPlaybackRate(
+    seed,
+    runtime.sequence,
+    profile,
+  )
   const startedAt = now + 0.002
   runtime.sequence += 1
   source.buffer = buffer
   source.playbackRate.setValueAtTime(playbackRate, startedAt)
   gain.gain.setValueAtTime(0, startedAt)
-  gain.gain.linearRampToValueAtTime(THOCK_TRACK.gain, startedAt + 0.003)
-  gain.gain.exponentialRampToValueAtTime(0.001, startedAt + 0.36)
+  gain.gain.linearRampToValueAtTime(
+    THOCK_TRACK.gain * audioProfile.sampleGain,
+    startedAt + 0.003,
+  )
+  gain.gain.exponentialRampToValueAtTime(
+    0.001,
+    startedAt + audioProfile.fadeSeconds,
+  )
   source.connect(gain)
   gain.connect(masterGain)
 
@@ -190,7 +218,11 @@ function playSample(runtime: ThockAudioRuntime, seed: number) {
     gain.disconnect()
     publishDiagnostics(runtime)
   }
-  source.start(startedAt, 0, Math.min(0.4, buffer.duration))
+  source.start(
+    startedAt,
+    0,
+    Math.min(audioProfile.durationSeconds, buffer.duration),
+  )
 
   runtime.lastStartedAt = startedAt
   runtime.diagnostics.playCount += 1
@@ -198,7 +230,11 @@ function playSample(runtime: ThockAudioRuntime, seed: number) {
   publishDiagnostics(runtime)
 }
 
-function flushPendingPresses(runtime: ThockAudioRuntime, seed: number) {
+function flushPendingPresses(
+  runtime: ThockAudioRuntime,
+  seed: number,
+  profile: ThockAudioProfile,
+) {
   if (
     runtime.context?.state !== 'running' ||
     !runtime.buffer ||
@@ -207,13 +243,14 @@ function flushPendingPresses(runtime: ThockAudioRuntime, seed: number) {
     return
   }
   runtime.pendingPressCount = 0
-  playSample(runtime, seed)
+  playSample(runtime, seed, profile)
 }
 
 function ensureDecodedTrack(
   runtime: ThockAudioRuntime,
   context: AudioContext,
   seed: number,
+  profile: ThockAudioProfile,
 ) {
   if (runtime.buffer) {
     return Promise.resolve(runtime.buffer)
@@ -238,7 +275,7 @@ function ensureDecodedTrack(
       runtime.buffer = buffer
       runtime.diagnostics.status =
         context.state === 'running' ? 'ready' : 'suspended'
-      flushPendingPresses(runtime, seed)
+      flushPendingPresses(runtime, seed, profile)
       publishDiagnostics(runtime)
       return buffer
     })
@@ -265,13 +302,18 @@ function primeAudioContext(context: AudioContext) {
   source.start()
 }
 
-export function useThockAudio(experienceSeed: number, enabled: boolean) {
+export function useThockAudio(
+  experienceSeed: number,
+  enabled: boolean,
+  profile: ThockAudioProfile = 'standard',
+) {
   const runtimeRef = useRef<ThockAudioRuntime | null>(null)
   if (!runtimeRef.current) {
     runtimeRef.current = {
       context: null,
       masterGain: null,
       lowShelf: null,
+      lowPass: null,
       compressor: null,
       buffer: null,
       decodePromise: null,
@@ -329,6 +371,7 @@ export function useThockAudio(experienceSeed: number, enabled: boolean) {
       runtime.context = null
       runtime.masterGain = null
       runtime.lowShelf = null
+      runtime.lowPass = null
       runtime.compressor = null
       runtime.buffer = null
       runtime.decodePromise = null
@@ -340,7 +383,7 @@ export function useThockAudio(experienceSeed: number, enabled: boolean) {
       }
       delete document.documentElement.dataset.squishyThockAudioDiagnostics
     }
-  }, [enabled, runtime])
+  }, [enabled, profile, runtime])
 
   useEffect(() => {
     runtime.sequence = 0
@@ -358,14 +401,14 @@ export function useThockAudio(experienceSeed: number, enabled: boolean) {
 
     let context = runtime.context
     if (!context || context.state === 'closed') {
-      context = createAudioGraph(runtime)
+      context = createAudioGraph(runtime, profile)
       if (!context) {
         return
       }
     }
 
     if (context.state === 'running' && runtime.buffer) {
-      playSample(runtime, experienceSeed)
+      playSample(runtime, experienceSeed, profile)
       return
     }
 
@@ -386,7 +429,7 @@ export function useThockAudio(experienceSeed: number, enabled: boolean) {
           runtime.diagnostics.status = runtime.buffer
             ? 'ready'
             : 'loading'
-          flushPendingPresses(runtime, experienceSeed)
+          flushPendingPresses(runtime, experienceSeed, profile)
           publishDiagnostics(runtime)
         })
         .catch((error: unknown) => {
@@ -401,10 +444,15 @@ export function useThockAudio(experienceSeed: number, enabled: boolean) {
         })
     }
 
-    void ensureDecodedTrack(runtime, context, experienceSeed).catch(() => {
+    void ensureDecodedTrack(
+      runtime,
+      context,
+      experienceSeed,
+      profile,
+    ).catch(() => {
       // Diagnostics expose decode failures while visual presses continue.
     })
-  }, [enabled, experienceSeed, runtime])
+  }, [enabled, experienceSeed, profile, runtime])
 
   return { trigger } as const
 }

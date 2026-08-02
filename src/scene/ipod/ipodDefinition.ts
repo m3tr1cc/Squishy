@@ -8,18 +8,20 @@ export const IPOD_MENU_ITEMS = Object.freeze([
 
 export const IPOD_MENU_ITEM_COUNT = IPOD_MENU_ITEMS.length
 export const IPOD_WHEEL_DEGREES_PER_MENU_STEP = 18.75
+export const IPOD_PRESENTATION_SCALE = 0.75
 
 export const IPOD_MINI_BODY = Object.freeze({
   width: 2,
   height: 3.6,
   depth: 0.54,
-  radius: 0.12,
+  radius: 0,
 })
 
 export const IPOD_MINI_SCREEN = Object.freeze({
   width: 1.3,
   height: 1.01,
   y: 1.02,
+  radius: 0,
 })
 
 export const IPOD_MINI_WHEEL = Object.freeze({
@@ -29,13 +31,24 @@ export const IPOD_MINI_WHEEL = Object.freeze({
 })
 
 export const IPOD_GREEN = '#c7dd76'
-export const IPOD_BACKGROUND_GREEN = '#b8cf68'
+export const IPOD_COMPLEMENTARY_PINK = '#ff1493'
 
 export function clampIpodMenuIndex(index: number) {
   return Math.min(
     IPOD_MENU_ITEM_COUNT - 1,
     Math.max(0, Math.round(index)),
   )
+}
+
+export function wrapIpodMenuIndex(
+  index: number,
+  itemCount = IPOD_MENU_ITEM_COUNT,
+) {
+  if (!Number.isFinite(index) || itemCount <= 0) {
+    return 0
+  }
+  const integerIndex = Math.round(index)
+  return ((integerIndex % itemCount) + itemCount) % itemCount
 }
 
 export function getResponsiveIpodCameraPose(
