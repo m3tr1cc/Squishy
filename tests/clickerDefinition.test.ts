@@ -1,21 +1,32 @@
 import * as THREE from 'three'
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { describe, expect, it } from 'vitest'
 import {
+  CLICKER_BACKPLATE,
   CLICKER_CLEAR_HOUSING_MATERIAL,
   CLICKER_CLEAR_INSERT_MATERIAL,
   CLICKER_HOUSING,
   CLICKER_INNER_GROOVE,
   CLICKER_KEY_COUNT,
   CLICKER_KEY_COLORS,
-  CLICKER_KEY_MATERIAL,
+  CLICKER_KEY_FACE,
+  CLICKER_KEY_FACE_MATERIAL,
+  CLICKER_KEY_SHELL,
+  CLICKER_KEY_SHELL_MATERIAL,
   CLICKER_KEYS,
-  CLICKER_KEY_SIZE,
+  CLICKER_SOCKET,
+  createClickerHousingGeometry,
+  createRoundedFrameGeometry,
   createClickerSynesthesiaTheme,
   getClickerKeyPosition,
   getResponsiveClickerCameraPose,
 } from '../src/scene/clicker'
 import { createRoundedCuboidGeometry } from '../src/scene/createRoundedCuboidGeometry'
+
+function triangleCount(geometry: THREE.BufferGeometry) {
+  return geometry.getIndex()
+    ? geometry.getIndex()!.count / 3
+    : geometry.getAttribute('position').count / 3
+}
 
 describe('clicker definition', () => {
   it('uses nine evenly spaced keys in the reference neon layout', () => {
@@ -54,15 +65,20 @@ describe('clicker definition', () => {
   it('defines clear acrylic housing and glossy resin key materials', () => {
     expect(CLICKER_CLEAR_HOUSING_MATERIAL).toMatchObject({
       transmission: 0,
-      opacity: 0.18,
+      opacity: 0.23,
       transparent: true,
-      roughness: 0.08,
+      roughness: 0.065,
       ior: 1.49,
       clearcoat: 1,
     })
-    expect(CLICKER_CLEAR_INSERT_MATERIAL.opacity).toBeLessThan(0.1)
-    expect(CLICKER_KEY_MATERIAL.transmission).toBeLessThan(0.1)
-    expect(CLICKER_KEY_MATERIAL.clearcoat).toBe(1)
+    expect(CLICKER_CLEAR_INSERT_MATERIAL.transmission).toBe(0)
+    expect(CLICKER_KEY_SHELL_MATERIAL).toMatchObject({
+      transparent: true,
+      clearcoat: 1,
+    })
+    expect(CLICKER_KEY_SHELL_MATERIAL.transmission).toBe(0)
+    expect(CLICKER_KEY_FACE_MATERIAL.transmission).toBe(0)
+    expect(CLICKER_KEY_FACE_MATERIAL.clearcoat).toBe(1)
   })
 
   it('derives a reproducible palette-loop theme from the experience seed', () => {
@@ -89,38 +105,93 @@ describe('clicker definition', () => {
     expect(CLICKER_INNER_GROOVE.radius).toBeGreaterThan(0)
   })
 
+  it('uses genuinely open rounded frames for the housing and nine sockets', () => {
+    const housing = createClickerHousingGeometry()
+    const socket = createRoundedFrameGeometry({
+      width: CLICKER_SOCKET.width,
+      height: CLICKER_SOCKET.height,
+      depth: CLICKER_SOCKET.depth,
+      radius: CLICKER_SOCKET.radius,
+      frameWidth: CLICKER_SOCKET.frameWidth,
+    })
+    const material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })
+    const housingMesh = new THREE.Mesh(housing, material)
+    const socketMesh = new THREE.Mesh(socket, material)
+    const raycaster = new THREE.Raycaster()
+    const direction = new THREE.Vector3(0, 0, -1)
+
+    try {
+      for (const mesh of [housingMesh, socketMesh]) {
+        mesh.updateMatrixWorld(true)
+        raycaster.set(new THREE.Vector3(0, 0, 2), direction)
+        expect(raycaster.intersectObject(mesh)).toHaveLength(0)
+      }
+
+      raycaster.set(
+        new THREE.Vector3(
+          CLICKER_HOUSING.width / 2 - CLICKER_HOUSING.frameWidth / 2,
+          0,
+          2,
+        ),
+        direction,
+      )
+      expect(raycaster.intersectObject(housingMesh).length).toBeGreaterThan(0)
+
+      raycaster.set(
+        new THREE.Vector3(
+          CLICKER_SOCKET.width / 2 - CLICKER_SOCKET.frameWidth / 2,
+          0,
+          2,
+        ),
+        direction,
+      )
+      expect(raycaster.intersectObject(socketMesh).length).toBeGreaterThan(0)
+    } finally {
+      housing.dispose()
+      socket.dispose()
+      material.dispose()
+    }
+  })
+
   it('keeps the complete procedural device below the triangle budget', () => {
-    const housing = new RoundedBoxGeometry(
-      CLICKER_HOUSING.width,
-      CLICKER_HOUSING.height,
-      CLICKER_HOUSING.depth,
-      4,
-      CLICKER_HOUSING.radius,
-    )
-    const plate = new RoundedBoxGeometry(
-      CLICKER_INNER_GROOVE.width,
-      CLICKER_INNER_GROOVE.height,
-      CLICKER_INNER_GROOVE.depth,
-      CLICKER_INNER_GROOVE.segments,
-      CLICKER_INNER_GROOVE.radius,
-    )
-    const key = createRoundedCuboidGeometry({
-      width: CLICKER_KEY_SIZE,
-      height: CLICKER_KEY_SIZE,
-      depth: 0.58,
-      radius: 0.285,
+    const housing = createClickerHousingGeometry()
+    const backplate = createRoundedCuboidGeometry({
+      width: CLICKER_BACKPLATE.width,
+      height: CLICKER_BACKPLATE.height,
+      depth: CLICKER_BACKPLATE.depth,
+      radius: CLICKER_BACKPLATE.radius,
+      widthSegments: 6,
+      heightSegments: 6,
+      depthSegments: 1,
+    })
+    const keyShell = createRoundedCuboidGeometry({
+      width: CLICKER_KEY_SHELL.size,
+      height: CLICKER_KEY_SHELL.size,
+      depth: CLICKER_KEY_SHELL.depth,
+      radius: CLICKER_KEY_SHELL.radius,
+      widthSegments: 5,
+      heightSegments: 5,
+      depthSegments: 2,
+    })
+    const keyFace = createRoundedCuboidGeometry({
+      width: CLICKER_KEY_FACE.size,
+      height: CLICKER_KEY_FACE.size,
+      depth: CLICKER_KEY_FACE.depth,
+      radius: CLICKER_KEY_FACE.radius,
       widthSegments: 6,
       heightSegments: 6,
       depthSegments: 3,
     })
-    const well = createRoundedCuboidGeometry({
-      width: 1.39,
-      height: 1.39,
-      depth: 0.11,
-      radius: 0.24,
-      widthSegments: 4,
-      heightSegments: 4,
-      depthSegments: 1,
+    const socket = createRoundedFrameGeometry({
+      width: CLICKER_SOCKET.width,
+      height: CLICKER_SOCKET.height,
+      depth: CLICKER_SOCKET.depth,
+      radius: CLICKER_SOCKET.radius,
+      frameWidth: CLICKER_SOCKET.frameWidth,
+      curveSegments: 5,
+      bevelSize: 0.025,
+      bevelThickness: 0.025,
+      bevelSegments: 1,
     })
     const stem = createRoundedCuboidGeometry({
       width: 0.48,
@@ -134,18 +205,19 @@ describe('clicker definition', () => {
 
     try {
       const triangles =
-        housing.getAttribute('position').count / 3 +
-        plate.getAttribute('position').count / 3 +
-        (key.getIndex()!.count / 3) * 9 +
-        (well.getIndex()!.count / 3) * 9 +
-        (stem.getIndex()!.count / 3) * 9 +
-        2
+        triangleCount(housing) +
+        triangleCount(backplate) +
+        triangleCount(keyShell) * 9 +
+        triangleCount(keyFace) * 9 +
+        triangleCount(socket) * 9 +
+        triangleCount(stem) * 9
       expect(triangles).toBeLessThanOrEqual(12_000)
     } finally {
       housing.dispose()
-      plate.dispose()
-      key.dispose()
-      well.dispose()
+      backplate.dispose()
+      keyShell.dispose()
+      keyFace.dispose()
+      socket.dispose()
       stem.dispose()
     }
   })

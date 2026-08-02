@@ -1,5 +1,6 @@
 export {
   CLICKER_COLUMN_COUNT,
+  CLICKER_BACKPLATE,
   CLICKER_CLEAR_HOUSING_MATERIAL,
   CLICKER_CLEAR_INSERT_MATERIAL,
   CLICKER_HOUSING,
@@ -7,19 +8,29 @@ export {
   CLICKER_KEY_COUNT,
   CLICKER_KEY_COLORS,
   CLICKER_KEY_DEPTH,
+  CLICKER_KEY_FACE,
+  CLICKER_KEY_FACE_MATERIAL,
   CLICKER_KEY_MATERIAL,
   CLICKER_KEY_POSITIONS,
   CLICKER_KEYS,
   CLICKER_KEY_SIZE,
+  CLICKER_KEY_SHELL,
+  CLICKER_KEY_SHELL_MATERIAL,
   CLICKER_KEY_SPACING,
   CLICKER_KEY_TRAVEL,
   CLICKER_MINIMUM_PRESS_MS,
   CLICKER_ROW_COUNT,
+  CLICKER_SOCKET,
   createClickerSynesthesiaTheme,
   getClickerKeyIndex,
   getClickerKeyPosition,
   getResponsiveClickerCameraPose,
 } from './clickerDefinition'
+export {
+  createClickerHousingGeometry,
+  createRoundedFrameGeometry,
+  type RoundedFrameGeometryOptions,
+} from './clickerGeometry'
 export {
   CLICKER_PRESS_SPRING,
   createClickerKeyRuntime,

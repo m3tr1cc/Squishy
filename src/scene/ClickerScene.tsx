@@ -8,18 +8,20 @@ import {
   useRef,
 } from 'react'
 import * as THREE from 'three'
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import {
+  CLICKER_BACKPLATE,
   CLICKER_CLEAR_HOUSING_MATERIAL,
   CLICKER_CLEAR_INSERT_MATERIAL,
-  CLICKER_HOUSING,
-  CLICKER_INNER_GROOVE,
   CLICKER_KEY_COUNT,
-  CLICKER_KEY_DEPTH,
-  CLICKER_KEY_MATERIAL,
+  CLICKER_KEY_FACE,
+  CLICKER_KEY_FACE_MATERIAL,
   CLICKER_KEYS,
-  CLICKER_KEY_SIZE,
+  CLICKER_KEY_SHELL,
+  CLICKER_KEY_SHELL_MATERIAL,
   CLICKER_KEY_TRAVEL,
+  CLICKER_SOCKET,
+  createClickerHousingGeometry,
+  createRoundedFrameGeometry,
   createClickerSynesthesiaTheme,
   createClickerKeyRuntime,
   getClickerKeyPosition,
@@ -49,9 +51,8 @@ type ActiveKeyPress = Readonly<{
   startY: number
 }>
 
-const KEY_REST_Z = 0.78
 const STEM_REST_Z = 0.57
-const PRESENTATION_ROTATION = [-0.075, 0.025, 0] as const
+const PRESENTATION_ROTATION = [-0.035, 0.012, 0] as const
 
 function ResponsiveClickerCamera() {
   const { camera, size } = useThree()
@@ -81,8 +82,9 @@ export function ClickerScene({
   const canvasElement = useThree((state) => state.gl.domElement)
   const runtime = useMemo(createClickerKeyRuntime, [experienceSeed])
   const activePressesRef = useRef(new Map<number, ActiveKeyPress>())
-  const capMeshRef = useRef<THREE.InstancedMesh>(null)
-  const wellMeshRef = useRef<THREE.InstancedMesh>(null)
+  const shellMeshRef = useRef<THREE.InstancedMesh>(null)
+  const faceMeshRef = useRef<THREE.InstancedMesh>(null)
+  const socketMeshRef = useRef<THREE.InstancedMesh>(null)
   const stemMeshRef = useRef<THREE.InstancedMesh>(null)
   const dummyRef = useRef(new THREE.Object3D())
   const visualSignals = useMemo(
@@ -94,50 +96,60 @@ export function ClickerScene({
     [experienceSeed],
   )
   const housingGeometry = useMemo(
-    () =>
-      new RoundedBoxGeometry(
-        CLICKER_HOUSING.width,
-        CLICKER_HOUSING.height,
-        CLICKER_HOUSING.depth,
-        4,
-        CLICKER_HOUSING.radius,
-      ),
+    () => createClickerHousingGeometry(),
     [],
   )
-  const plateGeometry = useMemo(
-    () =>
-      new RoundedBoxGeometry(
-        CLICKER_INNER_GROOVE.width,
-        CLICKER_INNER_GROOVE.height,
-        CLICKER_INNER_GROOVE.depth,
-        CLICKER_INNER_GROOVE.segments,
-        CLICKER_INNER_GROOVE.radius,
-      ),
-    [],
-  )
-  const keyGeometry = useMemo(
+  const backplateGeometry = useMemo(
     () =>
       createRoundedCuboidGeometry({
-        width: CLICKER_KEY_SIZE,
-        height: CLICKER_KEY_SIZE,
-        depth: CLICKER_KEY_DEPTH,
-        radius: 0.285,
+        width: CLICKER_BACKPLATE.width,
+        height: CLICKER_BACKPLATE.height,
+        depth: CLICKER_BACKPLATE.depth,
+        radius: CLICKER_BACKPLATE.radius,
+        widthSegments: 6,
+        heightSegments: 6,
+        depthSegments: 1,
+      }),
+    [],
+  )
+  const keyShellGeometry = useMemo(
+    () =>
+      createRoundedCuboidGeometry({
+        width: CLICKER_KEY_SHELL.size,
+        height: CLICKER_KEY_SHELL.size,
+        depth: CLICKER_KEY_SHELL.depth,
+        radius: CLICKER_KEY_SHELL.radius,
+        widthSegments: 5,
+        heightSegments: 5,
+        depthSegments: 2,
+      }),
+    [],
+  )
+  const keyFaceGeometry = useMemo(
+    () =>
+      createRoundedCuboidGeometry({
+        width: CLICKER_KEY_FACE.size,
+        height: CLICKER_KEY_FACE.size,
+        depth: CLICKER_KEY_FACE.depth,
+        radius: CLICKER_KEY_FACE.radius,
         widthSegments: 6,
         heightSegments: 6,
         depthSegments: 3,
       }),
     [],
   )
-  const wellGeometry = useMemo(
+  const socketGeometry = useMemo(
     () =>
-      createRoundedCuboidGeometry({
-        width: 1.39,
-        height: 1.39,
-        depth: 0.11,
-        radius: 0.24,
-        widthSegments: 4,
-        heightSegments: 4,
-        depthSegments: 1,
+      createRoundedFrameGeometry({
+        width: CLICKER_SOCKET.width,
+        height: CLICKER_SOCKET.height,
+        depth: CLICKER_SOCKET.depth,
+        radius: CLICKER_SOCKET.radius,
+        frameWidth: CLICKER_SOCKET.frameWidth,
+        curveSegments: 5,
+        bevelSize: 0.025,
+        bevelThickness: 0.025,
+        bevelSegments: 1,
       }),
     [],
   )
@@ -158,51 +170,62 @@ export function ClickerScene({
   useEffect(
     () => () => {
       housingGeometry.dispose()
-      plateGeometry.dispose()
-      keyGeometry.dispose()
-      wellGeometry.dispose()
+      backplateGeometry.dispose()
+      keyShellGeometry.dispose()
+      keyFaceGeometry.dispose()
+      socketGeometry.dispose()
       stemGeometry.dispose()
     },
     [
+      backplateGeometry,
       housingGeometry,
-      keyGeometry,
-      plateGeometry,
+      keyFaceGeometry,
+      keyShellGeometry,
+      socketGeometry,
       stemGeometry,
-      wellGeometry,
     ],
   )
 
   useEffect(() => {
-    const wellMesh = wellMeshRef.current
-    if (!wellMesh) {
+    const socketMesh = socketMeshRef.current
+    if (!socketMesh) {
       return
     }
     const dummy = dummyRef.current
     for (let index = 0; index < CLICKER_KEY_COUNT; index += 1) {
       const [x, y] = getClickerKeyPosition(index)
-      dummy.position.set(x, y, 0.505)
+      dummy.position.set(x, y, CLICKER_SOCKET.z)
       dummy.rotation.set(0, 0, 0)
       dummy.scale.set(1, 1, 1)
       dummy.updateMatrix()
-      wellMesh.setMatrixAt(index, dummy.matrix)
+      socketMesh.setMatrixAt(index, dummy.matrix)
     }
-    wellMesh.instanceMatrix.needsUpdate = true
+    socketMesh.instanceMatrix.needsUpdate = true
   }, [])
 
   useLayoutEffect(() => {
-    const capMesh = capMeshRef.current
-    if (!capMesh) {
+    const shellMesh = shellMeshRef.current
+    const faceMesh = faceMeshRef.current
+    if (!shellMesh || !faceMesh) {
       return
     }
+    const color = new THREE.Color()
     for (let index = 0; index < CLICKER_KEY_COUNT; index += 1) {
-      capMesh.setColorAt(index, new THREE.Color(CLICKER_KEYS[index].color))
+      color.set(CLICKER_KEYS[index].color)
+      shellMesh.setColorAt(index, color)
+      faceMesh.setColorAt(index, color)
     }
-    if (capMesh.instanceColor) {
-      capMesh.instanceColor.needsUpdate = true
+    if (shellMesh.instanceColor) {
+      shellMesh.instanceColor.needsUpdate = true
     }
-    const material = capMesh.material
-    if (!Array.isArray(material)) {
-      material.needsUpdate = true
+    if (faceMesh.instanceColor) {
+      faceMesh.instanceColor.needsUpdate = true
+    }
+    for (const mesh of [shellMesh, faceMesh]) {
+      const material = mesh.material
+      if (!Array.isArray(material)) {
+        material.needsUpdate = true
+      }
     }
   }, [])
 
@@ -326,19 +349,26 @@ export function ClickerScene({
     const dummy = dummyRef.current
     const stemMesh = stemMeshRef.current
 
-    const capMesh = capMeshRef.current
+    const shellMesh = shellMeshRef.current
+    const faceMesh = faceMeshRef.current
     for (let keyIndex = 0; keyIndex < CLICKER_KEY_COUNT; keyIndex += 1) {
       const [x, y] = getClickerKeyPosition(keyIndex)
       const press = runtime.springs[keyIndex].value
       const travel = press * CLICKER_KEY_TRAVEL
       visualSignals[keyIndex].pressStrength = press
 
-      if (capMesh) {
-        dummy.position.set(x, y, KEY_REST_Z - travel)
+      if (shellMesh) {
+        dummy.position.set(x, y, CLICKER_KEY_SHELL.restZ - travel)
         dummy.rotation.set(0, 0, 0)
         dummy.scale.set(1, 1, 1)
         dummy.updateMatrix()
-        capMesh.setMatrixAt(keyIndex, dummy.matrix)
+        shellMesh.setMatrixAt(keyIndex, dummy.matrix)
+      }
+
+      if (faceMesh) {
+        dummy.position.set(x, y, CLICKER_KEY_FACE.restZ - travel)
+        dummy.updateMatrix()
+        faceMesh.setMatrixAt(keyIndex, dummy.matrix)
       }
 
       if (stemMesh) {
@@ -347,8 +377,11 @@ export function ClickerScene({
         stemMesh.setMatrixAt(keyIndex, dummy.matrix)
       }
     }
-    if (capMesh) {
-      capMesh.instanceMatrix.needsUpdate = true
+    if (shellMesh) {
+      shellMesh.instanceMatrix.needsUpdate = true
+    }
+    if (faceMesh) {
+      faceMesh.instanceMatrix.needsUpdate = true
     }
     if (stemMesh) {
       stemMesh.instanceMatrix.needsUpdate = true
@@ -371,13 +404,9 @@ export function ClickerScene({
         position={[0, 5, 3]}
       />
       <directionalLight
-        castShadow
         color="#fff7e8"
         intensity={2.65}
         position={[-4.5, 6.5, 8]}
-        shadow-bias={-0.00015}
-        shadow-mapSize-height={1024}
-        shadow-mapSize-width={1024}
       />
       <directionalLight
         color="#bfefff"
@@ -390,24 +419,32 @@ export function ClickerScene({
         <mesh geometry={housingGeometry} receiveShadow>
           <meshPhysicalMaterial {...CLICKER_CLEAR_HOUSING_MATERIAL} />
         </mesh>
-        <mesh geometry={plateGeometry} position={[0, 0, 0.39]} receiveShadow>
-          <meshPhysicalMaterial {...CLICKER_CLEAR_INSERT_MATERIAL} />
-        </mesh>
-        <instancedMesh
-          ref={wellMeshRef}
-          args={[wellGeometry, undefined, CLICKER_KEY_COUNT]}
-          frustumCulled={false}
+        <mesh
+          geometry={backplateGeometry}
+          position={[0, 0, CLICKER_BACKPLATE.z]}
           receiveShadow
+          renderOrder={-2}
         >
           <meshPhysicalMaterial
             {...CLICKER_CLEAR_INSERT_MATERIAL}
-            opacity={0.18}
+            opacity={0.045}
+          />
+        </mesh>
+        <instancedMesh
+          ref={socketMeshRef}
+          args={[socketGeometry, undefined, CLICKER_KEY_COUNT]}
+          frustumCulled={false}
+          receiveShadow
+          renderOrder={1}
+        >
+          <meshPhysicalMaterial
+            {...CLICKER_CLEAR_INSERT_MATERIAL}
+            opacity={0.29}
           />
         </instancedMesh>
         <instancedMesh
           ref={stemMeshRef}
           args={[stemGeometry, undefined, CLICKER_KEY_COUNT]}
-          castShadow
           frustumCulled={false}
         >
           <meshPhysicalMaterial
@@ -417,9 +454,8 @@ export function ClickerScene({
           />
         </instancedMesh>
         <instancedMesh
-          ref={capMeshRef}
-          args={[keyGeometry, undefined, CLICKER_KEY_COUNT]}
-          castShadow
+          ref={shellMeshRef}
+          args={[keyShellGeometry, undefined, CLICKER_KEY_COUNT]}
           frustumCulled={false}
           onPointerCancel={handlePointerUp}
           onPointerDown={handlePointerDown}
@@ -428,17 +464,33 @@ export function ClickerScene({
           onPointerOver={handlePointerOver}
           onPointerUp={handlePointerUp}
           receiveShadow
+          renderOrder={2}
         >
           <meshPhysicalMaterial
-            {...CLICKER_KEY_MATERIAL}
+            {...CLICKER_KEY_SHELL_MATERIAL}
             color="#ffffff"
             toneMapped={false}
           />
         </instancedMesh>
-        <mesh position={[0, 0, -0.45]} receiveShadow>
-          <planeGeometry args={[12, 12]} />
-          <shadowMaterial opacity={0.18} />
-        </mesh>
+        <instancedMesh
+          ref={faceMeshRef}
+          args={[keyFaceGeometry, undefined, CLICKER_KEY_COUNT]}
+          frustumCulled={false}
+          onPointerCancel={handlePointerUp}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerOut={handlePointerOut}
+          onPointerOver={handlePointerOver}
+          onPointerUp={handlePointerUp}
+          receiveShadow
+          renderOrder={3}
+        >
+          <meshPhysicalMaterial
+            {...CLICKER_KEY_FACE_MATERIAL}
+            color="#ffffff"
+            toneMapped={false}
+          />
+        </instancedMesh>
       </group>
     </>
   )

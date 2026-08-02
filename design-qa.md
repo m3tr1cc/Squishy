@@ -1656,3 +1656,102 @@ contain no actionable P0/P1/P2 finding, and a fresh browser session reports no
 application-owned console error.
 
 final result: passed
+
+## Clear neon clicker model overhaul
+
+### Evidence and normalization
+
+- Source visual truth:
+  `.codex-remote-attachments/019fbf99-03c0-7ed3-81cb-e70316b54676/a05eca67-422e-4969-9bda-f6dc194fc92c/1-Photo-1.jpg`
+  at 1280 x 1280 pixels.
+- Browser-rendered desktop implementation:
+  `qa/clicker-model-overhaul-desktop-final.png` at 1440 x 900 CSS pixels,
+  DPR 1, on `/clicker`.
+- Normalized square implementation:
+  `qa/clicker-model-overhaul-square-final.png` at 900 x 900 pixels, cropped
+  from the center 900 x 900 region of the desktop capture without scaling the
+  product.
+- Equal-size direct comparison:
+  `qa/clicker-model-overhaul-reference-comparison.png` at 1800 x 900 pixels.
+  The source and implementation occupy adjacent 900 x 900 slots with the
+  source proportionally downsampled and neither image stretched.
+- Responsive evidence: `qa/clicker-model-overhaul-mobile-idle.png` and
+  `qa/clicker-model-overhaul-mobile-pressed.png`, each captured at a 390 x 844
+  CSS viewport, DPR 1.
+- State: settled idle for the primary comparison; one released center-key
+  press for the interaction capture.
+
+The product occupies most of each square comparison slot, and the button
+faces, resin shoulders, socket rings, and concentric outer rim are all large
+enough for direct inspection. No additional focused crop was needed.
+
+### Findings and comparison history
+
+- [Resolved P1] The previous implementation retained two solid rounded slabs
+  and flat well inserts, so the update read mainly as a color/material change.
+  The model now uses a genuinely open beveled frame, a second concentric rim,
+  and nine separate open socket rings. The final comparison shows the same
+  nested acrylic hierarchy as the reference rather than a colored keypad on a
+  milky plate.
+- [Resolved P1] Each prior key was a single opaque cuboid. Each final key is
+  two moving instanced layers: a translucent colored resin shell and a smaller
+  saturated face. Both layers share the existing spring travel and instance
+  index, producing the reference's colored clear shoulder around every face.
+- [Resolved P2] The first overhaul capture
+  (`qa/clicker-model-overhaul-desktop-initial.png`) made the transmissive rims
+  effectively invisible, leaving nine disconnected keys. The second pass
+  (`qa/clicker-model-overhaul-desktop-pass2.png`) changed the open acrylic to
+  allocation-free alpha/clearcoat materials with visible edge highlights and
+  removed the detached silhouette.
+- [Resolved P2] A shallow extruded face test matched the corner outline but
+  flattened the resin highlights. The final 0.38-unit rounded face nests into
+  the translucent shell, restores the bright top and side specular streaks,
+  and preserves the larger rounded corners seen in the reference.
+- [Resolved P2] The original shadow receiver made the rebuilt pieces read as
+  floating above the tray and raised the rendered triangle/draw-call count.
+  Removing that receiver and shadow-map pass seats the keys visually inside
+  the sockets and reduces the scene to 7 draw calls and 10,165 rendered
+  triangles.
+- [Passed] Fonts and typography: the canvas product contains no visible text;
+  existing accessible route copy and navigation typography were unchanged.
+- [Passed] Spacing and layout rhythm: row-major color order, key spacing,
+  square tray proportions, larger outer corner radius, centered desktop crop,
+  and portrait camera fit all track the reference without overlap or clipping.
+- [Passed] Colors and visual tokens: all nine sampled neon colors appear in
+  exact reference order. The application intentionally retains its existing
+  animated background, now seeded from those colors, instead of copying the
+  reference's black studio backdrop.
+- [Passed] Image quality and asset fidelity: the clicker remains procedural
+  WebGL geometry with smooth normals and no raster replacement, fake overlay,
+  post-processing, or additional asset dependency. The source photograph is
+  used only as comparison truth.
+- [Passed] Copy and content: title, instructions, navigation, thock behavior,
+  iframe behavior, and route semantics are unchanged.
+
+### Interaction, responsiveness, accessibility, and performance
+
+- A mobile center-key pointer press triggered the expected background burst;
+  the existing thock audio, two-touch limit, cancellation, and spring tests
+  remain unchanged and pass as regression coverage.
+- Desktop 1440 x 900 and mobile 390 x 844 captures retain the complete tray,
+  all nine tap targets, and navigation safe area without clipping or overflow.
+- Reduced-motion palette freezing and deterministic color-loop behavior are
+  covered by the synesthesia regression suite. The browser QA environment
+  reported normal-motion preference.
+- Settled diagnostics reported 7 draw calls and 10,165 rendered triangles,
+  below the prior 9-draw-call measurement and the 12,000-triangle ceiling.
+  Frame samples were predominantly 16.4-17.1 ms; capture/reload pauses were
+  excluded.
+- Browser logs contained no application-owned error. The existing upstream
+  `THREE.Clock` deprecation warning remains non-blocking.
+- No dependency, persistence, backend, asset, post-processing, or Supabase
+  migration was added.
+
+### Follow-up polish
+
+- [P3] The reference's black studio lighting produces stronger caustic edge
+  streaks than the live app background. The implementation preserves the
+  requested animated background, so its clear acrylic naturally inherits the
+  currently selected neon gradient instead of appearing colorless.
+
+final result: passed

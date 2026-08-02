@@ -3,26 +3,59 @@ import { createSynesthesiaTheme } from '../synesthesia'
 export const CLICKER_KEY_COUNT = 9
 export const CLICKER_COLUMN_COUNT = 3
 export const CLICKER_ROW_COUNT = 3
-export const CLICKER_KEY_SIZE = 1.28
-export const CLICKER_KEY_DEPTH = 0.58
+export const CLICKER_KEY_SIZE = 1.34
+export const CLICKER_KEY_DEPTH = 0.5
 export const CLICKER_KEY_SPACING = 1.48
 export const CLICKER_KEY_TRAVEL = 0.2
 export const CLICKER_MINIMUM_PRESS_MS = 70
 
 export const CLICKER_HOUSING = Object.freeze({
-  width: 5.35,
-  height: 5.35,
-  depth: 0.72,
-  radius: 0.58,
+  width: 5.46,
+  height: 5.46,
+  depth: 0.27,
+  radius: 0.7,
+  frameWidth: 0.2,
 })
 
 export const CLICKER_INNER_GROOVE = Object.freeze({
-  inset: 0.23,
-  width: CLICKER_HOUSING.width - 0.46,
-  height: CLICKER_HOUSING.height - 0.46,
-  depth: 0.2,
-  radius: CLICKER_HOUSING.radius - 0.23,
-  segments: 4,
+  inset: 0.29,
+  width: CLICKER_HOUSING.width - 0.58,
+  height: CLICKER_HOUSING.height - 0.58,
+  depth: 0.14,
+  radius: CLICKER_HOUSING.radius - 0.29,
+  frameWidth: 0.085,
+  z: 0.09,
+})
+
+export const CLICKER_BACKPLATE = Object.freeze({
+  width: 5.03,
+  height: 5.03,
+  depth: 0.08,
+  radius: 0.47,
+  z: -0.08,
+})
+
+export const CLICKER_SOCKET = Object.freeze({
+  width: 1.47,
+  height: 1.47,
+  depth: 0.14,
+  radius: 0.34,
+  frameWidth: 0.115,
+  z: 0.43,
+})
+
+export const CLICKER_KEY_SHELL = Object.freeze({
+  size: CLICKER_KEY_SIZE,
+  depth: CLICKER_KEY_DEPTH,
+  radius: 0.29,
+  restZ: 0.72,
+})
+
+export const CLICKER_KEY_FACE = Object.freeze({
+  size: 1.08,
+  depth: 0.38,
+  radius: 0.18,
+  restZ: 0.97,
 })
 
 export const CLICKER_KEY_COLORS = Object.freeze([
@@ -60,47 +93,65 @@ export const CLICKER_KEY_POSITIONS = Object.freeze(
 )
 
 export const CLICKER_CLEAR_HOUSING_MATERIAL = Object.freeze({
-  color: '#ffffff',
+  color: '#e9fbff',
   clearcoat: 1,
-  clearcoatRoughness: 0.035,
+  clearcoatRoughness: 0.025,
   depthWrite: false,
   ior: 1.49,
   metalness: 0,
-  opacity: 0.18,
-  roughness: 0.08,
+  opacity: 0.23,
+  roughness: 0.065,
   specularIntensity: 1,
-  thickness: 0.34,
+  thickness: 0.42,
   transmission: 0,
   transparent: true,
 })
 
 export const CLICKER_CLEAR_INSERT_MATERIAL = Object.freeze({
-  color: '#f7fbff',
+  color: '#e7faff',
   clearcoat: 1,
   clearcoatRoughness: 0.055,
   depthWrite: false,
   ior: 1.47,
   metalness: 0,
-  opacity: 0.07,
-  roughness: 0.09,
+  opacity: 0.24,
+  roughness: 0.07,
   specularIntensity: 1,
-  thickness: 0.18,
+  thickness: 0.2,
   transmission: 0,
   transparent: true,
 })
 
-export const CLICKER_KEY_MATERIAL = Object.freeze({
+export const CLICKER_KEY_SHELL_MATERIAL = Object.freeze({
   clearcoat: 1,
-  clearcoatRoughness: 0.04,
+  clearcoatRoughness: 0.025,
+  depthWrite: false,
   ior: 1.46,
   metalness: 0,
-  roughness: 0.105,
+  opacity: 0.62,
+  roughness: 0.055,
+  sheen: 0.32,
+  sheenColor: '#ffffff',
+  specularIntensity: 1,
+  thickness: 0.25,
+  transmission: 0,
+  transparent: true,
+})
+
+export const CLICKER_KEY_FACE_MATERIAL = Object.freeze({
+  clearcoat: 1,
+  clearcoatRoughness: 0.035,
+  ior: 1.46,
+  metalness: 0,
+  roughness: 0.075,
   sheen: 0.24,
   sheenColor: '#ffffff',
   specularIntensity: 1,
-  thickness: 0.12,
+  thickness: 0.1,
   transmission: 0,
 })
+
+export const CLICKER_KEY_MATERIAL = CLICKER_KEY_FACE_MATERIAL
 
 export function createClickerSynesthesiaTheme(experienceSeed: number) {
   return createSynesthesiaTheme({
