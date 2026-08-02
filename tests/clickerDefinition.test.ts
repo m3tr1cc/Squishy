@@ -2,30 +2,78 @@ import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { describe, expect, it } from 'vitest'
 import {
+  CLICKER_CLEAR_HOUSING_MATERIAL,
+  CLICKER_CLEAR_INSERT_MATERIAL,
   CLICKER_HOUSING,
   CLICKER_INNER_GROOVE,
   CLICKER_KEY_COUNT,
-  CLICKER_KEY_ROWS,
+  CLICKER_KEY_COLORS,
+  CLICKER_KEY_MATERIAL,
+  CLICKER_KEYS,
   CLICKER_KEY_SIZE,
+  createClickerSynesthesiaTheme,
   getClickerKeyPosition,
   getResponsiveClickerCameraPose,
 } from '../src/scene/clicker'
 import { createRoundedCuboidGeometry } from '../src/scene/createRoundedCuboidGeometry'
 
 describe('clicker definition', () => {
-  it('uses nine evenly spaced keys in yellow, pink, and blue rows', () => {
+  it('uses nine evenly spaced keys in the reference neon layout', () => {
     expect(CLICKER_KEY_COUNT).toBe(9)
-    expect(CLICKER_KEY_ROWS.map(({ id }) => id)).toEqual([
+    expect(CLICKER_KEYS.map(({ id }) => id)).toEqual([
+      'lime',
+      'magenta',
+      'cyan',
+      'purple',
+      'orange',
       'yellow',
       'pink',
       'blue',
+      'green',
     ])
+    expect(CLICKER_KEYS.map(({ color }) => color)).toEqual([
+      '#93F504',
+      '#FC04B0',
+      '#02E9E3',
+      '#9402FB',
+      '#FD7802',
+      '#FDEB03',
+      '#FB0371',
+      '#00C8F9',
+      '#68F601',
+    ])
+    expect(new Set(CLICKER_KEY_COLORS).size).toBe(9)
     expect(getClickerKeyPosition(0)[1]).toBeGreaterThan(0)
     expect(getClickerKeyPosition(4)).toEqual([0, 0, 0])
     expect(getClickerKeyPosition(8)[1]).toBeLessThan(0)
     expect(() => getClickerKeyPosition(9)).toThrow(
       'Clicker key index must be between 0 and 8',
     )
+  })
+
+  it('defines clear acrylic housing and glossy resin key materials', () => {
+    expect(CLICKER_CLEAR_HOUSING_MATERIAL).toMatchObject({
+      transmission: 0,
+      opacity: 0.18,
+      transparent: true,
+      roughness: 0.08,
+      ior: 1.49,
+      clearcoat: 1,
+    })
+    expect(CLICKER_CLEAR_INSERT_MATERIAL.opacity).toBeLessThan(0.1)
+    expect(CLICKER_KEY_MATERIAL.transmission).toBeLessThan(0.1)
+    expect(CLICKER_KEY_MATERIAL.clearcoat).toBe(1)
+  })
+
+  it('derives a reproducible palette-loop theme from the experience seed', () => {
+    const first = createClickerSynesthesiaTheme(0x12345678)
+    const second = createClickerSynesthesiaTheme(0x12345678)
+    const different = createClickerSynesthesiaTheme(0x87654321)
+
+    expect(first).toEqual(second)
+    expect(first.seed).not.toBe(different.seed)
+    expect(first.colorLoop?.colors).toEqual(CLICKER_KEY_COLORS)
+    expect(Object.isFrozen(first.colorLoop?.colors)).toBe(true)
   })
 
   it('keeps the inner groove concentric with the molded housing', () => {

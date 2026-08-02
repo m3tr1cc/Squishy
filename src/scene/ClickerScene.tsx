@@ -3,22 +3,25 @@ import { useFrame, useThree } from '@react-three/fiber'
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
 } from 'react'
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import {
+  CLICKER_CLEAR_HOUSING_MATERIAL,
+  CLICKER_CLEAR_INSERT_MATERIAL,
   CLICKER_HOUSING,
   CLICKER_INNER_GROOVE,
   CLICKER_KEY_COUNT,
   CLICKER_KEY_DEPTH,
-  CLICKER_KEY_ROWS,
+  CLICKER_KEY_MATERIAL,
+  CLICKER_KEYS,
   CLICKER_KEY_SIZE,
   CLICKER_KEY_TRAVEL,
-  CLICKER_SYNESTHESIA_THEME,
+  createClickerSynesthesiaTheme,
   createClickerKeyRuntime,
-  getClickerKeyIndex,
   getClickerKeyPosition,
   getResponsiveClickerCameraPose,
   pressClickerKey,
@@ -48,7 +51,7 @@ type ActiveKeyPress = Readonly<{
 
 const KEY_REST_Z = 0.78
 const STEM_REST_Z = 0.57
-const PRESENTATION_ROTATION = [-0.16, 0.045, 0] as const
+const PRESENTATION_ROTATION = [-0.075, 0.025, 0] as const
 
 function ResponsiveClickerCamera() {
   const { camera, size } = useThree()
@@ -78,12 +81,16 @@ export function ClickerScene({
   const canvasElement = useThree((state) => state.gl.domElement)
   const runtime = useMemo(createClickerKeyRuntime, [experienceSeed])
   const activePressesRef = useRef(new Map<number, ActiveKeyPress>())
-  const capMeshesRef = useRef<Array<THREE.InstancedMesh | null>>([])
+  const capMeshRef = useRef<THREE.InstancedMesh>(null)
   const wellMeshRef = useRef<THREE.InstancedMesh>(null)
   const stemMeshRef = useRef<THREE.InstancedMesh>(null)
   const dummyRef = useRef(new THREE.Object3D())
   const visualSignals = useMemo(
     () => createSquishyVisualSignalSources(CLICKER_KEY_COUNT),
+    [experienceSeed],
+  )
+  const synesthesiaTheme = useMemo(
+    () => createClickerSynesthesiaTheme(experienceSeed),
     [experienceSeed],
   )
   const housingGeometry = useMemo(
@@ -182,6 +189,23 @@ export function ClickerScene({
     wellMesh.instanceMatrix.needsUpdate = true
   }, [])
 
+  useLayoutEffect(() => {
+    const capMesh = capMeshRef.current
+    if (!capMesh) {
+      return
+    }
+    for (let index = 0; index < CLICKER_KEY_COUNT; index += 1) {
+      capMesh.setColorAt(index, new THREE.Color(CLICKER_KEYS[index].color))
+    }
+    if (capMesh.instanceColor) {
+      capMesh.instanceColor.needsUpdate = true
+    }
+    const material = capMesh.material
+    if (!Array.isArray(material)) {
+      material.needsUpdate = true
+    }
+  }, [])
+
   const releaseActivePress = useCallback(
     (pointerId: number) => {
       const active = activePressesRef.current.get(pointerId)
@@ -203,12 +227,11 @@ export function ClickerScene({
   }, [canvasElement, releaseActivePress])
 
   const handlePointerDown = useCallback(
-    (event: ThreeEvent<PointerEvent>, rowIndex: number) => {
-      const columnIndex = event.instanceId
-      if (columnIndex === undefined) {
+    (event: ThreeEvent<PointerEvent>) => {
+      const keyIndex = event.instanceId
+      if (keyIndex === undefined) {
         return
       }
-      const keyIndex = getClickerKeyIndex(rowIndex, columnIndex)
       const pointerId = event.nativeEvent.pointerId
       const activePresses = activePressesRef.current
       if (
@@ -303,30 +326,28 @@ export function ClickerScene({
     const dummy = dummyRef.current
     const stemMesh = stemMeshRef.current
 
-    for (let rowIndex = 0; rowIndex < CLICKER_KEY_ROWS.length; rowIndex += 1) {
-      const capMesh = capMeshesRef.current[rowIndex]
-      if (!capMesh) {
-        continue
-      }
-      for (let columnIndex = 0; columnIndex < 3; columnIndex += 1) {
-        const keyIndex = getClickerKeyIndex(rowIndex, columnIndex)
-        const [x, y] = getClickerKeyPosition(keyIndex)
-        const press = runtime.springs[keyIndex].value
-        const travel = press * CLICKER_KEY_TRAVEL
-        visualSignals[keyIndex].pressStrength = press
+    const capMesh = capMeshRef.current
+    for (let keyIndex = 0; keyIndex < CLICKER_KEY_COUNT; keyIndex += 1) {
+      const [x, y] = getClickerKeyPosition(keyIndex)
+      const press = runtime.springs[keyIndex].value
+      const travel = press * CLICKER_KEY_TRAVEL
+      visualSignals[keyIndex].pressStrength = press
 
+      if (capMesh) {
         dummy.position.set(x, y, KEY_REST_Z - travel)
         dummy.rotation.set(0, 0, 0)
         dummy.scale.set(1, 1, 1)
         dummy.updateMatrix()
-        capMesh.setMatrixAt(columnIndex, dummy.matrix)
-
-        if (stemMesh) {
-          dummy.position.set(x, y, STEM_REST_Z - travel)
-          dummy.updateMatrix()
-          stemMesh.setMatrixAt(keyIndex, dummy.matrix)
-        }
+        capMesh.setMatrixAt(keyIndex, dummy.matrix)
       }
+
+      if (stemMesh) {
+        dummy.position.set(x, y, STEM_REST_Z - travel)
+        dummy.updateMatrix()
+        stemMesh.setMatrixAt(keyIndex, dummy.matrix)
+      }
+    }
+    if (capMesh) {
       capMesh.instanceMatrix.needsUpdate = true
     }
     if (stemMesh) {
@@ -336,23 +357,23 @@ export function ClickerScene({
 
   return (
     <>
-      <color attach="background" args={[CLICKER_SYNESTHESIA_THEME.shadowColor]} />
+      <color attach="background" args={[synesthesiaTheme.shadowColor]} />
       <SynesthesiaBackground
         reducedMotion={reducedMotion}
         signals={visualSignals}
-        theme={CLICKER_SYNESTHESIA_THEME}
+        theme={synesthesiaTheme}
       />
       {import.meta.env.DEV ? <PerformanceDiagnostics /> : null}
       <ResponsiveClickerCamera />
-      <ambientLight color="#fffdf8" intensity={0.52} />
+      <ambientLight color="#fffdf8" intensity={0.3} />
       <hemisphereLight
-        args={['#fffdf8', '#061019', 0.86]}
+        args={['#fffdf8', '#061019', 0.55]}
         position={[0, 5, 3]}
       />
       <directionalLight
         castShadow
         color="#fff7e8"
-        intensity={3.4}
+        intensity={2.65}
         position={[-4.5, 6.5, 8]}
         shadow-bias={-0.00015}
         shadow-mapSize-height={1024}
@@ -360,28 +381,17 @@ export function ClickerScene({
       />
       <directionalLight
         color="#bfefff"
-        intensity={1.05}
+        intensity={0.8}
         position={[5, -1, 5]}
       />
-      <pointLight color="#ffd6ea" intensity={7} position={[0, 4, 5]} />
+      <pointLight color="#ffd6ea" intensity={3.8} position={[0, 4, 5]} />
 
       <group rotation={PRESENTATION_ROTATION}>
-        <mesh castShadow geometry={housingGeometry} receiveShadow>
-          <meshPhysicalMaterial
-            clearcoat={1}
-            clearcoatRoughness={0.11}
-            color="#fbf8f1"
-            metalness={0.02}
-            roughness={0.2}
-          />
+        <mesh geometry={housingGeometry} receiveShadow>
+          <meshPhysicalMaterial {...CLICKER_CLEAR_HOUSING_MATERIAL} />
         </mesh>
         <mesh geometry={plateGeometry} position={[0, 0, 0.39]} receiveShadow>
-          <meshPhysicalMaterial
-            clearcoat={0.75}
-            clearcoatRoughness={0.18}
-            color="#eeeae2"
-            roughness={0.3}
-          />
+          <meshPhysicalMaterial {...CLICKER_CLEAR_INSERT_MATERIAL} />
         </mesh>
         <instancedMesh
           ref={wellMeshRef}
@@ -389,7 +399,10 @@ export function ClickerScene({
           frustumCulled={false}
           receiveShadow
         >
-          <meshStandardMaterial color="#bdbab4" roughness={0.45} />
+          <meshPhysicalMaterial
+            {...CLICKER_CLEAR_INSERT_MATERIAL}
+            opacity={0.18}
+          />
         </instancedMesh>
         <instancedMesh
           ref={stemMeshRef}
@@ -397,41 +410,34 @@ export function ClickerScene({
           castShadow
           frustumCulled={false}
         >
-          <meshStandardMaterial color="#dedbd4" roughness={0.32} />
+          <meshPhysicalMaterial
+            {...CLICKER_CLEAR_INSERT_MATERIAL}
+            opacity={0.24}
+            transmission={0}
+          />
         </instancedMesh>
-        {CLICKER_KEY_ROWS.map((row, rowIndex) => (
-          <instancedMesh
-            key={row.id}
-            ref={(mesh) => {
-              capMeshesRef.current[rowIndex] = mesh
-            }}
-            args={[keyGeometry, undefined, 3]}
-            castShadow
-            frustumCulled={false}
-            onPointerCancel={handlePointerUp}
-            onPointerDown={(event) => handlePointerDown(event, rowIndex)}
-            onPointerMove={handlePointerMove}
-            onPointerOut={handlePointerOut}
-            onPointerOver={handlePointerOver}
-            onPointerUp={handlePointerUp}
-            receiveShadow
-          >
-            <meshPhysicalMaterial
-              clearcoat={1}
-              clearcoatRoughness={0.055}
-              color={row.color}
-              metalness={0}
-              roughness={0.16}
-              sheen={0.18}
-              sheenColor="#ffffff"
-              specularIntensity={1}
-              transmission={0.025}
-            />
-          </instancedMesh>
-        ))}
+        <instancedMesh
+          ref={capMeshRef}
+          args={[keyGeometry, undefined, CLICKER_KEY_COUNT]}
+          castShadow
+          frustumCulled={false}
+          onPointerCancel={handlePointerUp}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerOut={handlePointerOut}
+          onPointerOver={handlePointerOver}
+          onPointerUp={handlePointerUp}
+          receiveShadow
+        >
+          <meshPhysicalMaterial
+            {...CLICKER_KEY_MATERIAL}
+            color="#ffffff"
+            toneMapped={false}
+          />
+        </instancedMesh>
         <mesh position={[0, 0, -0.45]} receiveShadow>
           <planeGeometry args={[12, 12]} />
-          <shadowMaterial opacity={0.3} />
+          <shadowMaterial opacity={0.18} />
         </mesh>
       </group>
     </>

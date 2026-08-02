@@ -186,6 +186,105 @@ with angle changes retained only where real shard boundaries meet.
 
 final result: passed
 
+## Clear neon clicker redesign
+
+### Evidence and normalization
+
+- Source visual truth:
+  `.codex-remote-attachments/019fbf99-03c0-7ed3-81cb-e70316b54676/a05eca67-422e-4969-9bda-f6dc194fc92c/1-Photo-1.jpg`
+  at 1280 x 1280 pixels.
+- Browser-rendered square implementation:
+  `qa/clicker-neon-square-idle.png` at 1280 x 1280 CSS pixels,
+  DPR 1.
+- Desktop implementation: `qa/clicker-neon-desktop-final.png` at
+  1280 x 720 CSS pixels, DPR 1.
+- Mobile implementation: `qa/clicker-neon-mobile-idle.png` at
+  390 x 844 CSS pixels, DPR 1.
+- Pressed desktop state: `qa/clicker-neon-desktop-pressed.png`.
+- Initial black-key render: `qa/clicker-neon-desktop-initial.png`.
+- Intermediate colored-key/missing-shell render:
+  `qa/clicker-neon-desktop-pass2.png`.
+- Equal-size full-view comparison:
+  `qa/clicker-neon-reference-comparison.jpg` at 2560 x 1280 pixels.
+  The source and square implementation occupy equal 1280 x 1280 slots
+  without scaling, cropping, or density mismatch.
+
+The full-view comparison is sufficient because the outer housing, nine wells,
+button silhouettes, highlights, and complete color order are all readable at
+native size. No typography or small icon from the product reference requires a
+focused crop; the route controls are existing application chrome and are not
+part of the supplied product photograph.
+
+### Findings and comparison history
+
+1. **Resolved P1 - buttons rendered black.** The initial browser capture showed
+   a populated linear instance-color buffer but a shader compiled before that
+   buffer existed. Key color initialization now runs in a layout effect and
+   invalidates the shared physical material once, enabling the instanced-color
+   shader path before presentation.
+2. **Resolved P1 - physical transmission hid the acrylic shell.** The full-frame
+   synesthesia quad is not available to Three.js's transmission pre-pass, so a
+   high-transmission slab sampled dark and then disappeared when its opacity was
+   reduced. The final housing uses layered optical transparency, clearcoat, low
+   roughness, thickness, and IOR metadata; the animated field remains visible
+   through the shell while the outer rim, inner plate, wells, and stems remain
+   legible.
+3. **Resolved P2 - the first visible shell was too milky and cast heavy block
+   shadows.** Outer, insert, well, and shadow opacities were tuned separately.
+   The final comparison shows a clear tinted tray with nested surfaces and
+   lighter contact shadows rather than a solid white plate.
+4. Post-fix square, desktop, mobile, and pressed captures contain no actionable
+   P0, P1, or P2 mismatch. The exact reference color order is preserved and the
+   clear housing remains distinguishable across changing background pairs.
+
+### Required fidelity surfaces
+
+- **Fonts and typography:** the source contains no text. Existing hidden route
+  title, instructions, and navigation typography remain unchanged.
+- **Spacing and layout rhythm:** the 3 x 3 grid remains evenly spaced and
+  centered. The housing has a larger concentric corner radius and a subtler
+  presentation tilt; it fits without clipping at 1280 x 720, 1280 x 1280, and
+  390 x 844.
+- **Colors and visual tokens:** the buttons use sampled row-major colors
+  `#93F504`, `#FC04B0`, `#02E9E3`, `#9402FB`, `#FD7802`, `#FDEB03`,
+  `#FB0371`, `#00C8F9`, and `#68F601`. The existing shader motion and shadow
+  treatment remain; only its leading/complementary colors now crossfade through
+  deterministic non-repeating pairs from that palette.
+- **Image quality and asset fidelity:** the housing, inserts, stems, and keys
+  remain native procedural WebGL geometry with physical highlights. No raster
+  product replacement, CSS drawing, inline SVG, post-processing pass, or fake
+  glow was introduced.
+- **Copy and content:** the clicker title, accessible instructions, route order,
+  and navigation copy remain unchanged.
+- **Interaction and accessibility:** a clean-browser center press depressed the
+  intended key, produced two background motifs, raised flow speed above idle,
+  and played the existing thock once at rate `0.955`. Pointer cancellation,
+  two-touch limiting, minimum visible travel, and reduced-motion freezing retain
+  automated coverage.
+
+### Browser, performance, and migration QA
+
+- Fresh in-app browser sessions found one full-frame canvas and no
+  application-owned console error at desktop or mobile sizes. The existing
+  upstream `THREE.Clock` deprecation warning remains non-blocking.
+- The final scene reports 9 renderer calls and 8,571 triangles, below the
+  12,000-triangle ceiling and lower than the prior three-row-material scene.
+  Settled samples remain centered around 16.7 ms; navigation and screenshot
+  capture outliers were excluded.
+- All 179 automated tests pass, including deterministic palette cycling,
+  boundary continuity, seed variation, reduced motion, geometry budget,
+  clicker interaction, and thock selection.
+- No dependency, backend, persistence, Rapier, or Supabase migration was added.
+
+### Follow-up polish
+
+- P3: the photographic reference has stronger environment-driven refraction
+  and multiple acrylic edge caustics. The implementation keeps the repository's
+  no-post-processing and allocation-free rendering constraints, using layered
+  transparency and existing lights instead.
+
+final result: passed
+
 ## Slime container page
 
 ### Source and implementation evidence
@@ -1544,5 +1643,16 @@ remain smooth and contained when the stronger response accumulates.
   `THREE.Clock` deprecation warning remains non-blocking.
 - No dependency, persistence, backend, Rapier usage, or Supabase migration was
   added for this refinement.
+
+final result: passed
+
+## Latest QA status: clear neon clicker redesign
+
+The complete source/implementation evidence, normalized comparison, required
+fidelity-surface review, iteration history, responsive captures, interaction
+results, and performance measurements are recorded in the `Clear neon clicker
+redesign` section above. Its final square, desktop, mobile, and pressed captures
+contain no actionable P0/P1/P2 finding, and a fresh browser session reports no
+application-owned console error.
 
 final result: passed
