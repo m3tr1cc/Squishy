@@ -381,6 +381,12 @@ export function SynesthesiaBackground({
     createSynesthesiaAnimationState,
     [theme],
   )
+  const paletteColors = useMemo(
+    () =>
+      theme.colorLoop?.colors.map((color) => new THREE.Color(color)) ??
+      [],
+    [theme],
+  )
   const motifUniforms = useMemo(
     () =>
       Array.from(
@@ -439,6 +445,20 @@ export function SynesthesiaBackground({
     uniforms.uFlowSpeed.value = animationState.flowSpeed
     uniforms.uBurstEnergy.value = animationState.burstEnergy
     uniforms.uDamageProgress.value = animationState.damageProgress
+    if (paletteColors.length > 0) {
+      uniforms.uLeadingColor.value
+        .copy(paletteColors[animationState.leadingColorIndex])
+        .lerp(
+          paletteColors[animationState.nextLeadingColorIndex],
+          animationState.colorMix,
+        )
+      uniforms.uComplementaryColor.value
+        .copy(paletteColors[animationState.complementaryColorIndex])
+        .lerp(
+          paletteColors[animationState.nextComplementaryColorIndex],
+          animationState.colorMix,
+        )
+    }
     const materialUniforms = materialRef.current?.uniforms
     if (materialUniforms) {
       materialUniforms.uElapsedSeconds.value =
@@ -449,6 +469,17 @@ export function SynesthesiaBackground({
         animationState.burstEnergy
       materialUniforms.uDamageProgress.value =
         animationState.damageProgress
+      if (
+        materialUniforms.uLeadingColor.value !==
+        uniforms.uLeadingColor.value
+      ) {
+        materialUniforms.uLeadingColor.value.copy(
+          uniforms.uLeadingColor.value,
+        )
+        materialUniforms.uComplementaryColor.value.copy(
+          uniforms.uComplementaryColor.value,
+        )
+      }
     }
     for (
       let slot = 0;
@@ -496,6 +527,10 @@ export function SynesthesiaBackground({
             burstEnergy: animationState.burstEnergy,
             damageProgress: animationState.damageProgress,
             flowSpeed: animationState.flowSpeed,
+            colorCycle: animationState.colorCycle,
+            leadingColorIndex: animationState.leadingColorIndex,
+            complementaryColorIndex:
+              animationState.complementaryColorIndex,
           })
       }
     }

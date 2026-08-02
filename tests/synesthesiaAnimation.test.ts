@@ -31,6 +31,18 @@ const TEST_THEME = createSynesthesiaTheme({
   maximumMotifs: SYNESTHESIA_MOTIF_SLOT_COUNT,
 })
 
+const COLOR_LOOP_THEME = createSynesthesiaTheme({
+  leadingColor: '#93f504',
+  complementaryColor: '#fc04b0',
+  shadowColor: '#071a25',
+  seed: 0x51a7c0de,
+  idleSpeed: 1,
+  maximumMotifs: SYNESTHESIA_MOTIF_SLOT_COUNT,
+  colorLoop: {
+    colors: ['#93f504', '#fc04b0', '#02e9e3', '#9402fb'],
+  },
+})
+
 function activeMotifCount(motifData: Float32Array) {
   let count = 0
   for (
@@ -69,6 +81,31 @@ describe('synesthesia animation', () => {
         maximumMotifs: SYNESTHESIA_MOTIF_SLOT_COUNT + 1,
       }),
     ).toThrow('maximumMotifs must be between')
+    expect(() =>
+      createSynesthesiaTheme({
+        ...TEST_THEME,
+        colorLoop: { colors: ['#ffffff'] },
+      }),
+    ).toThrow('colorLoop.colors must include at least two colors')
+    expect(() =>
+      createSynesthesiaTheme({
+        ...TEST_THEME,
+        colorLoop: { colors: ['#ffffff', 'neon'] },
+      }),
+    ).toThrow('colorLoop color must be a six-digit hex color')
+  })
+
+  it('freezes a defensive copy of a valid color-loop palette', () => {
+    const source = ['#93f504', '#fc04b0']
+    const theme = createSynesthesiaTheme({
+      ...TEST_THEME,
+      colorLoop: { colors: source },
+    })
+    source[0] = '#ffffff'
+
+    expect(theme.colorLoop?.colors[0]).toBe('#93f504')
+    expect(Object.isFrozen(theme.colorLoop)).toBe(true)
+    expect(Object.isFrozen(theme.colorLoop?.colors)).toBe(true)
   })
 
   it('selects a stable random page color and its paired complement', () => {
@@ -216,6 +253,103 @@ describe('synesthesia animation', () => {
     expect(firstState.motifCursor).toBeLessThan(
       SYNESTHESIA_MOTIF_SLOT_COUNT,
     )
+  })
+
+  it('selects deterministic distinct color pairs without immediate repeats', () => {
+    const firstSignals = createSquishyVisualSignals()
+    const secondSignals = createSquishyVisualSignals()
+    const firstState = createSynesthesiaAnimationState()
+    const secondState = createSynesthesiaAnimationState()
+    const observedPairs: string[] = []
+
+    for (let step = 0; step < 55; step += 1) {
+      stepSynesthesiaAnimation(
+        firstState,
+        firstSignals,
+        COLOR_LOOP_THEME,
+        0.1,
+        false,
+      )
+      stepSynesthesiaAnimation(
+        secondState,
+        secondSignals,
+        COLOR_LOOP_THEME,
+        0.1,
+        false,
+      )
+      expect(firstState.leadingColorIndex).toBe(
+        secondState.leadingColorIndex,
+      )
+      expect(firstState.complementaryColorIndex).toBe(
+        secondState.complementaryColorIndex,
+      )
+      expect(firstState.leadingColorIndex).not.toBe(
+        firstState.complementaryColorIndex,
+      )
+      const pair = `${firstState.leadingColorIndex}:${firstState.complementaryColorIndex}`
+      if (observedPairs.at(-1) !== pair) {
+        observedPairs.push(pair)
+      }
+    }
+
+    expect(observedPairs.length).toBeGreaterThan(4)
+    for (let index = 1; index < observedPairs.length; index += 1) {
+      expect(observedPairs[index]).not.toBe(observedPairs[index - 1])
+    }
+  })
+
+  it('keeps palette interpolation continuous across flow loops', () => {
+    const signals = createSquishyVisualSignals()
+    const state = createSynesthesiaAnimationState()
+    stepSynesthesiaAnimation(state, signals, COLOR_LOOP_THEME, 0, false)
+    const expectedLeading = state.nextLeadingColorIndex
+    const expectedComplementary = state.nextComplementaryColorIndex
+
+    while (state.colorCycle === 0) {
+      stepSynesthesiaAnimation(
+        state,
+        signals,
+        COLOR_LOOP_THEME,
+        0.1,
+        false,
+      )
+    }
+
+    expect(state.leadingColorIndex).toBe(expectedLeading)
+    expect(state.complementaryColorIndex).toBe(expectedComplementary)
+    expect(state.colorMix).toBeGreaterThanOrEqual(0)
+    expect(state.colorMix).toBeLessThan(0.04)
+  })
+
+  it('freezes the seeded palette under reduced motion', () => {
+    const signals = createSquishyVisualSignals()
+    const state = createSynesthesiaAnimationState()
+    stepSynesthesiaAnimation(state, signals, COLOR_LOOP_THEME, 0.1, true)
+    const initialPair = [
+      state.leadingColorIndex,
+      state.complementaryColorIndex,
+      state.nextLeadingColorIndex,
+      state.nextComplementaryColorIndex,
+    ]
+
+    for (let step = 0; step < 20; step += 1) {
+      stepSynesthesiaAnimation(
+        state,
+        signals,
+        COLOR_LOOP_THEME,
+        0.1,
+        true,
+      )
+    }
+
+    expect(state.flowTime).toBe(0)
+    expect(state.colorMix).toBe(0)
+    expect([
+      state.leadingColorIndex,
+      state.complementaryColorIndex,
+      state.nextLeadingColorIndex,
+      state.nextComplementaryColorIndex,
+    ]).toEqual(initialPair)
   })
 
   it('fades crack energy and motifs back to idle in two seconds', () => {

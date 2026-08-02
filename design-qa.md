@@ -186,6 +186,105 @@ with angle changes retained only where real shard boundaries meet.
 
 final result: passed
 
+## Clear neon clicker redesign
+
+### Evidence and normalization
+
+- Source visual truth:
+  `.codex-remote-attachments/019fbf99-03c0-7ed3-81cb-e70316b54676/a05eca67-422e-4969-9bda-f6dc194fc92c/1-Photo-1.jpg`
+  at 1280 x 1280 pixels.
+- Browser-rendered square implementation:
+  `qa/clicker-neon-square-idle.png` at 1280 x 1280 CSS pixels,
+  DPR 1.
+- Desktop implementation: `qa/clicker-neon-desktop-final.png` at
+  1280 x 720 CSS pixels, DPR 1.
+- Mobile implementation: `qa/clicker-neon-mobile-idle.png` at
+  390 x 844 CSS pixels, DPR 1.
+- Pressed desktop state: `qa/clicker-neon-desktop-pressed.png`.
+- Initial black-key render: `qa/clicker-neon-desktop-initial.png`.
+- Intermediate colored-key/missing-shell render:
+  `qa/clicker-neon-desktop-pass2.png`.
+- Equal-size full-view comparison:
+  `qa/clicker-neon-reference-comparison.jpg` at 2560 x 1280 pixels.
+  The source and square implementation occupy equal 1280 x 1280 slots
+  without scaling, cropping, or density mismatch.
+
+The full-view comparison is sufficient because the outer housing, nine wells,
+button silhouettes, highlights, and complete color order are all readable at
+native size. No typography or small icon from the product reference requires a
+focused crop; the route controls are existing application chrome and are not
+part of the supplied product photograph.
+
+### Findings and comparison history
+
+1. **Resolved P1 - buttons rendered black.** The initial browser capture showed
+   a populated linear instance-color buffer but a shader compiled before that
+   buffer existed. Key color initialization now runs in a layout effect and
+   invalidates the shared physical material once, enabling the instanced-color
+   shader path before presentation.
+2. **Resolved P1 - physical transmission hid the acrylic shell.** The full-frame
+   synesthesia quad is not available to Three.js's transmission pre-pass, so a
+   high-transmission slab sampled dark and then disappeared when its opacity was
+   reduced. The final housing uses layered optical transparency, clearcoat, low
+   roughness, thickness, and IOR metadata; the animated field remains visible
+   through the shell while the outer rim, inner plate, wells, and stems remain
+   legible.
+3. **Resolved P2 - the first visible shell was too milky and cast heavy block
+   shadows.** Outer, insert, well, and shadow opacities were tuned separately.
+   The final comparison shows a clear tinted tray with nested surfaces and
+   lighter contact shadows rather than a solid white plate.
+4. Post-fix square, desktop, mobile, and pressed captures contain no actionable
+   P0, P1, or P2 mismatch. The exact reference color order is preserved and the
+   clear housing remains distinguishable across changing background pairs.
+
+### Required fidelity surfaces
+
+- **Fonts and typography:** the source contains no text. Existing hidden route
+  title, instructions, and navigation typography remain unchanged.
+- **Spacing and layout rhythm:** the 3 x 3 grid remains evenly spaced and
+  centered. The housing has a larger concentric corner radius and a subtler
+  presentation tilt; it fits without clipping at 1280 x 720, 1280 x 1280, and
+  390 x 844.
+- **Colors and visual tokens:** the buttons use sampled row-major colors
+  `#93F504`, `#FC04B0`, `#02E9E3`, `#9402FB`, `#FD7802`, `#FDEB03`,
+  `#FB0371`, `#00C8F9`, and `#68F601`. The existing shader motion and shadow
+  treatment remain; only its leading/complementary colors now crossfade through
+  deterministic non-repeating pairs from that palette.
+- **Image quality and asset fidelity:** the housing, inserts, stems, and keys
+  remain native procedural WebGL geometry with physical highlights. No raster
+  product replacement, CSS drawing, inline SVG, post-processing pass, or fake
+  glow was introduced.
+- **Copy and content:** the clicker title, accessible instructions, route order,
+  and navigation copy remain unchanged.
+- **Interaction and accessibility:** a clean-browser center press depressed the
+  intended key, produced two background motifs, raised flow speed above idle,
+  and played the existing thock once at rate `0.955`. Pointer cancellation,
+  two-touch limiting, minimum visible travel, and reduced-motion freezing retain
+  automated coverage.
+
+### Browser, performance, and migration QA
+
+- Fresh in-app browser sessions found one full-frame canvas and no
+  application-owned console error at desktop or mobile sizes. The existing
+  upstream `THREE.Clock` deprecation warning remains non-blocking.
+- The final scene reports 9 renderer calls and 8,571 triangles, below the
+  12,000-triangle ceiling and lower than the prior three-row-material scene.
+  Settled samples remain centered around 16.7 ms; navigation and screenshot
+  capture outliers were excluded.
+- All 179 automated tests pass, including deterministic palette cycling,
+  boundary continuity, seed variation, reduced motion, geometry budget,
+  clicker interaction, and thock selection.
+- No dependency, backend, persistence, Rapier, or Supabase migration was added.
+
+### Follow-up polish
+
+- P3: the photographic reference has stronger environment-driven refraction
+  and multiple acrylic edge caustics. The implementation keeps the repository's
+  no-post-processing and allocation-free rendering constraints, using layered
+  transparency and existing lights instead.
+
+final result: passed
+
 ## Slime container page
 
 ### Source and implementation evidence
@@ -1544,5 +1643,170 @@ remain smooth and contained when the stronger response accumulates.
   `THREE.Clock` deprecation warning remains non-blocking.
 - No dependency, persistence, backend, Rapier usage, or Supabase migration was
   added for this refinement.
+
+final result: passed
+
+## Latest QA status: clear neon clicker redesign
+
+The complete source/implementation evidence, normalized comparison, required
+fidelity-surface review, iteration history, responsive captures, interaction
+results, and performance measurements are recorded in the `Clear neon clicker
+redesign` section above. Its final square, desktop, mobile, and pressed captures
+contain no actionable P0/P1/P2 finding, and a fresh browser session reports no
+application-owned console error.
+
+final result: passed
+
+## Clear neon clicker model overhaul
+
+### Evidence and normalization
+
+- Source visual truth:
+  `.codex-remote-attachments/019fbf99-03c0-7ed3-81cb-e70316b54676/a05eca67-422e-4969-9bda-f6dc194fc92c/1-Photo-1.jpg`
+  at 1280 x 1280 pixels.
+- Browser-rendered desktop implementation:
+  `qa/clicker-model-overhaul-desktop-final.png` at 1440 x 900 CSS pixels,
+  DPR 1, on `/clicker`.
+- Normalized square implementation:
+  `qa/clicker-model-overhaul-square-final.png` at 900 x 900 pixels, cropped
+  from the center 900 x 900 region of the desktop capture without scaling the
+  product.
+- Equal-size direct comparison:
+  `qa/clicker-model-overhaul-reference-comparison.png` at 1800 x 900 pixels.
+  The source and implementation occupy adjacent 900 x 900 slots with the
+  source proportionally downsampled and neither image stretched.
+- Responsive evidence: `qa/clicker-model-overhaul-mobile-idle.png` and
+  `qa/clicker-model-overhaul-mobile-pressed.png`, each captured at a 390 x 844
+  CSS viewport, DPR 1.
+- State: settled idle for the primary comparison; one released center-key
+  press for the interaction capture.
+
+The product occupies most of each square comparison slot, and the button
+faces, resin shoulders, socket rings, and concentric outer rim are all large
+enough for direct inspection. No additional focused crop was needed.
+
+### Findings and comparison history
+
+- [Resolved P1] The previous implementation retained two solid rounded slabs
+  and flat well inserts, so the update read mainly as a color/material change.
+  The model now uses a genuinely open beveled frame, a second concentric rim,
+  and nine separate open socket rings. The final comparison shows the same
+  nested acrylic hierarchy as the reference rather than a colored keypad on a
+  milky plate.
+- [Resolved P1] Each prior key was a single opaque cuboid. Each final key is
+  two moving instanced layers: a translucent colored resin shell and a smaller
+  saturated face. Both layers share the existing spring travel and instance
+  index, producing the reference's colored clear shoulder around every face.
+- [Resolved P2] The first overhaul capture
+  (`qa/clicker-model-overhaul-desktop-initial.png`) made the transmissive rims
+  effectively invisible, leaving nine disconnected keys. The second pass
+  (`qa/clicker-model-overhaul-desktop-pass2.png`) changed the open acrylic to
+  allocation-free alpha/clearcoat materials with visible edge highlights and
+  removed the detached silhouette.
+- [Resolved P2] A shallow extruded face test matched the corner outline but
+  flattened the resin highlights. The final 0.38-unit rounded face nests into
+  the translucent shell, restores the bright top and side specular streaks,
+  and preserves the larger rounded corners seen in the reference.
+- [Resolved P2] The original shadow receiver made the rebuilt pieces read as
+  floating above the tray and raised the rendered triangle/draw-call count.
+  Removing that receiver and shadow-map pass seats the keys visually inside
+  the sockets and reduces the scene to 7 draw calls and 10,165 rendered
+  triangles.
+- [Passed] Fonts and typography: the canvas product contains no visible text;
+  existing accessible route copy and navigation typography were unchanged.
+- [Passed] Spacing and layout rhythm: row-major color order, key spacing,
+  square tray proportions, larger outer corner radius, centered desktop crop,
+  and portrait camera fit all track the reference without overlap or clipping.
+- [Passed] Colors and visual tokens: all nine sampled neon colors appear in
+  exact reference order. The application intentionally retains its existing
+  animated background, now seeded from those colors, instead of copying the
+  reference's black studio backdrop.
+- [Passed] Image quality and asset fidelity: the clicker remains procedural
+  WebGL geometry with smooth normals and no raster replacement, fake overlay,
+  post-processing, or additional asset dependency. The source photograph is
+  used only as comparison truth.
+- [Passed] Copy and content: title, instructions, navigation, thock behavior,
+  iframe behavior, and route semantics are unchanged.
+
+### Interaction, responsiveness, accessibility, and performance
+
+- A mobile center-key pointer press triggered the expected background burst;
+  the existing thock audio, two-touch limit, cancellation, and spring tests
+  remain unchanged and pass as regression coverage.
+- Desktop 1440 x 900 and mobile 390 x 844 captures retain the complete tray,
+  all nine tap targets, and navigation safe area without clipping or overflow.
+- Reduced-motion palette freezing and deterministic color-loop behavior are
+  covered by the synesthesia regression suite. The browser QA environment
+  reported normal-motion preference.
+- Settled diagnostics reported 7 draw calls and 10,165 rendered triangles,
+  below the prior 9-draw-call measurement and the 12,000-triangle ceiling.
+  Frame samples were predominantly 16.4-17.1 ms; capture/reload pauses were
+  excluded.
+- Browser logs contained no application-owned error. The existing upstream
+  `THREE.Clock` deprecation warning remains non-blocking.
+- No dependency, persistence, backend, asset, post-processing, or Supabase
+  migration was added.
+
+### Follow-up polish
+
+- [P3] The reference's black studio lighting produces stronger caustic edge
+  streaks than the live app background. The implementation preserves the
+  requested animated background, so its clear acrylic naturally inherits the
+  currently selected neon gradient instead of appearing colorless.
+
+final result: passed
+
+## Clicker housing opacity refinement
+
+### Evidence and normalization
+
+- Source visual truth:
+  `.codex-remote-attachments/019fbf99-03c0-7ed3-81cb-e70316b54676/a05eca67-422e-4969-9bda-f6dc194fc92c/1-Photo-1.jpg`
+  at 1280 x 1280 pixels.
+- Desktop implementation: `qa/clicker-housing-opacity-desktop.png` at
+  1440 x 900 CSS pixels, DPR 1.
+- Normalized implementation: `qa/clicker-housing-opacity-square.png` at
+  900 x 900 pixels, cropped from the centered desktop viewport without
+  scaling the product.
+- Equal-size comparison: `qa/clicker-housing-opacity-reference-comparison.png`
+  at 1800 x 900 pixels.
+- Mobile implementation: `qa/clicker-housing-opacity-mobile.png` at
+  390 x 844 CSS pixels, DPR 1.
+- State: settled idle at `/clicker`.
+
+The full product fills both square comparison slots, making the outer frame,
+backplate, sockets, and button shoulders readable without a separate detail
+crop.
+
+### Findings
+
+- [Resolved P2] The previous 0.23-opacity outer frame and 0.045-opacity
+  backplate let the animated gradient dominate, making the acrylic housing
+  look almost absent. The outer frame is now 0.38 opacity, the shared insert
+  material is 0.32, the backplate override is 0.13, and the socket override is
+  0.38. The final comparison shows a continuous translucent tray while
+  preserving the nested clear rim and colored button-shell separation.
+- [Passed] Fonts and typography: no visible typography changed.
+- [Passed] Spacing and layout rhythm: housing dimensions, rim widths, socket
+  positions, key proportions, and desktop/mobile framing are unchanged.
+- [Passed] Colors and visual tokens: the housing remains a cool neutral
+  acrylic and continues inheriting some live background color instead of
+  becoming opaque white plastic.
+- [Passed] Image quality and asset fidelity: all surfaces remain procedural
+  WebGL geometry with clearcoat materials; no image, overlay, or
+  post-processing substitute was introduced.
+- [Passed] Copy and content: interaction instructions, navigation, audio, and
+  route semantics are unchanged.
+
+### Browser, performance, and migration QA
+
+- Desktop 1440 x 900 and mobile 390 x 844 renders retain the complete tray and
+  navigation clearance without clipping.
+- Browser logs contain no application-owned error; the existing upstream
+  `THREE.Clock` deprecation warning remains non-blocking.
+- Settled diagnostics remain 7 draw calls and 10,165 rendered triangles, with
+  frame samples predominantly 16.4-17.1 ms.
+- Lint, TypeScript checks, all 180 tests, and the production build pass.
+- No dependency, persistence, backend, or Supabase migration was added.
 
 final result: passed

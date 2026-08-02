@@ -12,6 +12,9 @@ export type SynesthesiaTheme = Readonly<{
   seed: number
   idleSpeed: number
   maximumMotifs: number
+  colorLoop?: Readonly<{
+    colors: readonly string[]
+  }>
 }>
 
 export type SynesthesiaPaletteEntry = Readonly<{
@@ -39,6 +42,12 @@ export type SynesthesiaAnimationState = {
   damageProgress: number
   observedBurstSequence: number
   motifCursor: number
+  colorCycle: number
+  leadingColorIndex: number
+  complementaryColorIndex: number
+  nextLeadingColorIndex: number
+  nextComplementaryColorIndex: number
+  colorMix: number
   readonly motifData: Float32Array
 }
 
@@ -81,9 +90,23 @@ export function createSynesthesiaTheme(
     )
   }
 
+  let colorLoop: SynesthesiaTheme['colorLoop']
+  if (theme.colorLoop) {
+    if (theme.colorLoop.colors.length < 2) {
+      throw new Error('colorLoop.colors must include at least two colors')
+    }
+    for (const color of theme.colorLoop.colors) {
+      assertHexColor(color, 'colorLoop color')
+    }
+    colorLoop = Object.freeze({
+      colors: Object.freeze([...theme.colorLoop.colors]),
+    })
+  }
+
   return Object.freeze({
     ...theme,
     seed: theme.seed >>> 0,
+    ...(colorLoop ? { colorLoop } : {}),
   })
 }
 
@@ -224,11 +247,112 @@ export function createSynesthesiaAnimationState():
     damageProgress: 0,
     observedBurstSequence: 0,
     motifCursor: 0,
+    colorCycle: -1,
+    leadingColorIndex: 0,
+    complementaryColorIndex: 1,
+    nextLeadingColorIndex: 0,
+    nextComplementaryColorIndex: 1,
+    colorMix: 0,
     motifData: new Float32Array(
       SYNESTHESIA_MOTIF_SLOT_COUNT *
         SYNESTHESIA_MOTIF_STRIDE,
     ),
   }
+}
+
+function selectRawLeadingColorIndex(
+  theme: SynesthesiaTheme,
+  cycle: number,
+) {
+  const colorCount = theme.colorLoop?.colors.length ?? 0
+  return (
+    hashUint32(
+      theme.seed ^ Math.imul(cycle + 1, 0x9e3779b1),
+    ) % colorCount
+  )
+}
+
+function selectRawComplementaryColorIndex(
+  theme: SynesthesiaTheme,
+  cycle: number,
+  leadingColorIndex: number,
+) {
+  const colorCount = theme.colorLoop?.colors.length ?? 0
+  const complementaryCandidate =
+    hashUint32(
+      theme.seed ^ Math.imul(cycle + 1, 0x85ebca6b),
+    ) %
+    (colorCount - 1)
+  const complementaryColorIndex =
+    complementaryCandidate >= leadingColorIndex
+      ? complementaryCandidate + 1
+      : complementaryCandidate
+  return complementaryColorIndex
+}
+
+function writeNextColorPair(
+  state: SynesthesiaAnimationState,
+  theme: SynesthesiaTheme,
+  cycle: number,
+) {
+  const leadingColorIndex = selectRawLeadingColorIndex(theme, cycle)
+  let complementaryColorIndex = selectRawComplementaryColorIndex(
+    theme,
+    cycle,
+    leadingColorIndex,
+  )
+  if (
+    leadingColorIndex === state.leadingColorIndex &&
+    complementaryColorIndex === state.complementaryColorIndex
+  ) {
+    complementaryColorIndex =
+      (complementaryColorIndex + 1) %
+      theme.colorLoop!.colors.length
+    if (complementaryColorIndex === leadingColorIndex) {
+      complementaryColorIndex =
+        (complementaryColorIndex + 1) %
+        theme.colorLoop!.colors.length
+    }
+  }
+  state.nextLeadingColorIndex = leadingColorIndex
+  state.nextComplementaryColorIndex = complementaryColorIndex
+}
+
+function updateSynesthesiaColorLoop(
+  state: SynesthesiaAnimationState,
+  theme: SynesthesiaTheme,
+) {
+  if (!theme.colorLoop) {
+    return
+  }
+
+  if (state.colorCycle < 0) {
+    state.leadingColorIndex = selectRawLeadingColorIndex(theme, 0)
+    state.complementaryColorIndex =
+      selectRawComplementaryColorIndex(
+        theme,
+        0,
+        state.leadingColorIndex,
+      )
+    writeNextColorPair(state, theme, 1)
+    state.colorCycle = 0
+  }
+
+  const targetCycle = Math.floor(state.flowTime)
+  while (state.colorCycle < targetCycle) {
+    state.leadingColorIndex = state.nextLeadingColorIndex
+    state.complementaryColorIndex =
+      state.nextComplementaryColorIndex
+    state.colorCycle += 1
+    writeNextColorPair(
+      state,
+      theme,
+      state.colorCycle + 1,
+    )
+  }
+
+  const fraction = state.flowTime - targetCycle
+  state.colorMix = fraction * fraction * (3 - 2 * fraction)
 }
 
 function clearExpiredMotifs(state: SynesthesiaAnimationState) {
@@ -287,6 +411,7 @@ export function stepSynesthesiaAnimation(
     state.burstEnergy = 0
     state.observedBurstSequence = signals.burstSequence
     state.motifData.fill(0)
+    updateSynesthesiaColorLoop(state, theme)
     return
   }
 
@@ -315,5 +440,6 @@ export function stepSynesthesiaAnimation(
     clamp01(signals.pressStrength) * 0.5 +
     state.burstEnergy * 1.75
   state.flowTime += delta * theme.idleSpeed * state.flowSpeed
+  updateSynesthesiaColorLoop(state, theme)
   clearExpiredMotifs(state)
 }
