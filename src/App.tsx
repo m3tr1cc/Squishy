@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber'
 import {
   Suspense,
   lazy,
+  type KeyboardEvent as ReactKeyboardEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -11,6 +12,7 @@ import {
 import { useCrackAudio } from './audio/useCrackAudio'
 import { useSlimeAudio } from './audio/useSlimeAudio'
 import { useThockAudio } from './audio/useThockAudio'
+import { useIpodScrollAudio } from './audio/useIpodScrollAudio'
 import {
   PageNavigation,
   usePageNavigation,
@@ -20,6 +22,16 @@ import {
 import { createSquishyPointerEvents } from './scene/createSquishyPointerEvents'
 import { SquishyScene } from './scene/SquishyScene'
 import type { SoapId } from './scene/soaps'
+import {
+  createIpodScrollSparkSignals,
+  emitIpodScrollSparks,
+  IPOD_MENU_ITEMS,
+  wrapIpodMenuIndex,
+} from './scene/ipod'
+import {
+  createSquishyVisualSignalSources,
+  emitSynesthesiaBurst,
+} from './scene/synesthesia'
 
 const LazySoapScene = lazy(() =>
   import('./scene/SoapScene').then((module) => ({
@@ -36,6 +48,12 @@ const LazyChocolateScene = lazy(() =>
 const LazyClickerScene = lazy(() =>
   import('./scene/ClickerScene').then((module) => ({
     default: module.ClickerScene,
+  })),
+)
+
+const LazyIpodScene = lazy(() =>
+  import('./scene/IpodScene').then((module) => ({
+    default: module.IpodScene,
   })),
 )
 
@@ -82,6 +100,8 @@ function LoadingState({ pageId }: { pageId: PageId }) {
           ? 'Filling a fresh slime tub...'
         : pageId === 'clicker'
           ? 'Warming up nine thocky keys...'
+          : pageId === 'ipod'
+            ? 'Polishing a green iPod mini...'
           : 'Warming three fresh coatings...'
   return (
     <div className="status-card" role="status">
@@ -116,8 +136,19 @@ export function App() {
   const [session, setSession] = useState<ExperienceSession>(() =>
     createExperienceSession(route?.id ?? 'butter'),
   )
+  const [ipodMenuIndex, setIpodMenuIndex] = useState(0)
+  const ipodMenuIndexRef = useRef(0)
+  const ipodVisualSignals = useMemo(
+    () => createSquishyVisualSignalSources(1),
+    [session.seed],
+  )
+  const ipodScrollSparkSignals = useMemo(
+    createIpodScrollSparkSignals,
+    [session.seed],
+  )
   const headingRef = useRef<HTMLHeadingElement>(null)
   const isClickerPage = route?.id === 'clicker'
+  const isIpodPage = route?.id === 'ipod'
   const isSlimePage = route?.id === 'slime'
   const isCrackPage =
     route?.id === 'butter' ||
@@ -127,7 +158,15 @@ export function App() {
     session.seed,
     isCrackPage,
   )
-  const thockAudio = useThockAudio(session.seed, isClickerPage)
+  const { trigger: playThock } = useThockAudio(
+    session.seed,
+    isClickerPage || isIpodPage,
+    isIpodPage ? 'deep' : 'standard',
+  )
+  const {
+    trigger: playIpodScroll,
+    unlock: unlockIpodScroll,
+  } = useIpodScrollAudio(isIpodPage)
   const slimeAudio = useSlimeAudio(session.seed, isSlimePage)
   const isCoarsePointer =
     typeof window !== 'undefined' &&
@@ -152,6 +191,8 @@ export function App() {
     (nextRoute: PageRoute) => {
       navigate(nextRoute)
       setSession(createExperienceSession(nextRoute.id))
+      ipodMenuIndexRef.current = 0
+      setIpodMenuIndex(0)
     },
     [navigate],
   )
@@ -180,6 +221,53 @@ export function App() {
     })
   }, [session.pageId, session.resetKey])
 
+  const handleIpodMenuSelection = useCallback((index: number) => {
+    const nextIndex = wrapIpodMenuIndex(index)
+    ipodMenuIndexRef.current = nextIndex
+    setIpodMenuIndex(nextIndex)
+  }, [])
+
+  const handleIpodKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLElement>) => {
+      if (!isIpodPage) {
+        return
+      }
+      const direction =
+        event.key === 'ArrowDown' || event.key === 'ArrowRight'
+          ? 1
+          : event.key === 'ArrowUp' || event.key === 'ArrowLeft'
+            ? -1
+            : 0
+      if (direction !== 0) {
+        event.preventDefault()
+        unlockIpodScroll()
+        const nextIndex = wrapIpodMenuIndex(
+          ipodMenuIndexRef.current + direction,
+        )
+        if (nextIndex !== ipodMenuIndexRef.current) {
+          handleIpodMenuSelection(nextIndex)
+          emitIpodScrollSparks(ipodScrollSparkSignals)
+          playIpodScroll()
+        }
+        return
+      }
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        emitSynesthesiaBurst(ipodVisualSignals[0], 0.76)
+        playThock()
+      }
+    },
+    [
+      handleIpodMenuSelection,
+      isIpodPage,
+      ipodScrollSparkSignals,
+      ipodVisualSignals,
+      playIpodScroll,
+      playThock,
+      unlockIpodScroll,
+    ],
+  )
+
   if (!route) {
     return (
       <>
@@ -188,8 +276,8 @@ export function App() {
           <div className="not-found-card" role="alert">
             <h1>That squishy is not here.</h1>
             <p>
-              The butter, soap, chocolate, slime, and clicker experiences
-              are ready.
+              The butter, soap, chocolate, slime, clicker, and iPod
+              experiences are ready.
             </p>
             <a href="/">Return to the butter</a>
           </div>
@@ -249,6 +337,8 @@ export function App() {
           ? 'Click or tap the exposed slime to leave a permanent dent, grow it through the container, mix both colors, and play a wet squish.'
         : route.id === 'clicker'
           ? 'Click or tap any of the nine keys to press it, play a mechanical thock, and animate the background.'
+          : route.id === 'ipod'
+            ? 'Drag clockwise or counter-clockwise around the click wheel to scroll the main menu. Tap any wheel button for a thock. Arrow keys and Enter work from the keyboard.'
           : 'Click or tap any of the three butter sticks to press its wax surface.'
   const liveMessage = session.isComplete
     ? route.id === 'soaps'
@@ -270,6 +360,7 @@ export function App() {
       <main
         aria-labelledby="experience-heading"
         className={`app-shell app-shell--${route.id}`}
+        onKeyDown={handleIpodKeyDown}
       >
         <h1
           ref={headingRef}
@@ -295,6 +386,7 @@ export function App() {
             shadows={
               route.id === 'butter' ||
               route.id === 'clicker' ||
+              route.id === 'ipod' ||
               route.id === 'slime'
                 ? 'percentage'
                 : false
@@ -334,16 +426,47 @@ export function App() {
                   playSlime={slimeAudio.trigger}
                 />
               </Suspense>
-            ) : (
+            ) : route.id === 'clicker' ? (
               <Suspense fallback={null}>
                 <LazyClickerScene
                   experienceSeed={session.seed}
-                  playThock={thockAudio.trigger}
+                  playThock={playThock}
+                />
+              </Suspense>
+            ) : (
+              <Suspense fallback={null}>
+                <LazyIpodScene
+                  experienceSeed={session.seed}
+                  scrollSparkSignals={ipodScrollSparkSignals}
+                  selectedMenuIndex={ipodMenuIndex}
+                  onSelectMenuIndex={handleIpodMenuSelection}
+                  playScrollClick={playIpodScroll}
+                  playThock={playThock}
+                  unlockScrollAudio={unlockIpodScroll}
+                  visualSignals={ipodVisualSignals}
                 />
               </Suspense>
             )}
           </Canvas>
         </Suspense>
+        {isIpodPage ? (
+          <div
+            aria-label="iPod main menu"
+            className="visually-hidden"
+            role="listbox"
+          >
+            {IPOD_MENU_ITEMS.map((item, index) => (
+              <div
+                aria-selected={index === ipodMenuIndex}
+                id={`ipod-menu-option-${index}`}
+                key={item}
+                role="option"
+              >
+                {item}
+              </div>
+            ))}
+          </div>
+        ) : null}
         {session.isComplete ? (
           <button
             className="recoat-button"
@@ -360,7 +483,9 @@ export function App() {
           </button>
         ) : null}
         <div className="visually-hidden" aria-live="polite">
-          {liveMessage}
+          {isIpodPage
+            ? `Selected ${IPOD_MENU_ITEMS[ipodMenuIndex]}`
+            : liveMessage}
         </div>
       </main>
     </>

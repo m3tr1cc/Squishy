@@ -103,14 +103,31 @@ remains tappable, and three local wet-slime recordings play through a bounded
 Web Audio shuffle. The bundled
 Fredoka face used by the soaps also renders the curved lowercase `slime` mark.
 
+The `/ipod` experience presents a first-generation green iPod mini with a
+reflective anodized body and a flowing green/hot-pink synesthesia background.
+Its body uses a vertically extruded slot cross-section, keeping a square
+straight-on silhouette while curved depth transitions produce real side
+highlights.
+Its monochrome main menu is drawn at the original 138 x 110 display resolution.
+Pointer and touch drags around the click wheel accumulate signed angle, move
+one row per 18.75 degrees, and wrap continuously across both menu ends;
+keyboard arrows expose the same selection behavior. Wheel increments play a
+short synthesized piezo click and emit independent one-second stars and
+four-lobed blobs around the iPod's visible perimeter. Up to thirty-two sparks
+can overlap in one instanced draw call, with deterministic green/hot-pink
+variation and no reduced-motion rendering. Wheel and center button taps reuse
+the licensed mechanical sample through a deeper low-passed thock profile and
+continue to trigger the larger synesthesia swirl independently of the sparks.
+
 ## Experience boundary
 
-This version includes three-butter, six-soap, chocolate-slime, slime-container,
-and nine-key clicker pages, persistent thick color-tinted wax shells, progressive damage and crack merging, local
+This version includes three-butter, six-soap, chocolate-slime,
+slime-container, nine-key clicker, and green iPod mini pages, persistent
+thick color-tinted wax shells, progressive damage and crack merging, local
 dents, compression and rebound, peeling and fading debris, product decals,
 exact surface raycasting, idle invitation motion, reduced-motion behavior,
-randomized crack and clicker audio, route-aware previous/next navigation, completion
-feedback, and in-page re-coating.
+randomized crack and clicker audio, route-aware previous/next navigation,
+completion feedback, and in-page re-coating.
 
 Wax-impact/debris-specific audio, haptics, saved progress, analytics, and
 Codefair-specific messaging remain intentionally deferred.

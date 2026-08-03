@@ -1,5 +1,15 @@
 # Audio sources
 
+## iPod mini click-wheel sound
+
+- Source: synthesized locally with the Web Audio API; no recorded asset is
+  bundled.
+- Model: a short 1,846 Hz piezo-like pulse based on published click-wheel
+  reverse-engineering notes, with a 0.4 ms drive and 4 ms decay.
+- License: original application code.
+- Changes: generated only after user interaction and rate-limited to one click
+  per registered menu increment.
+
 ## `thock-keypress.mp3`
 
 - Source: “Keyboard, computer, mechanical, typing, individual keys, press,
@@ -9,6 +19,9 @@
 - License: Creative Commons Attribution 4.0
 - Changes: Freesound’s high-quality MP3 preview is bundled locally; playback is
   shortened, gain-shaped, low-shelf emphasized, and pitch-varied in the app.
+  iPod button presses use a separate 0.72x pitch profile with stronger
+  low-shelf emphasis, a 2.6 kHz low-pass filter, and a longer decay for a
+  deeper thock; clicker playback keeps the original profile.
 
 ## `slime-squish-1.mp3`, `slime-squish-2.mp3`, and `slime-squish-4.mp3`
 
