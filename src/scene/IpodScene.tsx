@@ -30,25 +30,32 @@ import {
   IPOD_MINI_WHEEL,
   IPOD_PRESENTATION_SCALE,
 } from './ipod/ipodDefinition'
+import { IpodScrollSparkLayer } from './ipod/IpodScrollSparkLayer'
+import {
+  emitIpodScrollSparks,
+  type IpodScrollSparkSignals,
+} from './ipod/ipodScrollSparks'
 import { bindPointerCancellation } from './interaction'
 import {
   PerformanceDiagnostics,
   useReducedMotion,
 } from './SquishyScene'
 import {
-  createSquishyVisualSignalSources,
   createSynesthesiaTheme,
   emitSynesthesiaBurst,
   SynesthesiaBackground,
+  type SquishyVisualSignals,
 } from './synesthesia'
 
 type IpodSceneProps = Readonly<{
   experienceSeed: number
+  scrollSparkSignals: IpodScrollSparkSignals
   selectedMenuIndex: number
   onSelectMenuIndex: (index: number) => void
   playScrollClick: () => void
   playThock: () => void
   unlockScrollAudio: () => void
+  visualSignals: readonly SquishyVisualSignals[]
 }>
 
 type ActiveWheelGesture = {
@@ -90,11 +97,13 @@ function ResponsiveIpodCamera() {
 
 export function IpodScene({
   experienceSeed,
+  scrollSparkSignals,
   selectedMenuIndex,
   onSelectMenuIndex,
   playScrollClick,
   playThock,
   unlockScrollAudio,
+  visualSignals,
 }: IpodSceneProps) {
   const reducedMotion = useReducedMotion()
   const canvasElement = useThree((state) => state.gl.domElement)
@@ -103,10 +112,6 @@ export function IpodScene({
   const activeCenterRef = useRef<ActiveButtonPress | null>(null)
   const wheelRuntimeRef = useRef<IpodWheelRuntime>(
     createIpodWheelRuntime(),
-  )
-  const visualSignals = useMemo(
-    () => createSquishyVisualSignalSources(1),
-    [experienceSeed],
   )
   const synesthesiaTheme = useMemo(
     () =>
@@ -251,7 +256,7 @@ export function IpodScene({
         selectedIndexRef.current,
       )
       wheelRuntimeRef.current = result.runtime
-      if (result.selectedIndex !== selectedIndexRef.current) {
+      if (result.selectionChangeCount > 0) {
         selectedIndexRef.current = result.selectedIndex
         onSelectMenuIndex(result.selectedIndex)
         for (
@@ -261,13 +266,13 @@ export function IpodScene({
         ) {
           playScrollClick()
         }
-        emitSynesthesiaBurst(
-          visualSignals[0],
-          Math.min(0.72, 0.34 + result.selectionChangeCount * 0.1),
+        emitIpodScrollSparks(
+          scrollSparkSignals,
+          result.selectionChangeCount,
         )
       }
     },
-    [onSelectMenuIndex, playScrollClick, visualSignals],
+    [onSelectMenuIndex, playScrollClick, scrollSparkSignals],
   )
 
   const playButtonThock = useCallback(() => {
@@ -395,6 +400,14 @@ export function IpodScene({
         reducedMotion={reducedMotion}
         signals={visualSignals}
         theme={synesthesiaTheme}
+      />
+      <IpodScrollSparkLayer
+        complementaryColor={IPOD_COMPLEMENTARY_PINK}
+        experienceSeed={experienceSeed ^ 0x51a7c3d9}
+        leadingColor={IPOD_GREEN}
+        reducedMotion={reducedMotion}
+        shadowColor="#25102c"
+        signals={scrollSparkSignals}
       />
       {import.meta.env.DEV ? <PerformanceDiagnostics /> : null}
       <ResponsiveIpodCamera />

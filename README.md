@@ -112,8 +112,12 @@ Its monochrome main menu is drawn at the original 138 x 110 display resolution.
 Pointer and touch drags around the click wheel accumulate signed angle, move
 one row per 18.75 degrees, and wrap continuously across both menu ends;
 keyboard arrows expose the same selection behavior. Wheel increments play a
-short synthesized piezo click, while wheel and center button taps reuse the
-licensed mechanical sample through a deeper low-passed thock profile.
+short synthesized piezo click and emit independent one-second stars and
+four-lobed blobs around the iPod's visible perimeter. Up to thirty-two sparks
+can overlap in one instanced draw call, with deterministic green/hot-pink
+variation and no reduced-motion rendering. Wheel and center button taps reuse
+the licensed mechanical sample through a deeper low-passed thock profile and
+continue to trigger the larger synesthesia swirl independently of the sparks.
 
 ## Experience boundary
 

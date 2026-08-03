@@ -23,9 +23,15 @@ import { createSquishyPointerEvents } from './scene/createSquishyPointerEvents'
 import { SquishyScene } from './scene/SquishyScene'
 import type { SoapId } from './scene/soaps'
 import {
+  createIpodScrollSparkSignals,
+  emitIpodScrollSparks,
   IPOD_MENU_ITEMS,
   wrapIpodMenuIndex,
-} from './scene/ipod/ipodDefinition'
+} from './scene/ipod'
+import {
+  createSquishyVisualSignalSources,
+  emitSynesthesiaBurst,
+} from './scene/synesthesia'
 
 const LazySoapScene = lazy(() =>
   import('./scene/SoapScene').then((module) => ({
@@ -132,6 +138,14 @@ export function App() {
   )
   const [ipodMenuIndex, setIpodMenuIndex] = useState(0)
   const ipodMenuIndexRef = useRef(0)
+  const ipodVisualSignals = useMemo(
+    () => createSquishyVisualSignalSources(1),
+    [session.seed],
+  )
+  const ipodScrollSparkSignals = useMemo(
+    createIpodScrollSparkSignals,
+    [session.seed],
+  )
   const headingRef = useRef<HTMLHeadingElement>(null)
   const isClickerPage = route?.id === 'clicker'
   const isIpodPage = route?.id === 'ipod'
@@ -232,18 +246,22 @@ export function App() {
         )
         if (nextIndex !== ipodMenuIndexRef.current) {
           handleIpodMenuSelection(nextIndex)
+          emitIpodScrollSparks(ipodScrollSparkSignals)
           playIpodScroll()
         }
         return
       }
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault()
+        emitSynesthesiaBurst(ipodVisualSignals[0], 0.76)
         playThock()
       }
     },
     [
       handleIpodMenuSelection,
       isIpodPage,
+      ipodScrollSparkSignals,
+      ipodVisualSignals,
       playIpodScroll,
       playThock,
       unlockIpodScroll,
@@ -419,11 +437,13 @@ export function App() {
               <Suspense fallback={null}>
                 <LazyIpodScene
                   experienceSeed={session.seed}
+                  scrollSparkSignals={ipodScrollSparkSignals}
                   selectedMenuIndex={ipodMenuIndex}
                   onSelectMenuIndex={handleIpodMenuSelection}
                   playScrollClick={playIpodScroll}
                   playThock={playThock}
                   unlockScrollAudio={unlockIpodScroll}
+                  visualSignals={ipodVisualSignals}
                 />
               </Suspense>
             )}

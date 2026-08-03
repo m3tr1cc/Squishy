@@ -1,4 +1,5 @@
 export * from './createIpodBodyGeometry'
 export * from './ipodDefinition'
 export * from './ipodInteraction'
+export * from './ipodScrollSparks'
 export * from './ipodTextures'

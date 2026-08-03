@@ -186,6 +186,91 @@ with angle changes retained only where real shard boundaries meet.
 
 final result: passed
 
+## iPod scroll-spark background layer
+
+### Evidence and normalization
+
+- Source visual truth:
+  `Ratatouille Tastes Food/frame_000331.png` and
+  `Ratatouille Tastes Food/frame_000552.png`, both 1280 x 720 pixels. The
+  references establish the small eight-point star, soft four-lobed blob, loose
+  perimeter placement, and sparse single-frame density rather than the iPod
+  page's device proportions.
+- Browser-rendered desktop implementation:
+  `qa/ipod-scroll-sparks-desktop-active.png` at a 743 x 851 CSS viewport,
+  DPR 1, on `/ipod?qaDpr=1`.
+- Browser-rendered mobile implementation:
+  `qa/ipod-scroll-sparks-mobile-active.png` at a 390 x 844 CSS viewport,
+  DPR 1.
+- Independent overlap state: `qa/ipod-scroll-sparks-overlap.png` at a
+  743 x 851 CSS viewport, DPR 1, with four sparks and a button-triggered large
+  swirl active together.
+- Idle control: `qa/ipod-scroll-sparks-desktop-idle.png` at 743 x 851 pixels.
+- State: four Arrow-key menu movements for active captures; Enter/Space added
+  only for the overlap capture.
+
+The two 1280 x 720 references and both implementation captures were opened in
+one comparison input. Pixel dimensions were not stretched or density-scaled;
+the comparison focuses on shape language, relative visual weight, perimeter
+placement, and density because the source is a cinematic frame rather than a
+same-viewport product mock. The complete iPod and all marks remain readable in
+the full views, so a focused crop was not needed.
+
+### Findings and comparison history
+
+- [Resolved P1] The first browser pass reported active events but rendered no
+  visible marks because React Three Fiber's material-owned elapsed-time uniform
+  was not the same object as the preallocated uniform source. The layer now
+  synchronizes the live shader material directly; browser captures show the
+  intended stars and blobs throughout their one-second lifetime.
+- [Resolved P2] The initial quad position attribute used two components, which
+  caused a NaN bounding sphere and an application-owned Three.js error. It now
+  uses a valid three-component position buffer while retaining exactly 32
+  instanced quads and one draw call. A clean final reload produced no new
+  application-owned error.
+- [Resolved P2] Fully random color choice could make a short burst appear only
+  lime. Color now alternates in two-event pairs, guaranteeing an equal
+  lime/hot-pink mix across 20 and 32 events while star/blob type alternates per
+  event. The final captures show both colors with bright cores and dark halos.
+- [Passed] Fonts and typography: the LCD header, five menu rows, selection
+  reversal, weights, line heights, and navigation typography remain unchanged.
+- [Passed] Spacing and layout rhythm: deterministic rejection placement keeps
+  spark bounds outside the responsive iPod safe rectangle and top-right route
+  controls. Desktop uses the side perimeter; portrait uses the larger top and
+  bottom bands without clipping the device.
+- [Passed] Colors and visual tokens: sparks reuse the established iPod lime and
+  complementary hot pink. Light cores and subtle dark halos preserve contrast
+  against both phases of the flowing background.
+- [Passed] Image quality and asset fidelity: the eight-point stars and soft
+  clover-like blobs match the supplied Ratatouille shape language at an
+  intentionally smaller scale. They are procedural shader marks appropriate to
+  the requested live effect; the iPod reference texture and model are unchanged.
+- [Passed] Copy and content: no visible product copy changed. The accessible
+  live menu selection and hidden interaction instructions remain coherent.
+- [Passed] Interaction and accessibility: pointer wheel dragging emitted nine
+  sparks and selected `Browse`; twenty keyboard steps emitted twenty events and
+  wrapped back to `Playlists`. Center clicks, wheel taps, Enter, and Space
+  produced the existing swirl/thock without adding sparks. Reduced motion
+  consumes the event sequence while rendering no marks, covered by unit tests.
+
+### Performance, validation, and migration status
+
+- The preallocated 32-slot ring buffer preserves 20 same-frame events, recycles
+  only the oldest slot at event 33, alternates 16 stars and 16 blobs at full
+  capacity, and returns every slot to idle at exactly one second.
+- The layer adds one instanced shader draw call and 64 triangles. Settled
+  desktop diagnostics across 300 samples reported 11 draw calls and 1,177
+  triangles, with a 16.67 ms average, 16.70 ms p50, 16.80 ms p95, and 17.10 ms
+  maximum.
+- Desktop and mobile captures retain the complete reflective iPod and clear
+  navigation targets. Button-only and simultaneous spark/swirl states were
+  verified, and the final reload produced zero fresh application-owned console
+  errors. The upstream `THREE.Clock` deprecation warning remains non-blocking.
+- No dependency, raster asset, persistence, backend, schema, RLS, seed,
+  function, trigger, policy, or Supabase migration was required.
+
+final result: passed
+
 ## Green iPod mini refinement
 
 ### Evidence and normalization
@@ -2068,5 +2153,16 @@ desktop and mobile captures, pointer/keyboard interaction checks, required
 fidelity-surface review, console check, and settled performance measurements
 are recorded in the `Green iPod mini extruded slot body` section above. No
 actionable P0/P1/P2 finding remains.
+
+final result: passed
+
+## Latest QA status: iPod scroll-spark background layer
+
+The Ratatouille reference frames and the browser-rendered desktop/mobile spark
+states were inspected together. The complete evidence, responsive safe-zone
+review, interaction matrix, resolved comparison findings, and performance
+measurements are recorded in the `iPod scroll-spark background layer` section
+above. Lint, TypeScript checks, all 201 tests, and the production build pass;
+no actionable P0/P1/P2 finding remains.
 
 final result: passed
